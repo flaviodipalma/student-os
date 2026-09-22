@@ -47,26 +47,25 @@ export type Task = {
 // What the create/edit form produces.
 export type TaskInput = Omit<Task, "id">
 
-// fixed = classes, practice, anything at a set time; study = planned work; free = open time.
-export type ScheduleKind = "fixed" | "study" | "free"
+// Something that occupies time on the calendar. Events are single-day: they
+// start and end on `date`. (Tasks are different: things to get done, with a due date.)
+export type EventType = "class" | "sports" | "work" | "personal" | "study"
 
-export type ScheduleBlock = {
+export type CalendarEvent = {
   id: string
-  kind: ScheduleKind
   title: string
-  start: Date
-  end: Date
-  category?: string
-  location?: string
+  date: string
+  startTime: string
+  endTime: string
+  type: EventType
+  description?: string
+  // Optional links. A class belongs to a course; a study session can be for a
+  // specific task. The Planner will create study sessions like that later.
   courseId?: string
+  taskId?: string
 }
 
-export type DayLoad = {
-  date: string
-  fixedHours: number
-  studyHours: number
-  freeHours: number
-}
+export type EventInput = Omit<CalendarEvent, "id">
 
 export type Student = {
   firstName: string

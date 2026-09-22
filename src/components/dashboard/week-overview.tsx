@@ -2,14 +2,15 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCourse } from "@/lib/data/courses"
-import { formatRelativeDay, fromDateKey } from "@/lib/format"
+import { useEvents } from "@/lib/event-store"
+import { busyRanges, durationMinutes, eventsOn } from "@/lib/events"
+import { addDays, formatRelativeDay, formatWeekday, fromDateKey } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { daysUntilDue, upcomingDeadlines } from "@/lib/tasks"
-import type { Task } from "@/lib/types"
+import type { CalendarEvent, Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-// Hours for one day, prepared on the server (these don't come from tasks).
-export type WeekDayLoad = {
+type WeekDay = {
   date: string
   shortLabel: string
   longLabel: string
@@ -17,9 +18,26 @@ export type WeekDayLoad = {
   fixedHours: number
   studyHours: number
   freeHours: number
+  deadlines: string[]
 }
 
-type WeekDay = WeekDayLoad & { deadlines: string[] }
+// Free time is counted inside a realistic waking window, 8 AM to 10 PM.
+const DAY_START = 8 * 60
+const DAY_END = 22 * 60
+
+// A day's hours, worked out from its calendar events.
+function loadOf(events: CalendarEvent[]) {
+  const sum = (list: CalendarEvent[]) => list.reduce((total, e) => total + durationMinutes(e), 0) / 60
+  const busyInWindow = busyRanges(events).reduce(
+    (total, [start, end]) => total + Math.max(0, Math.min(end, DAY_END) - Math.max(start, DAY_START)),
+    0
+  )
+  return {
+    fixedHours: sum(events.filter((e) => e.type !== "study")),
+    studyHours: sum(events.filter((e) => e.type === "study")),
+    freeHours: (DAY_END - DAY_START - busyInWindow) / 60,
+  }
+}
 
 // Rounds to the nearest half hour: 3.58 -> "3.5h"
 function hours(value: number): string {
@@ -30,34 +48,36 @@ const CHART_HEIGHT_PX = 112
 
 function summarize(day: WeekDay): string {
   const due = day.deadlines.length > 0 ? ` Due: ${day.deadlines.join(", ")}.` : ""
-  return `${day.longLabel}: ${hours(day.fixedHours)} fixed, ${hours(day.studyHours)} study, ${hours(day.freeHours)} free.${due}`
+  return `${day.longLabel}: ${hours(day.fixedHours)} commitments, ${hours(day.studyHours)} study, ${hours(day.freeHours)} free.${due}`
 }
 
-export function WeekOverview({
-  days: loads,
-  className,
-}: {
-  days: WeekDayLoad[]
-  className?: string
-}) {
+export function WeekOverview({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
+  const { events } = useEvents()
   const label = (task: Task) => `${getCourse(task.courseId)?.code ?? ""} ${task.title}`.trim()
 
   // Open graded work due in the next 7 days.
   const thisWeek = upcomingDeadlines(tasks, today).filter((task) => daysUntilDue(task, today) < 7)
   const exams = thisWeek.filter((task) => task.type === "exam" || task.type === "quiz")
-  const days: WeekDay[] = loads.map((day) => ({
-    ...day,
-    deadlines: thisWeek.filter((task) => task.dueDate === day.date).map(label),
-  }))
+  const days: WeekDay[] = Array.from({ length: 7 }, (_, offset) => {
+    const date = addDays(today, offset)
+    return {
+      date,
+      shortLabel: offset === 0 ? "Today" : formatWeekday(fromDateKey(date), "short"),
+      longLabel: offset === 0 ? "Today" : formatRelativeDay(fromDateKey(date), fromDateKey(today)),
+      isToday: offset === 0,
+      ...loadOf(eventsOn(events, date)),
+      deadlines: thisWeek.filter((task) => task.dueDate === date).map(label),
+    }
+  })
 
   const stats = {
     assignmentsDue: thisWeek.length - exams.length,
     examsAndQuizzes: exams.length,
-    studyHours: loads.reduce((sum, day) => sum + day.studyHours, 0),
-    freeHours: loads.reduce((sum, day) => sum + day.freeHours, 0),
+    studyHours: days.reduce((sum, day) => sum + day.studyHours, 0),
+    freeHours: days.reduce((sum, day) => sum + day.freeHours, 0),
   }
-  const committedHours = loads.reduce((sum, day) => sum + day.fixedHours + day.studyHours, 0)
+  const committedHours = days.reduce((sum, day) => sum + day.fixedHours + day.studyHours, 0)
   const verdict =
     committedHours >= 40 || exams.length >= 2
       ? "Busy week ahead"
@@ -103,7 +123,7 @@ export function WeekOverview({
             <ul aria-label="Legend" className="flex gap-3 text-xs text-muted-foreground">
               <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className="size-2.5 rounded-sm bg-teal-500" />
-                Fixed
+                Commitments
               </li>
               <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className="size-2.5 rounded-sm bg-primary" />
@@ -156,7 +176,7 @@ export function WeekOverview({
                   >
                     <p className="font-medium">{day.longLabel}</p>
                     <p className="mt-1 text-muted-foreground">
-                      {hours(day.fixedHours)} fixed · {hours(day.studyHours)} study · {hours(day.freeHours)} free
+                      {hours(day.fixedHours)} commitments · {hours(day.studyHours)} study · {hours(day.freeHours)} free
                     </p>
                     {day.deadlines.length > 0 && (
                       <p className="mt-1">Due: {day.deadlines.join(", ")}</p>

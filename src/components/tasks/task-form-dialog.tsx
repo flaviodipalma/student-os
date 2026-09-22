@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Field, SimpleSelect, type Option } from "@/components/form-fields"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -11,22 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { courses } from "@/lib/data/courses"
 import { addDays } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { priorities, priorityLabel, statusLabel, typeLabel } from "@/lib/tasks"
 import type { Priority, Task, TaskInput, TaskStatus, TaskType } from "@/lib/types"
-
-type Option<T extends string> = { value: T; label: string }
 
 const courseOptions = courses.map((course) => ({
   value: course.id,
@@ -173,54 +164,5 @@ function TaskForm({
         <Button type="submit">{task ? "Save changes" : "Add task"}</Button>
       </DialogFooter>
     </form>
-  )
-}
-
-function Field({
-  label,
-  htmlFor,
-  optional,
-  children,
-}: {
-  label: string
-  htmlFor: string
-  optional?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={htmlFor}>
-        {label}
-        {optional && <span className="font-normal text-muted-foreground">(optional)</span>}
-      </Label>
-      {children}
-    </div>
-  )
-}
-
-function SimpleSelect<T extends string>({
-  id,
-  value,
-  onChange,
-  options,
-}: {
-  id: string
-  value: T
-  onChange: (value: T) => void
-  options: Option<T>[]
-}) {
-  return (
-    <Select items={options} value={value} onValueChange={(next) => next && onChange(next as T)}>
-      <SelectTrigger id={id} className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   )
 }

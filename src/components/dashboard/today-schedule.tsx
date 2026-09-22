@@ -1,115 +1,112 @@
-import { MapPinIcon } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { ScheduleKind } from "@/lib/types"
+"use client"
+
+import Link from "next/link"
+import { eventStyle } from "@/components/calendar/event-style"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useNow } from "@/lib/clock"
+import { useEvents } from "@/lib/event-store"
+import { eventTypeLabel, eventsOn, freeGaps, toMinutes } from "@/lib/events"
+import { formatDuration, formatTime, fromDateKey, toDateKey } from "@/lib/format"
+import type { CalendarEvent } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-export type ScheduleItem = {
-  id: string
-  kind: ScheduleKind
-  title: string
-  category?: string
-  location?: string
-  startLabel: string
-  endLabel: string
-  durationLabel: string
-  status: "past" | "now" | "next" | "later"
-}
+// Today's events from the shared calendar, with the free time between them.
+type Item =
+  | { kind: "event"; key: string; start: string; end: string; event: CalendarEvent }
+  | { kind: "free"; key: string; start: string; end: string }
 
-const kindStyle: Record<ScheduleKind, { label: string; block: string; swatch: string }> = {
-  fixed: {
-    label: "Fixed",
-    block: "border-l-teal-500 bg-teal-500/[0.06]",
-    swatch: "bg-teal-500",
-  },
-  study: {
-    label: "Study",
-    block: "border-l-primary bg-primary/[0.06]",
-    swatch: "bg-primary",
-  },
-  free: {
-    label: "Free",
-    block: "border-l border-dashed border-foreground/15 bg-transparent",
-    swatch: "border border-dashed border-foreground/40",
-  },
-}
+export function TodaySchedule({ className }: { className?: string }) {
+  const { events } = useEvents()
+  const now = useNow()
+  const today = toDateKey(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
 
-export function TodaySchedule({
-  items,
-  className,
-}: {
-  items: ScheduleItem[]
-  className?: string
-}) {
-  const allPast = items.every((item) => item.status === "past")
+  const todays = eventsOn(events, today)
+  const items: Item[] = [
+    ...todays.map((event) => ({
+      kind: "event" as const,
+      key: event.id,
+      start: event.startTime,
+      end: event.endTime,
+      event,
+    })),
+    ...freeGaps(todays).map((gap) => ({ kind: "free" as const, key: `free-${gap.start}`, ...gap })),
+  ].sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end))
+
+  const statusOf = (item: Item) => {
+    if (toMinutes(item.end) <= nowMinutes) return "past"
+    if (toMinutes(item.start) <= nowMinutes) return "now"
+    return "later"
+  }
+  const nextKey = items.find((item) => toMinutes(item.start) > nowMinutes)?.key
+  const time = (hhmm: string) => formatTime(fromDateKey(today, hhmm))
 
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Today&apos;s schedule</CardTitle>
         <CardDescription>
-          {allPast ? "That's everything for today." : `${items.length} blocks planned`}
+          {todays.length === 0
+            ? "Nothing on your calendar today."
+            : items.every((item) => statusOf(item) === "past")
+              ? "That's everything for today."
+              : `${todays.length} ${todays.length === 1 ? "event" : "events"} today`}
         </CardDescription>
-        <ul aria-label="Legend" className="mt-2 flex gap-4 text-xs text-muted-foreground">
-          {(Object.keys(kindStyle) as ScheduleKind[]).map((kind) => (
-            <li key={kind} className="inline-flex items-center gap-1.5">
-              <span aria-hidden className={cn("size-2.5 rounded-sm", kindStyle[kind].swatch)} />
-              {kindStyle[kind].label}
-            </li>
-          ))}
-        </ul>
+        <CardAction>
+          <Link
+            href="/calendar"
+            className="rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Calendar
+          </Link>
+        </CardAction>
       </CardHeader>
       <CardContent>
         <ol className="space-y-2">
           {items.map((item) => {
-            const style = kindStyle[item.kind]
+            const status = statusOf(item)
             const isFree = item.kind === "free"
+            const minutes = toMinutes(item.end) - toMinutes(item.start)
             return (
               <li
-                key={item.id}
-                aria-current={item.status === "now" ? "time" : undefined}
-                className={cn(
-                  "grid grid-cols-[4.25rem_minmax(0,1fr)] gap-3",
-                  item.status === "past" && "opacity-55"
-                )}
+                key={item.key}
+                aria-current={status === "now" ? "time" : undefined}
+                className={cn("grid grid-cols-[4.25rem_minmax(0,1fr)] gap-3", status === "past" && "opacity-55")}
               >
-                <div className="pt-2 text-right text-sm tabular-nums">
-                  <p className="font-medium">{item.startLabel}</p>
-                </div>
+                <p className="pt-2 text-right text-sm font-medium tabular-nums">{time(item.start)}</p>
                 <div
                   className={cn(
-                    "rounded-lg border border-l-[3px] border-transparent px-3 py-2",
-                    style.block,
-                    item.status === "now" && "ring-2 ring-primary/30"
+                    "rounded-lg border px-3 py-2",
+                    isFree
+                      ? "border-dashed border-foreground/15"
+                      : cn("border-transparent border-l-[3px]", eventStyle[item.event.type].block),
+                    status === "now" && "ring-2 ring-primary/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className={cn("font-medium leading-snug", isFree && "text-muted-foreground")}>
-                      <span className="sr-only">{style.label}: </span>
-                      {item.title}
+                      {isFree ? "Free time" : item.event.title}
                     </p>
-                    {item.status === "now" && (
+                    {status === "now" && (
                       <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
                         Now
                       </span>
                     )}
-                    {item.status === "next" && (
-                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {item.key === nextKey && (
+                      <span className="shrink-0 rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                         Up next
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    <span>
-                      {[item.durationLabel, `until ${item.endLabel}`, item.category]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                    {item.location && (
-                      <span className="inline-flex items-center gap-0.5">
-                        <MapPinIcon aria-hidden className="size-3" />
-                        {item.location}
-                      </span>
-                    )}
+                  <p className={cn("mt-0.5 text-xs", isFree ? "text-muted-foreground" : "opacity-75")}>
+                    {[
+                      formatDuration(minutes),
+                      `until ${time(item.end)}`,
+                      !isFree && eventTypeLabel[item.event.type],
+                      !isFree && item.event.description,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
               </li>
