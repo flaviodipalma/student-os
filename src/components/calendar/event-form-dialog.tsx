@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useCourses } from "@/lib/course-store"
-import { useEvents } from "@/lib/event-store"
+import { useEvents, useStudySessions } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes, fromMinutes, toMinutes } from "@/lib/events"
 import type { CalendarEvent, EventInput, EventType } from "@/lib/types"
 
@@ -51,9 +51,13 @@ export function EventFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{event ? "Edit event" : "New event"}</DialogTitle>
+          <DialogTitle>{event?.sessionId ? "Study session" : event ? "Edit event" : "New event"}</DialogTitle>
           <DialogDescription>
-            {event ? "Update or remove this event." : "Block out time on your calendar."}
+            {event?.sessionId
+              ? "Move this study session or remove it. It belongs to a task, so its title comes from the task."
+              : event
+                ? "Update or remove this event."
+                : "Block out time on your calendar."}
           </DialogDescription>
         </DialogHeader>
         <EventForm event={event} draft={draft} onDone={() => onOpenChange(false)} />
@@ -72,6 +76,9 @@ function EventForm({
   onDone: () => void
 }) {
   const { addEvent, updateEvent, deleteEvent } = useEvents()
+  const { updateStudySession, deleteStudySession } = useStudySessions()
+  // Study sessions (from the Planner) can only be moved or removed here.
+  const sessionId = event?.sessionId
   const { courses } = useCourses()
   const courseOptions = [
     { value: NO_COURSE, label: "None" },
@@ -97,6 +104,10 @@ function EventForm({
     if (!startTime || !endTime) return setError("Set a start and end time.")
     if (toMinutes(endTime) <= toMinutes(startTime)) return setError("End time must be after the start time.")
 
+    if (sessionId) {
+      updateStudySession(sessionId, { date, startTime, endTime })
+      return onDone()
+    }
     const input: EventInput = {
       title: title.trim(),
       date,
@@ -105,7 +116,6 @@ function EventForm({
       type,
       description: description.trim() || undefined,
       courseId: courseId === NO_COURSE ? undefined : courseId,
-      taskId: event?.taskId,
     }
     if (event) updateEvent(event.id, input)
     else addEvent(input)
@@ -120,7 +130,8 @@ function EventForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Team meeting"
-          autoFocus
+          readOnly={Boolean(sessionId)}
+          autoFocus={!sessionId}
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -134,23 +145,27 @@ function EventForm({
           <Input id="event-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Type" htmlFor="event-type">
-          <SimpleSelect id="event-type" value={type} onChange={(v) => setType(v as EventType)} options={typeOptions} />
-        </Field>
-        <Field label="Course" htmlFor="event-course" optional>
-          <SimpleSelect id="event-course" value={courseId} onChange={setCourseId} options={courseOptions} />
-        </Field>
-      </div>
-      <Field label="Description" htmlFor="event-description" optional>
-        <Textarea
-          id="event-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Location, notes…"
-          rows={2}
-        />
-      </Field>
+      {!sessionId && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Type" htmlFor="event-type">
+              <SimpleSelect id="event-type" value={type} onChange={(v) => setType(v as EventType)} options={typeOptions} />
+            </Field>
+            <Field label="Course" htmlFor="event-course" optional>
+              <SimpleSelect id="event-course" value={courseId} onChange={setCourseId} options={courseOptions} />
+            </Field>
+          </div>
+          <Field label="Description" htmlFor="event-description" optional>
+            <Textarea
+              id="event-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Location, notes…"
+              rows={2}
+            />
+          </Field>
+        </>
+      )}
 
       {error && (
         <p role="alert" className="text-sm font-medium text-destructive">
@@ -189,7 +204,8 @@ function EventForm({
               <AlertDialogAction
                 variant="destructive"
                 onClick={() => {
-                  deleteEvent(event.id)
+                  if (sessionId) deleteStudySession(sessionId)
+                  else deleteEvent(event.id)
                   setConfirmDelete(false)
                   onDone()
                 }}

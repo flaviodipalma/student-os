@@ -238,13 +238,13 @@ function Recommended({ plan, taskById, dayWord }: { plan: DailyPlan; taskById: M
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {state === "suggested" && (
-                  <Button size="sm" onClick={() => actions.accept(session, task)}>
+                  <Button size="sm" onClick={() => actions.accept(session)}>
                     <CheckIcon data-icon="inline-start" />
                     Accept
                   </Button>
                 )}
                 {state !== "completed" ? (
-                  <Button size="sm" variant="outline" onClick={() => actions.complete(session, task)}>
+                  <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
                     Mark done
                   </Button>
                 ) : (

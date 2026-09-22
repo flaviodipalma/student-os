@@ -1,48 +1,57 @@
 import { connection } from "next/server"
 import { Brand } from "@/components/app-shell/brand"
+import { DatabaseError } from "@/components/app-shell/database-error"
 import { MobileNav } from "@/components/app-shell/mobile-nav"
 import { Sidebar } from "@/components/app-shell/sidebar"
+import { AppStoreProvider } from "@/lib/app-store"
 import { ClockProvider } from "@/lib/clock"
-import { CourseStoreProvider } from "@/lib/course-store"
-import { mockCourses } from "@/lib/data/courses"
-import { buildMockEvents } from "@/lib/data/events"
-import { buildMockTasks } from "@/lib/data/tasks"
-import { EventStoreProvider } from "@/lib/event-store"
+import { FeedbackProvider } from "@/lib/feedback"
 import { toDateKey } from "@/lib/format"
-import { PlannerStoreProvider } from "@/lib/planner-store"
-import { TaskStoreProvider } from "@/lib/task-store"
+import { requireUser } from "@/server/auth"
+import { getDb } from "@/server/db"
+import { loadAppData, type AppData } from "@/server/services/app-data"
+import { ensureProfile } from "@/server/services/profiles"
 
-// Shared shell for every main section: sidebar on desktop, top bar + slide-out menu on mobile.
-// It also holds the app's shared data (courses, tasks, events, planner, clock), so every page
-// sees the same state.
+// Shell for every signed-in page: sidebar on desktop, top bar + slide-out menu on mobile.
+// It checks who is signed in, then loads that student's data from the database once;
+// every page reads it from the app store.
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  // Work out "today" per request, not once at build time.
+  // Always render per request: these pages depend on who is signed in.
   await connection()
+  const user = await requireUser()
   const now = new Date()
   const today = toDateKey(now)
 
+  let data: AppData
+  try {
+    const db = getDb()
+    await ensureProfile(db, user.id)
+    data = await loadAppData(db, user.id)
+  } catch (error) {
+    console.error("[app] couldn't load user data", { name: error instanceof Error ? error.name : typeof error })
+    return <DatabaseError />
+  }
+
+  const account = { firstName: data.student.firstName, email: user.email ?? "" }
+
   return (
     <ClockProvider serverNow={now.getTime()}>
-      <CourseStoreProvider initialCourses={mockCourses}>
-        <TaskStoreProvider initialTasks={buildMockTasks(today)} today={today}>
-          <EventStoreProvider initialEvents={buildMockEvents(today)}>
-            <PlannerStoreProvider>
-              <div className="flex min-h-svh">
-                <Sidebar />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur lg:hidden">
-                    <MobileNav />
-                    <Brand />
-                  </header>
-                  <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-                    <div className="mx-auto w-full max-w-5xl">{children}</div>
-                  </main>
-                </div>
-              </div>
-            </PlannerStoreProvider>
-          </EventStoreProvider>
-        </TaskStoreProvider>
-      </CourseStoreProvider>
+      <FeedbackProvider>
+        <AppStoreProvider initial={data} today={today}>
+          <div className="flex min-h-svh">
+            <Sidebar account={account} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur lg:hidden">
+                <MobileNav account={account} />
+                <Brand />
+              </header>
+              <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+                <div className="mx-auto w-full max-w-5xl">{children}</div>
+              </main>
+            </div>
+          </div>
+        </AppStoreProvider>
+      </FeedbackProvider>
     </ClockProvider>
   )
 }

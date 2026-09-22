@@ -1,7 +1,7 @@
 import { addDays, fromDateKey } from "@/lib/format"
 import type { CalendarEvent, EventInput } from "@/lib/types"
 
-// Fictional calendar events, used until the database exists.
+// DEVELOPMENT SEED DATA. Only `npm run db:seed` uses this, for a dev test account.
 //
 // The student's regular week (classes, practice, work shifts) is written out
 // as real, dated events for a few weeks around today. There are no recurring

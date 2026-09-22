@@ -69,24 +69,26 @@ export function buildImportPlan(draft: ReviewDraft): ImportPlan {
   return { course, tasks }
 }
 
-// Where the import writes to. In the app these are the course and task stores;
-// later, the database.
-export type ImportServices = {
-  addCourse: (input: CourseInput) => { id: string }
-  addTask: (input: TaskInput) => void
+// What gets sent to the server when the student confirms. Returns null when the
+// import isn't confirmed, so nothing is created. Each task gets its id here.
+export type ImportRequest = {
+  course: { kind: "new"; fields: CourseInput } | { kind: "existing"; courseId: string }
+  tasks: (Omit<TaskInput, "courseId"> & { id: string })[]
+  source: { fileName: string; itemsFound: number }
 }
 
 export type ImportResult = { courseId: string; taskCount: number; createdCourse: boolean }
 
-// Imports only when `confirmed` is true; otherwise nothing is created.
-export function importReviewedSyllabus(
+export function toImportRequest(
   draft: ReviewDraft,
   confirmed: boolean,
-  services: ImportServices
-): ImportResult | null {
+  source: ImportRequest["source"]
+): ImportRequest | null {
   if (!confirmed) return null
   const plan = buildImportPlan(draft)
-  const courseId = plan.course.kind === "existing" ? plan.course.courseId : services.addCourse(plan.course.input).id
-  for (const task of plan.tasks) services.addTask({ ...task, courseId })
-  return { courseId, taskCount: plan.tasks.length, createdCourse: plan.course.kind === "new" }
+  return {
+    course: plan.course.kind === "new" ? { kind: "new", fields: plan.course.input } : plan.course,
+    tasks: plan.tasks.map((task) => ({ ...task, id: crypto.randomUUID() })),
+    source,
+  }
 }

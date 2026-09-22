@@ -1,102 +1,67 @@
 "use client"
 
-import { createContext, use, useMemo, useState } from "react"
+import { useMemo } from "react"
+import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
-import { useCourses } from "@/lib/course-store"
-import { useEvents } from "@/lib/event-store"
 import { generatePlan, type DailyPlan, type StudySession } from "@/lib/planner"
-import { useTasks } from "@/lib/task-store"
-import type { Task } from "@/lib/types"
 
-// Connects the planner (pure logic in src/lib/planner) to the app's shared state.
+// Connects the planner (pure logic in src/lib/planner) to the student's saved data.
 //
-// usePlan(date) runs the planner on the current tasks and events, so the Planner
-// page and the Dashboard always show the same plan. The only planner-specific state
-// kept here is which tasks the student removed from a day's plan.
+//   database -> tasks + events + study sessions -> generatePlan -> suggestions
 //
-// Accepting a suggestion turns it into a calendar event (type "study", linked to
-// the task). The task itself never becomes an event.
-
-type PlannerStore = {
-  skipped: Set<string>
-  setSkipped: (update: (prev: Set<string>) => Set<string>) => void
-}
-
-const PlannerContext = createContext<PlannerStore | null>(null)
-
-const skipKey = (taskId: string, date: string) => `${taskId}|${date}`
-
-export function PlannerStoreProvider({ children }: { children: React.ReactNode }) {
-  const [skipped, setSkipped] = useState<Set<string>>(() => new Set())
-  return <PlannerContext value={{ skipped, setSkipped }}>{children}</PlannerContext>
-}
-
-function usePlannerStore(): PlannerStore {
-  const store = use(PlannerContext)
-  if (!store) throw new Error("Planner hooks must be used inside PlannerStoreProvider")
-  return store
-}
+// usePlan(date) is used by both the Planner page and the Dashboard, so they
+// always agree. Suggestions themselves aren't stored; they're recalculated from
+// the saved data. What the student does with them is stored as a study session:
+//   accept -> scheduled, mark done -> completed, remove -> skipped.
 
 export function usePlan(date: string): DailyPlan {
-  const { tasks } = useTasks()
-  const { events } = useEvents()
+  const { tasks, calendarItems, studySessions } = useAppStore()
   const now = useNow()
-  const { skipped } = usePlannerStore()
 
   return useMemo(() => {
-    const skippedTaskIds = [...skipped]
-      .filter((key) => key.endsWith(`|${date}`))
-      .map((key) => key.slice(0, key.indexOf("|")))
-    return generatePlan({ date, tasks, events, now, skippedTaskIds })
-  }, [date, tasks, events, now, skipped])
-}
-
-// The title a study session gets on the calendar.
-export function sessionTitle(task: Task, courseCode?: string): string {
-  return `Study — ${courseCode ? `${courseCode} ` : ""}${task.title}`
+    const skippedTaskIds = studySessions
+      .filter((session) => session.status === "skipped" && session.date === date)
+      .map((session) => session.taskId)
+    // calendarItems = events plus the student's scheduled/completed study sessions.
+    return generatePlan({ date, tasks, events: calendarItems, now, skippedTaskIds })
+  }, [date, tasks, calendarItems, studySessions, now])
 }
 
 export function usePlanActions() {
-  const { addEvent, updateEvent, deleteEvent } = useEvents()
-  const { setSkipped } = usePlannerStore()
-  const { getCourse } = useCourses()
+  const { studySessions, addStudySession, updateStudySession, deleteStudySession } = useAppStore()
 
-  const skip = (taskId: string, date: string) =>
-    setSkipped((prev) => new Set(prev).add(skipKey(taskId, date)))
-
-  const toEvent = (session: StudySession, task: Task, completed: boolean) =>
-    addEvent({
-      title: sessionTitle(task, getCourse(task.courseId)?.code),
+  // A planner session that exists on the calendar has eventId = its study session id.
+  const store = (session: StudySession, status: "scheduled" | "completed" | "skipped") =>
+    addStudySession({
+      taskId: session.taskId,
       date: session.date,
       startTime: session.startTime,
       endTime: session.endTime,
-      type: "study",
-      courseId: task.courseId,
-      taskId: task.id,
-      completed: completed || undefined,
+      status,
     })
 
   return {
     // Put a suggestion on the calendar.
-    accept: (session: StudySession, task: Task) => toEvent(session, task, false),
+    accept: (session: StudySession) => store(session, "scheduled"),
 
-    // Mark a session done (a suggestion is added to the calendar as done).
-    complete: (session: StudySession, task: Task) =>
-      session.eventId ? updateEvent(session.eventId, { completed: true }) : toEvent(session, task, true),
+    // Mark a session done (a suggestion is saved as done straight away).
+    complete: (session: StudySession) =>
+      session.eventId ? updateStudySession(session.eventId, { status: "completed" }) : store(session, "completed"),
 
-    undoComplete: (session: StudySession) => session.eventId && updateEvent(session.eventId, { completed: false }),
+    undoComplete: (session: StudySession) =>
+      session.eventId && updateStudySession(session.eventId, { status: "scheduled" }),
 
-    // Drop a session from this day's plan. The task isn't suggested again that day.
-    remove: (session: StudySession) => {
-      if (session.eventId) deleteEvent(session.eventId)
-      skip(session.taskId, session.date)
+    // Drop a session from this day's plan; the task isn't suggested again that day.
+    remove: (session: StudySession) =>
+      session.eventId ? updateStudySession(session.eventId, { status: "skipped" }) : store(session, "skipped"),
+
+    // Bring a removed task back into that day's plan.
+    restore: (taskId: string, date: string) => {
+      for (const session of studySessions) {
+        if (session.taskId === taskId && session.date === date && session.status === "skipped") {
+          deleteStudySession(session.id)
+        }
+      }
     },
-
-    restore: (taskId: string, date: string) =>
-      setSkipped((prev) => {
-        const next = new Set(prev)
-        next.delete(skipKey(taskId, date))
-        return next
-      }),
   }
 }

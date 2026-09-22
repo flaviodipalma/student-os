@@ -1,11 +1,18 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { SyllabusAIService } from "@/lib/ai/syllabus-ai-service"
 import { MockSyllabusService } from "@/lib/ai/mock-syllabus-service"
 import { generatePlan } from "@/lib/planner"
-import type { Course, Task, TaskInput } from "@/lib/types"
+import type { Course, Task } from "@/lib/types"
+import { syllabusImports } from "@/server/db/schema"
+import { NotFoundError } from "@/server/errors"
+import { loadAppData } from "@/server/services/app-data"
+import { createCourse } from "@/server/services/courses"
+import { saveSyllabusImport } from "@/server/services/syllabus"
+import { createTask, updateTask } from "@/server/services/tasks"
+import { createTestDb } from "@/server/test-utils/test-db"
 import { findDuplicateTask, titlesSimilar } from "./duplicates"
 import { SyllabusImportError } from "./errors"
-import { buildImportPlan, checkDraft, importReviewedSyllabus, type ImportServices } from "./import"
+import { buildImportPlan, checkDraft, toImportRequest } from "./import"
 import { processSyllabus, type ImportStage } from "./importer"
 import { extractPdfText, MAX_FILE_BYTES } from "./pdf"
 import { blankReviewItem, buildReviewDraft, findDraftDuplicates } from "./review"
@@ -73,23 +80,6 @@ function existingTask(overrides: Partial<Task> = {}): Task {
     status: "not_started",
     ...overrides,
   }
-}
-
-// In-memory stand-ins for the course and task stores.
-function fakeServices() {
-  const courses: (Course & { id: string })[] = []
-  const tasks: Task[] = []
-  const services: ImportServices = {
-    addCourse: (input) => {
-      const course = { ...input, id: `course-${courses.length + 1}`, color: "sky" as const }
-      courses.push(course)
-      return course
-    },
-    addTask: (input: TaskInput) => {
-      tasks.push({ ...input, id: `task-${tasks.length + 1}` })
-    },
-  }
-  return { courses, tasks, services }
 }
 
 function expectImportError(fn: () => unknown, code: SyllabusImportError["code"]) {
@@ -191,66 +181,84 @@ describe("duplicate detection", () => {
   })
 })
 
-describe("importing a reviewed syllabus", () => {
-  it("creates the course and its tasks when confirmed", () => {
+describe("importing a reviewed syllabus (saved to the database)", () => {
+  let t: Awaited<ReturnType<typeof createTestDb>>
+  beforeEach(async () => {
+    t = await createTestDb()
+  })
+  afterEach(() => t.close())
+  const source = { fileName: "csc215-syllabus.pdf", itemsFound: 3 }
+
+  it("creates the course and its tasks when confirmed", async () => {
+    const user = await t.addUser()
     const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
-    const { courses, tasks, services } = fakeServices()
 
-    const result = importReviewedSyllabus(draft, true, services)
+    const saved = await saveSyllabusImport(t.db, user, toImportRequest(draft, true, source)!)
 
-    expect(result).toEqual({ courseId: "course-1", taskCount: 3, createdCourse: true })
-    expect(courses).toEqual([
+    expect(saved.createdCourse).toBe(true)
+    const data = await loadAppData(t.db, user)
+    expect(data.courses).toEqual([
       expect.objectContaining({ code: "CSC 215", name: "Data Structures", professor: "John Smith" }),
     ])
-    expect(tasks.map((t) => [t.title, t.courseId, t.dueDate, t.type])).toEqual([
-      ["Assignment 1", "course-1", "2026-09-25", "assignment"],
-      ["Assignment 2", "course-1", "2026-10-02", "assignment"],
-      ["Midterm Exam", "course-1", "2026-10-14", "exam"],
+    expect(data.tasks.map((task) => [task.title, task.courseId, task.dueDate, task.type])).toEqual([
+      ["Assignment 1", saved.course.id, "2026-09-25", "assignment"],
+      ["Assignment 2", saved.course.id, "2026-10-02", "assignment"],
+      ["Midterm Exam", saved.course.id, "2026-10-14", "exam"],
     ])
     // Stated duration kept; no duration -> the visible per-type default, never an AI guess.
-    expect(tasks[2].estimateMinutes).toBe(75)
-    expect(tasks[0].estimateMinutes).toBe(90)
-    expect(tasks[0]).toMatchObject({ dueTime: "23:59", status: "not_started", priority: "medium" })
+    expect(data.tasks[2].estimateMinutes).toBe(75)
+    expect(data.tasks[0]).toMatchObject({ estimateMinutes: 90, dueTime: "23:59", status: "not_started" })
+    // A small record of the import is kept; never the PDF or its text.
+    const records = await t.db.select().from(syllabusImports)
+    expect(records).toEqual([
+      expect.objectContaining({ userId: user, courseId: saved.course.id, fileName: source.fileName, itemsImported: 3 }),
+    ])
   })
 
-  it("adds to an existing course instead of creating a second one", () => {
-    const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [csc215], [existingTask()])
-    const { courses, tasks, services } = fakeServices()
+  it("adds to an existing course instead of creating a second one", async () => {
+    const user = await t.addUser()
+    const course = await createCourse(t.db, user, { code: "CSC215", name: "Data Structures", professor: "", description: "" })
+    await createTask(t.db, user, { ...existingTask(), id: crypto.randomUUID(), courseId: course.id })
+    const before = await loadAppData(t.db, user)
+    const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), before.courses, before.tasks)
 
-    const result = importReviewedSyllabus(draft, true, services)
+    const saved = await saveSyllabusImport(t.db, user, toImportRequest(draft, true, source)!)
 
-    expect(courses).toHaveLength(0)
-    expect(result).toMatchObject({ courseId: "csc215", taskCount: 2, createdCourse: false })
-    expect(tasks.every((t) => t.courseId === "csc215")).toBe(true)
+    const after = await loadAppData(t.db, user)
+    expect(saved.createdCourse).toBe(false)
+    expect(after.courses).toHaveLength(1)
+    // The duplicate "Assignment 2" was left unselected, so only 2 new tasks.
+    expect(after.tasks.map((task) => task.title).sort()).toEqual(
+      ["Assignment #2: Linked Lists", "Assignment 1", "Midterm Exam"].sort()
+    )
   })
 
-  it("respects the student's edits and selections", () => {
+  it("respects the student's edits and selections", async () => {
+    const user = await t.addUser()
     const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
     draft.course.name = "Data Structures & Algorithms"
     draft.items[0] = { ...draft.items[0], title: "Homework 1", estimateMinutes: "45", priority: "critical" }
     draft.items[1] = { ...draft.items[1], selected: false }
     draft.items.push({ ...blankReviewItem(), title: "Final Project", type: "project", dueDate: "2026-12-05" })
-    const { courses, tasks, services } = fakeServices()
 
-    importReviewedSyllabus(draft, true, services)
+    await saveSyllabusImport(t.db, user, toImportRequest(draft, true, source)!)
 
-    expect(courses[0].name).toBe("Data Structures & Algorithms")
-    expect(tasks.map((t) => t.title)).toEqual(["Homework 1", "Midterm Exam", "Final Project"])
-    expect(tasks[0]).toMatchObject({ estimateMinutes: 45, priority: "critical" })
-    expect(tasks[2].estimateMinutes).toBe(240)
+    const data = await loadAppData(t.db, user)
+    expect(data.courses[0].name).toBe("Data Structures & Algorithms")
+    expect(data.tasks.map((task) => task.title)).toEqual(["Homework 1", "Midterm Exam", "Final Project"])
+    expect(data.tasks[0]).toMatchObject({ estimateMinutes: 45, priority: "critical" })
+    expect(data.tasks[2].estimateMinutes).toBe(240)
   })
 
-  it("creates nothing without confirmation", () => {
+  it("creates nothing without confirmation", async () => {
+    const user = await t.addUser()
     const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
-    const { courses, tasks, services } = fakeServices()
-    const addCourse = vi.spyOn(services, "addCourse")
-    const addTask = vi.spyOn(services, "addTask")
 
-    expect(importReviewedSyllabus(draft, false, services)).toBeNull()
-    expect(addCourse).not.toHaveBeenCalled()
-    expect(addTask).not.toHaveBeenCalled()
-    expect(courses).toHaveLength(0)
-    expect(tasks).toHaveLength(0)
+    expect(toImportRequest(draft, false, source)).toBeNull()
+
+    const data = await loadAppData(t.db, user)
+    expect(data.courses).toHaveLength(0)
+    expect(data.tasks).toHaveLength(0)
   })
 
   it("blocks the import until required information is filled in", () => {
@@ -267,32 +275,61 @@ describe("importing a reviewed syllabus", () => {
     )
     expect(checkDraft(draft).map((p) => p.message)).toEqual(["Add the course code.", "Lab report needs a due date."])
     expect(() => buildImportPlan(draft)).toThrow()
-
-    const { services, tasks } = fakeServices()
-    expect(() => importReviewedSyllabus(draft, true, services)).toThrow()
-    expect(tasks).toHaveLength(0)
+    expect(() => toImportRequest(draft, true, source)).toThrow()
 
     // Deselecting the undated item and adding the code makes it valid.
     draft.course.code = "BIO101"
     draft.items[0].selected = false
     expect(checkDraft(draft)).toEqual([])
   })
+
+  it("saves all or nothing", async () => {
+    const user = await t.addUser()
+    const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
+    const request = toImportRequest(draft, true, source)!
+    // One task the database refuses (title over 200 characters).
+    request.tasks[2] = { ...request.tasks[2], title: "x".repeat(250) }
+
+    await expect(saveSyllabusImport(t.db, user, request)).rejects.toBeTruthy()
+
+    const data = await loadAppData(t.db, user)
+    expect(data.courses).toHaveLength(0)
+    expect(data.tasks).toHaveLength(0)
+  })
+
+  it("can't import into another student's course", async () => {
+    const alice = await t.addUser("Alice")
+    const bob = await t.addUser("Bob")
+    const alicesCourse = await createCourse(t.db, alice, { code: "CSC215", name: "DS", professor: "", description: "" })
+    const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
+    draft.target = { kind: "existing", courseId: alicesCourse.id }
+
+    await expect(saveSyllabusImport(t.db, bob, toImportRequest(draft, true, source)!)).rejects.toBeInstanceOf(
+      NotFoundError
+    )
+    expect((await loadAppData(t.db, alice)).tasks).toHaveLength(0)
+    expect((await loadAppData(t.db, bob)).tasks).toHaveLength(0)
+  })
 })
 
 describe("imported tasks and the Planner", () => {
-  it("are planned like any other task, and completed ones are left out", () => {
+  it("are planned from the database like any other task, and completed ones are left out", async () => {
+    const t = await createTestDb()
+    const user = await t.addUser()
     const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [], [])
-    const { tasks, services } = fakeServices()
-    importReviewedSyllabus(draft, true, services)
+    await saveSyllabusImport(t.db, user, toImportRequest(draft, true, { fileName: "s.pdf", itemsFound: 3 })!)
 
     const now = new Date(2026, 8, 22, 8, 0)
-    const plan = generatePlan({ date: TODAY, tasks, events: [], now })
-    const planned = new Set(plan.suggestions.map((s) => s.taskId))
-    expect(planned.has(tasks[0].id)).toBe(true) // Assignment 1, due in 3 days
+    const { tasks, events } = await loadAppData(t.db, user)
+    const assignment1 = tasks.find((task) => task.title === "Assignment 1")!
+    const plan = generatePlan({ date: TODAY, tasks, events, now })
+    expect(plan.suggestions.some((s) => s.taskId === assignment1.id)).toBe(true) // due in 3 days
 
-    const withDone = tasks.map((t, i) => (i === 0 ? { ...t, status: "completed" as const } : t))
-    const after = generatePlan({ date: TODAY, tasks: withDone, events: [], now })
-    expect(after.suggestions.some((s) => s.taskId === tasks[0].id)).toBe(false)
+    await updateTask(t.db, user, assignment1.id, { status: "completed" })
+    const after = await loadAppData(t.db, user)
+    const replanned = generatePlan({ date: TODAY, tasks: after.tasks, events: after.events, now })
+    expect(replanned.suggestions.some((s) => s.taskId === assignment1.id)).toBe(false)
+    await t.close()
   })
 })
 

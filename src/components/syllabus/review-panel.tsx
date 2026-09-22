@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useCourses } from "@/lib/course-store"
-import { checkDraft, importReviewedSyllabus, type ImportResult } from "@/lib/syllabus/import"
+import { useAppStore } from "@/lib/app-store"
+import { checkDraft, toImportRequest, type ImportRequest, type ImportResult } from "@/lib/syllabus/import"
 import {
   blankReviewItem,
   defaultEstimateMinutes,
@@ -29,17 +30,22 @@ const priorityOptions = priorities.map((value) => ({ value, label: priorityLabel
 
 export function ReviewPanel({
   initialDraft,
+  source,
   onCancel,
   onImported,
 }: {
   initialDraft: ReviewDraft
+  source: ImportRequest["source"]
   onCancel: () => void
   onImported: (result: ImportResult) => void
 }) {
-  const { courses, getCourse, addCourse } = useCourses()
-  const { tasks, today, addTask } = useTasks()
+  const { courses, getCourse } = useCourses()
+  const { tasks, today } = useTasks()
+  const { importSyllabus } = useAppStore()
   const [draft, setDraft] = useState(initialDraft)
   const [tried, setTried] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const problems = checkDraft(draft)
   const problemKeys = new Set(problems.map((p) => p.itemKey).filter(Boolean))
@@ -52,11 +58,22 @@ export function ReviewPanel({
   const removeItem = (key: string) => setDraft((d) => ({ ...d, items: d.items.filter((item) => item.key !== key) }))
   const setAll = (value: boolean) => setDraft((d) => ({ ...d, items: d.items.map((item) => ({ ...item, selected: value })) }))
 
-  function handleImport() {
+  // The student confirmed: save the course and tasks (one database transaction).
+  async function handleImport() {
     setTried(true)
     if (problems.length > 0) return
-    const result = importReviewedSyllabus(draft, true, { addCourse, addTask })
-    if (result) onImported(result)
+    const request = toImportRequest(draft, true, source)
+    if (!request) return
+    setSaving(true)
+    setSaveError(null)
+    const result = await importSyllabus(request)
+    setSaving(false)
+    if (!result.ok) return setSaveError(result.error)
+    onImported({
+      courseId: result.data.course.id,
+      taskCount: result.data.tasks.length,
+      createdCourse: result.data.createdCourse,
+    })
   }
 
   const targetOptions = [
@@ -159,7 +176,12 @@ export function ReviewPanel({
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur lg:left-64">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
           <div className="min-w-0 text-sm" aria-live="polite">
-            {tried && problems.length > 0 ? (
+            {saveError ? (
+              <p className="flex items-start gap-1.5 text-destructive">
+                <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+                {saveError}
+              </p>
+            ) : tried && problems.length > 0 ? (
               <p className="flex items-start gap-1.5 text-destructive">
                 <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
                 {problems[0].message}
@@ -176,8 +198,8 @@ export function ReviewPanel({
             <Button size="lg" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
-            <Button size="lg" onClick={handleImport} disabled={tried && problems.length > 0}>
-              Import into Student OS
+            <Button size="lg" onClick={handleImport} disabled={saving || (tried && problems.length > 0)}>
+              {saving ? "Importing…" : "Import into Student OS"}
             </Button>
           </div>
         </div>

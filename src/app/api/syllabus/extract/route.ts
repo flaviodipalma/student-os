@@ -1,4 +1,5 @@
 import { getSyllabusAIService } from "@/lib/ai"
+import { getCurrentUser } from "@/server/auth"
 import { daysBetween, fromDateKey, toDateKey } from "@/lib/format"
 import { SyllabusImportError } from "@/lib/syllabus/errors"
 import { processSyllabus } from "@/lib/syllabus/importer"
@@ -31,6 +32,9 @@ function studentToday(value: FormDataEntryValue | null): string {
 }
 
 export async function POST(request: Request) {
+  // Only signed-in students can use the importer (and the AI budget).
+  if (!(await getCurrentUser())) return errorResponse(new SyllabusImportError("unauthorized"), 401)
+
   // Reject oversized uploads before reading them (with room for the form wrapper).
   const declaredSize = Number(request.headers.get("content-length") ?? 0)
   if (declaredSize > MAX_FILE_BYTES + 64 * 1024) return errorResponse(new SyllabusImportError("file-too-large"), 413)

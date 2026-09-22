@@ -1,8 +1,8 @@
 import { addDays, fromDateKey } from "@/lib/format"
 import type { Task } from "@/lib/types"
 
-// Fictional starting tasks, used until the database exists.
-// Due dates are relative to `today` so the app always looks current.
+// DEVELOPMENT SEED DATA. Only `npm run db:seed` uses this, for a dev test account.
+// Due dates are relative to `today` so the seeded account always looks current.
 
 export function buildMockTasks(today: string): Task[] {
   const day = (offset: number) => addDays(today, offset)

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { FileUpIcon } from "lucide-react"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { CourseGrid } from "@/components/courses/course-grid"
+import { NewCourseButton } from "@/components/courses/new-course-button"
 import { buttonVariants } from "@/components/ui/button"
 import { getNavItem } from "@/lib/navigation"
 
@@ -17,10 +18,13 @@ export default function CoursesPage() {
         title={section.title}
         description={section.description}
         action={
-          <Link href="/courses/import" className={buttonVariants({ size: "lg" })}>
-            <FileUpIcon data-icon="inline-start" />
-            Import syllabus
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <NewCourseButton />
+            <Link href="/courses/import" className={buttonVariants({ size: "lg" })}>
+              <FileUpIcon data-icon="inline-start" />
+              Import syllabus
+            </Link>
+          </div>
         }
       />
       <CourseGrid />

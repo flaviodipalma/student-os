@@ -24,7 +24,7 @@ type State =
   | { step: "upload"; error?: string }
   | { step: "processing"; fileName: string; stage: "uploading" | ImportStage }
   | { step: "found"; fileName: string; draft: ReviewDraft }
-  | { step: "review"; draft: ReviewDraft }
+  | { step: "review"; fileName: string; draft: ReviewDraft }
   | { step: "done"; result: ImportResult }
 
 export function SyllabusImporter() {
@@ -71,13 +71,14 @@ export function SyllabusImporter() {
         <FoundPanel
           draft={state.draft}
           fileName={state.fileName}
-          onReview={() => setState({ step: "review", draft: state.draft })}
+          onReview={() => setState({ step: "review", fileName: state.fileName, draft: state.draft })}
           onStartOver={startOver}
         />
       )}
       {state.step === "review" && (
         <ReviewPanel
           initialDraft={state.draft}
+          source={{ fileName: state.fileName, itemsFound: state.draft.items.length }}
           onCancel={startOver}
           onImported={(result) => setState({ step: "done", result })}
         />

@@ -1,8 +1,8 @@
-import type { Course, CourseColor } from "@/lib/types"
+import type { Course } from "@/lib/types"
 
-// The student's starting courses (mock data). The live list lives in the course
-// store (src/lib/course-store.tsx), which can also add courses, e.g. from a syllabus.
-export const mockCourses: Course[] = [
+// DEVELOPMENT SEED DATA. Only `npm run db:seed` uses this, for a dev test account.
+// Real students start with no courses.
+export const seedCourses: Course[] = [
   {
     id: "csc215",
     code: "CSC215",
@@ -40,13 +40,3 @@ export const mockCourses: Course[] = [
     color: "orange",
   },
 ]
-
-// Course colors in the order they're handed out. Checked to stay distinguishable,
-// including for color-blind students; the course code is always shown next to it too.
-export const courseColors: CourseColor[] = ["sky", "emerald", "violet", "orange", "rose"]
-
-// The first color no course uses yet, or the least-used one once all are taken.
-export function pickCourseColor(existing: Course[]): CourseColor {
-  const uses = (color: CourseColor) => existing.filter((course) => course.color === color).length
-  return [...courseColors].sort((a, b) => uses(a) - uses(b))[0]
-}

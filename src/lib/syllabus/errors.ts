@@ -15,6 +15,7 @@ export type SyllabusErrorCode =
   | "ai-timeout"
   | "ai-invalid-response"
   | "network"
+  | "unauthorized"
 
 export const syllabusErrorMessages: Record<SyllabusErrorCode, string> = {
   "invalid-file-type": "That file isn't a PDF. Please upload your syllabus as a PDF.",
@@ -31,6 +32,7 @@ export const syllabusErrorMessages: Record<SyllabusErrorCode, string> = {
   "ai-timeout": "Reading your syllabus took too long. Please try again.",
   "ai-invalid-response": "We couldn't make sense of the results for this syllabus. Please try again.",
   network: "We couldn't reach the server. Check your connection and try again.",
+  unauthorized: "Your session has expired. Please log in again.",
 }
 
 export class SyllabusImportError extends Error {

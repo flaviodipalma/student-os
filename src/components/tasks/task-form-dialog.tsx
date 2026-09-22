@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { Field, SimpleSelect, type Option } from "@/components/form-fields"
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,7 @@ function TaskForm({
   const courseOptions = courses.map((course) => ({ value: course.id, label: `${course.code} · ${course.name}` }))
   const [title, setTitle] = useState(task?.title ?? "")
   const [description, setDescription] = useState(task?.description ?? "")
-  const [courseId, setCourseId] = useState(task?.courseId ?? defaultCourseId ?? courses[0].id)
+  const [courseId, setCourseId] = useState(task?.courseId ?? defaultCourseId ?? courses[0]?.id ?? "")
   const [type, setType] = useState<TaskType>(task?.type ?? "assignment")
   const [dueDate, setDueDate] = useState(task?.dueDate ?? addDays(today, 1))
   const [dueTime, setDueTime] = useState(task?.dueTime ?? "")
@@ -95,6 +96,25 @@ function TaskForm({
     if (task) updateTask(task.id, input)
     else addTask(input)
     onDone()
+  }
+
+  // Every task belongs to a course, so a brand-new student adds a course first.
+  if (courses.length === 0) {
+    return (
+      <div className="grid gap-4">
+        <p className="text-sm text-muted-foreground">
+          Tasks belong to a course. Add your first course, or import a syllabus, then come back to add tasks.
+        </p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Close
+          </Button>
+          <Link href="/courses" className={buttonVariants()} onClick={onDone}>
+            Go to Courses
+          </Link>
+        </DialogFooter>
+      </div>
+    )
   }
 
   return (

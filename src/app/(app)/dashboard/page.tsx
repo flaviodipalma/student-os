@@ -2,11 +2,11 @@ import type { Metadata } from "next"
 import { connection } from "next/server"
 import { DailyProgress } from "@/components/dashboard/daily-progress"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
+import { GettingStarted } from "@/components/dashboard/getting-started"
 import { PriorityTasks } from "@/components/dashboard/priority-tasks"
 import { TodaySchedule } from "@/components/dashboard/today-schedule"
 import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines"
 import { WeekOverview } from "@/components/dashboard/week-overview"
-import { student } from "@/lib/data/student"
 import { formatLongDate, greetingFor } from "@/lib/format"
 
 export const metadata: Metadata = { title: "Dashboard" }
@@ -21,13 +21,11 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] md:items-end">
-        <DashboardHeader
-          greeting={greetingFor(now)}
-          firstName={student.firstName}
-          dateLabel={formatLongDate(now)}
-        />
+        <DashboardHeader greeting={greetingFor(now)} dateLabel={formatLongDate(now)} />
         <DailyProgress />
       </div>
+
+      <GettingStarted />
 
       {/*
         Desktop (xl): two columns. Left = priorities + week; right = schedule + deadlines.

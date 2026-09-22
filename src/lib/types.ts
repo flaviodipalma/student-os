@@ -64,15 +64,29 @@ export type CalendarEvent = {
   endTime: string
   type: EventType
   description?: string
-  // Optional links. A class belongs to a course; a study session can be for a
-  // specific task (that's how accepted Planner sessions are stored).
+  // Optional link: a class belongs to a course.
   courseId?: string
+  // Set only on calendar items that show a study session (see
+  // src/lib/calendar-items.ts). Those are stored as StudySessionRecords, not events.
+  sessionId?: string
   taskId?: string
-  // Study sessions only: the student marked this session as done.
   completed?: boolean
 }
 
-export type EventInput = Omit<CalendarEvent, "id">
+export type EventInput = Omit<CalendarEvent, "id" | "sessionId" | "taskId" | "completed">
+
+// Time set aside to work on a task, stored when the student accepts, completes or
+// skips a Planner suggestion. skipped = removed from that day's plan.
+export type StudySessionStatus = "scheduled" | "completed" | "skipped"
+
+export type StudySessionRecord = {
+  id: string
+  taskId: string
+  date: string
+  startTime: string
+  endTime: string
+  status: StudySessionStatus
+}
 
 export type Student = {
   firstName: string

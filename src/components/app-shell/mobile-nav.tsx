@@ -10,10 +10,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { AccountSection, type Account } from "./account-section"
 import { Brand } from "./brand"
 import { NavLinks } from "./nav-links"
 
-export function MobileNav() {
+export function MobileNav({ account }: { account: Account }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -29,9 +30,10 @@ export function MobileNav() {
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Brand />
         </SheetHeader>
-        <div className="px-3">
+        <div className="flex-1 px-3">
           <NavLinks onNavigate={() => setOpen(false)} />
         </div>
+        <AccountSection account={account} />
       </SheetContent>
     </Sheet>
   )
