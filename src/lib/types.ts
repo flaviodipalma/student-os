@@ -60,9 +60,11 @@ export type CalendarEvent = {
   type: EventType
   description?: string
   // Optional links. A class belongs to a course; a study session can be for a
-  // specific task. The Planner will create study sessions like that later.
+  // specific task (that's how accepted Planner sessions are stored).
   courseId?: string
   taskId?: string
+  // Study sessions only: the student marked this session as done.
+  completed?: boolean
 }
 
 export type EventInput = Omit<CalendarEvent, "id">

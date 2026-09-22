@@ -179,11 +179,12 @@ function DayColumn({
             key={event.id}
             type="button"
             onClick={() => onSelectEvent(event)}
-            aria-label={`${event.title}, ${time}, ${eventTypeLabel[event.type]}`}
+            aria-label={`${event.title}, ${time}, ${eventTypeLabel[event.type]}${event.completed ? ", done" : ""}`}
             className={cn(
               "absolute overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-left text-xs leading-tight shadow-xs outline-none transition-colors focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50",
               eventStyle[event.type].block,
-              columns > 1 && "ring-1 ring-card"
+              columns > 1 && "ring-1 ring-card",
+              event.completed && "line-through opacity-60"
             )}
             style={{
               top: (start / 60) * HOUR_PX + 1,

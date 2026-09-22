@@ -62,20 +62,10 @@ export function buildMockEvents(today: string): CalendarEvent[] {
     }
   }
 
-  // One-off events around today, including study sessions for specific tasks.
+  // One-off events around today, including study sessions already booked for
+  // specific tasks. (Today's work is left for the Planner to suggest.)
   const day = (offset: number) => addDays(today, offset)
   events.push(
-    {
-      id: "study-csc215-a2",
-      title: "Study — CSC215 Assignment #2",
-      date: day(0),
-      startTime: "18:00",
-      endTime: "19:30",
-      type: "study",
-      courseId: "csc215",
-      taskId: "csc215-a2",
-      description: "Finish reverse() and write tests.",
-    },
     {
       id: "dinner-roommates",
       title: "Dinner with roommates",
