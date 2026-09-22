@@ -1,0 +1,37 @@
+"use client"
+
+import { useTasks } from "@/lib/task-store"
+import { isDone, isImportant, todaysTasks } from "@/lib/tasks"
+
+export function DashboardHeader({
+  greeting,
+  firstName,
+  dateLabel,
+}: {
+  greeting: string
+  firstName: string
+  dateLabel: string
+}) {
+  const { tasks, today } = useTasks()
+  const remaining = todaysTasks(tasks, today).filter((task) => !isDone(task))
+  const important = remaining.filter(isImportant).length
+
+  let message: string
+  if (remaining.length === 0) message = "You're all caught up for today."
+  else if (important > 0)
+    message = `You have ${important} important ${important === 1 ? "task" : "tasks"} today.`
+  else
+    message = `Important work is done. ${remaining.length} smaller ${remaining.length === 1 ? "task" : "tasks"} left.`
+
+  return (
+    <header>
+      <p className="text-sm font-medium text-muted-foreground">{dateLabel}</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+        {greeting}, {firstName}
+      </h1>
+      <p className="mt-1.5 text-muted-foreground" aria-live="polite">
+        {message}
+      </p>
+    </header>
+  )
+}

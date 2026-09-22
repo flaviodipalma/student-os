@@ -1,66 +1,80 @@
 import type { Metadata } from "next"
-import { PageHeader } from "@/components/app-shell/page-header"
+import { connection } from "next/server"
+import { DailyProgress } from "@/components/dashboard/daily-progress"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
+import { PriorityTasks } from "@/components/dashboard/priority-tasks"
+import { TodaySchedule, type ScheduleItem } from "@/components/dashboard/today-schedule"
+import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines"
+import { WeekOverview, type WeekDayLoad } from "@/components/dashboard/week-overview"
+import { getScheduleData } from "@/lib/data/schedule"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { getNavItem } from "@/lib/navigation"
+  formatDuration,
+  formatLongDate,
+  formatRelativeDay,
+  formatTime,
+  formatWeekday,
+  fromDateKey,
+  greetingFor,
+} from "@/lib/format"
 
-const section = getNavItem("/dashboard")
+export const metadata: Metadata = { title: "Dashboard" }
 
-export const metadata: Metadata = { title: section.title }
+// Task-based sections (priorities, progress, deadlines, week) read the shared
+// task store themselves. This page prepares the time-based parts: greeting,
+// today's schedule and each day's hours.
+export default async function DashboardPage() {
+  // Render on every request so the greeting and "now" marker are current.
+  await connection()
+  const now = new Date()
+  const { student, schedule, week } = getScheduleData(now)
 
-// Empty panels that show where each part of the dashboard will go.
-const panels = [
-  {
-    title: "Today's plan",
-    description: "What to work on today, in order.",
-    empty: "Your plan will appear here once the planner is built.",
-    className: "md:col-span-2",
-  },
-  {
-    title: "Due soon",
-    description: "Deadlines in the next 7 days.",
-    empty: "No deadlines yet.",
-  },
-  {
-    title: "Classes today",
-    description: "Where you need to be and when.",
-    empty: "No classes yet.",
-  },
-  {
-    title: "This week",
-    description: "How your workload is spread out.",
-    empty: "Nothing scheduled yet.",
-    className: "md:col-span-2",
-  },
-]
+  const nextIndex = schedule.findIndex((block) => block.start > now)
+  const scheduleItems: ScheduleItem[] = schedule.map((block, index) => ({
+    id: block.id,
+    kind: block.kind,
+    title: block.title,
+    category: block.category,
+    location: block.location,
+    startLabel: formatTime(block.start),
+    endLabel: formatTime(block.end),
+    durationLabel: formatDuration((block.end.getTime() - block.start.getTime()) / 60_000),
+    status:
+      block.end <= now ? "past" : block.start <= now ? "now" : index === nextIndex ? "next" : "later",
+  }))
 
-export default function DashboardPage() {
+  const weekDays: WeekDayLoad[] = week.map((day, index) => ({
+    ...day,
+    shortLabel: index === 0 ? "Today" : formatWeekday(fromDateKey(day.date), "short"),
+    longLabel: index === 0 ? "Today" : formatRelativeDay(fromDateKey(day.date), now),
+    isToday: index === 0,
+  }))
+
   return (
-    <>
-      <PageHeader
-        title="What should I do today?"
-        description="Your deadlines, classes and commitments will come together here."
-      />
-      <div className="grid gap-4 md:grid-cols-2">
-        {panels.map((panel) => (
-          <Card key={panel.title} className={panel.className}>
-            <CardHeader>
-              <CardTitle>{panel.title}</CardTitle>
-              <CardDescription>{panel.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                {panel.empty}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] md:items-end">
+        <DashboardHeader
+          greeting={greetingFor(now)}
+          firstName={student.firstName}
+          dateLabel={formatLongDate(now)}
+        />
+        <DailyProgress />
       </div>
-    </>
+
+      {/*
+        Desktop (xl): two columns. Left = priorities + week; right = schedule + deadlines.
+        Smaller screens: one column, ordered priorities → schedule → deadlines → week.
+        The column wrappers use `contents` below xl so `order-*` can interleave their children.
+      */}
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+        <div className="contents xl:flex xl:flex-col xl:gap-6">
+          <PriorityTasks className="order-1" />
+          <WeekOverview days={weekDays} className="order-4" />
+        </div>
+        <div className="contents xl:flex xl:flex-col xl:gap-6">
+          <TodaySchedule items={scheduleItems} className="order-2" />
+          <UpcomingDeadlines className="order-3" />
+        </div>
+      </div>
+    </div>
   )
 }

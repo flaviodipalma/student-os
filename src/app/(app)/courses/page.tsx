@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
-import { ComingSoon } from "@/components/coming-soon"
 import { PageHeader } from "@/components/app-shell/page-header"
+import { CourseCard } from "@/components/courses/course-card"
+import { courses } from "@/lib/data/courses"
 import { getNavItem } from "@/lib/navigation"
 
 const section = getNavItem("/courses")
@@ -11,14 +12,11 @@ export default function CoursesPage() {
   return (
     <>
       <PageHeader title={section.title} description={section.description} />
-      <ComingSoon
-        icon={section.icon}
-        title={section.title}
-        planned={[
-          "Keep a list of your classes for the term",
-          "Import a syllabus to pull out every deadline",
-        ]}
-      />
+      <div className="grid gap-4 md:grid-cols-2">
+        {courses.map((course) => (
+          <CourseCard key={course.id} course={course} />
+        ))}
+      </div>
     </>
   )
 }
