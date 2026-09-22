@@ -2,16 +2,19 @@
 // Dates are stored as "YYYY-MM-DD" strings and times as "HH:MM" (24h), the same
 // shape a database date/time column and an <input type="date"> use.
 
-export type CourseColor = "sky" | "emerald" | "violet" | "orange"
+export type CourseColor = "sky" | "emerald" | "violet" | "orange" | "rose"
 
 export type Course = {
   id: string
   code: string
   name: string
+  // Empty when unknown (e.g. a syllabus that doesn't name the professor).
   professor: string
   description: string
   color: CourseColor
 }
+
+export type CourseInput = Omit<Course, "id" | "color">
 
 export type Priority = "low" | "medium" | "high" | "critical"
 
@@ -23,8 +26,10 @@ export type TaskType =
   | "exam"
   | "quiz"
   | "project"
+  | "paper"
   | "reading"
   | "lab"
+  | "presentation"
   | "study"
   | "other"
 

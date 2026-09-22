@@ -3,7 +3,7 @@
 import { CircleAlertIcon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { formatRelativeDay, formatTime, fromDateKey } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { daysUntilDue, typeLabel, upcomingDeadlines } from "@/lib/tasks"
@@ -18,6 +18,7 @@ function urgencyOf(daysLeft: number) {
 
 export function UpcomingDeadlines({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
+  const { getCourse } = useCourses()
   const deadlines = upcomingDeadlines(tasks, today).slice(0, 5)
 
   return (

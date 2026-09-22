@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { courses } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes, fromMinutes, toMinutes } from "@/lib/events"
 import type { CalendarEvent, EventInput, EventType } from "@/lib/types"
@@ -34,10 +34,6 @@ export type EventDraft = { date: string; startTime: string }
 
 const NO_COURSE = "none"
 const typeOptions = eventTypes.map((value) => ({ value, label: eventTypeLabel[value] }))
-const courseOptions = [
-  { value: NO_COURSE, label: "None" },
-  ...courses.map((course) => ({ value: course.id, label: `${course.code} · ${course.name}` })),
-]
 
 // Create an event (pass `draft`) or edit one (pass `event`).
 export function EventFormDialog({
@@ -76,6 +72,11 @@ function EventForm({
   onDone: () => void
 }) {
   const { addEvent, updateEvent, deleteEvent } = useEvents()
+  const { courses } = useCourses()
+  const courseOptions = [
+    { value: NO_COURSE, label: "None" },
+    ...courses.map((course) => ({ value: course.id, label: `${course.code} · ${course.name}` })),
+  ]
   const defaultStart = draft?.startTime ?? "09:00"
   const [title, setTitle] = useState(event?.title ?? "")
   const [date, setDate] = useState(event?.date ?? draft?.date ?? "")

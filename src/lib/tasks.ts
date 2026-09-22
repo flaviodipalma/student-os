@@ -1,6 +1,5 @@
-import { courses } from "@/lib/data/courses"
 import { daysBetween, formatRelativeDay, formatTime, fromDateKey } from "@/lib/format"
-import type { Priority, Task, TaskStatus, TaskType } from "@/lib/types"
+import type { Course, Priority, Task, TaskStatus, TaskType } from "@/lib/types"
 
 // Labels and rules for tasks, shared by every page that shows them.
 
@@ -25,8 +24,10 @@ export const typeLabel: Record<TaskType, string> = {
   exam: "Exam",
   quiz: "Quiz",
   project: "Project",
+  paper: "Paper",
   reading: "Reading",
   lab: "Lab report",
+  presentation: "Presentation",
   study: "Study",
   other: "Other",
 }
@@ -76,10 +77,10 @@ export function byPriority(a: Task, b: Task): number {
   return priorities.indexOf(a.priority) - priorities.indexOf(b.priority) || byDue(a, b)
 }
 
-const courseOrder = new Map(courses.map((course, index) => [course.id, index]))
-
-export function byCourse(a: Task, b: Task): number {
-  return (courseOrder.get(a.courseId) ?? 99) - (courseOrder.get(b.courseId) ?? 99) || byDue(a, b)
+// Sorts by the order courses are listed in, then by due date.
+export function byCourse(courses: Course[]): (a: Task, b: Task) => number {
+  const order = new Map(courses.map((course, index) => [course.id, index]))
+  return (a, b) => (order.get(a.courseId) ?? courses.length) - (order.get(b.courseId) ?? courses.length) || byDue(a, b)
 }
 
 // ---- Selections ----------------------------------------------------------

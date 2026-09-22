@@ -13,16 +13,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { courses } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { addDays } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { priorities, priorityLabel, statusLabel, typeLabel } from "@/lib/tasks"
 import type { Priority, Task, TaskInput, TaskStatus, TaskType } from "@/lib/types"
 
-const courseOptions = courses.map((course) => ({
-  value: course.id,
-  label: `${course.code} · ${course.name}`,
-}))
 const typeOptions = Object.entries(typeLabel).map(([value, label]) => ({ value, label })) as Option<TaskType>[]
 const priorityOptions = priorities.map((value) => ({ value, label: priorityLabel[value] }))
 const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label })) as Option<TaskStatus>[]
@@ -64,6 +60,8 @@ function TaskForm({
   onDone: () => void
 }) {
   const { today, addTask, updateTask } = useTasks()
+  const { courses } = useCourses()
+  const courseOptions = courses.map((course) => ({ value: course.id, label: `${course.code} · ${course.name}` }))
   const [title, setTitle] = useState(task?.title ?? "")
   const [description, setDescription] = useState(task?.description ?? "")
   const [courseId, setCourseId] = useState(task?.courseId ?? defaultCourseId ?? courses[0].id)

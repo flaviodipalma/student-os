@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { busyRanges, durationMinutes, eventsOn } from "@/lib/events"
 import { addDays, formatRelativeDay, formatWeekday, fromDateKey } from "@/lib/format"
@@ -54,6 +54,7 @@ function summarize(day: WeekDay): string {
 export function WeekOverview({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
   const { events } = useEvents()
+  const { getCourse } = useCourses()
   const label = (task: Task) => `${getCourse(task.courseId)?.code ?? ""} ${task.title}`.trim()
 
   // Open graded work due in the next 7 days.

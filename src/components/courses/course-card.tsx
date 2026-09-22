@@ -25,7 +25,7 @@ export function CourseCard({ course }: { course: Course }) {
           <div>
             <p className="text-sm font-medium text-muted-foreground">{course.code}</p>
             <h2 className="mt-0.5 text-lg font-semibold leading-snug">{course.name}</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">{course.professor}</p>
+            {course.professor && <p className="mt-0.5 text-sm text-muted-foreground">{course.professor}</p>}
           </div>
           <ChevronRightIcon
             aria-hidden

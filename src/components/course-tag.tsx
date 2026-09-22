@@ -7,6 +7,7 @@ export const courseColorClass: Record<CourseColor, string> = {
   emerald: "bg-emerald-500",
   violet: "bg-violet-500",
   orange: "bg-orange-500",
+  rose: "bg-rose-600",
 }
 
 export function CourseTag({

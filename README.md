@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Student OS
 
-## Getting Started
+A planner for college students that answers "What should I do today?", built with Next.js, TypeScript and Tailwind.
 
-First, run the development server:
+## Run it locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Syllabus import (AI)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Courses → **Import syllabus** reads a PDF syllabus and turns its course details and deadlines into tasks, after you review and confirm them. It uses Claude on the server.
 
-## Learn More
+1. Copy `.env.example` to `.env.local`.
+2. Set `ANTHROPIC_API_KEY` to your Claude API key.
+3. Restart `npm run dev`.
 
-To learn more about Next.js, take a look at the following resources:
+The key is only read on the server and is never sent to the browser. Without a key, the importer shows "Syllabus import isn't set up yet". For development without a key, `SYLLABUS_AI_PROVIDER=mock` uses a simple pattern matcher instead of AI.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Checks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx tsc --noEmit   # types
+npm run lint       # lint
+npm test           # unit tests (Vitest)
+npm run build      # production build
+```

@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useCourses } from "@/lib/course-store"
 import { useTasks } from "@/lib/task-store"
 import { byCourse, byDue, byPriority, isDone } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
@@ -36,14 +37,14 @@ const sorts = [
   { value: "course", label: "Course" },
 ] as const
 
-const compare: Record<Sort, (a: Task, b: Task) => number> = {
-  due: byDue,
-  priority: byPriority,
-  course: byCourse,
-}
-
 export function TasksView() {
   const { tasks, today } = useTasks()
+  const { courses } = useCourses()
+  const compare: Record<Sort, (a: Task, b: Task) => number> = {
+    due: byDue,
+    priority: byPriority,
+    course: byCourse(courses),
+  }
   const [filter, setFilter] = useState<Filter>("upcoming")
   const [sort, setSort] = useState<Sort>("due")
 

@@ -3,7 +3,7 @@
 import { CalendarIcon, ClockIcon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
 import { Checkbox } from "@/components/ui/checkbox"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { useTasks } from "@/lib/task-store"
 import { formatDue, formatEstimate, isDone, isOverdue } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
@@ -24,7 +24,7 @@ export function TaskRow({
   actions?: React.ReactNode
 }) {
   const { today, setStatus } = useTasks()
-  const course = getCourse(task.courseId)
+  const course = useCourses().getCourse(task.courseId)
   const done = isDone(task)
   const overdue = isOverdue(task, today)
   const checkboxId = `task-${task.id}`

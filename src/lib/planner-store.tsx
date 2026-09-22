@@ -2,7 +2,7 @@
 
 import { createContext, use, useMemo, useState } from "react"
 import { useNow } from "@/lib/clock"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { generatePlan, type DailyPlan, type StudySession } from "@/lib/planner"
 import { useTasks } from "@/lib/task-store"
@@ -52,21 +52,21 @@ export function usePlan(date: string): DailyPlan {
 }
 
 // The title a study session gets on the calendar.
-export function sessionTitle(task: Task): string {
-  const code = getCourse(task.courseId)?.code
-  return `Study — ${code ? `${code} ` : ""}${task.title}`
+export function sessionTitle(task: Task, courseCode?: string): string {
+  return `Study — ${courseCode ? `${courseCode} ` : ""}${task.title}`
 }
 
 export function usePlanActions() {
   const { addEvent, updateEvent, deleteEvent } = useEvents()
   const { setSkipped } = usePlannerStore()
+  const { getCourse } = useCourses()
 
   const skip = (taskId: string, date: string) =>
     setSkipped((prev) => new Set(prev).add(skipKey(taskId, date)))
 
   const toEvent = (session: StudySession, task: Task, completed: boolean) =>
     addEvent({
-      title: sessionTitle(task),
+      title: sessionTitle(task, getCourse(task.courseId)?.code),
       date: session.date,
       startTime: session.startTime,
       endTime: session.endTime,

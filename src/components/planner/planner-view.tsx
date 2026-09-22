@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { eventsOn, toMinutes } from "@/lib/events"
 import { addDays, formatDuration, formatRelativeDay, formatTime, fromDateKey } from "@/lib/format"
@@ -177,6 +177,7 @@ const emptyMessage: Record<DailyPlan["status"], (day: string) => string> = {
 
 function Recommended({ plan, taskById, dayWord }: { plan: DailyPlan; taskById: Map<string, Task>; dayWord: string }) {
   const actions = usePlanActions()
+  const { getCourse } = useCourses()
   const sessions = [...plan.existingSessions, ...plan.suggestions].sort((a, b) => a.startTime.localeCompare(b.startTime))
   const time = (s: StudySession, hhmm: string) => formatTime(fromDateKey(s.date, hhmm))
 
@@ -294,6 +295,7 @@ function NeedsAttention({
   dayWord: string
   today: string
 }) {
+  const { getCourse } = useCourses()
   const count = plan.unscheduled.length
   if (count === 0) return null
 

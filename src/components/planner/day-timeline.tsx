@@ -4,7 +4,7 @@ import { CircleCheckIcon, SparklesIcon } from "lucide-react"
 import { eventStyle } from "@/components/calendar/event-style"
 import { CourseTag } from "@/components/course-tag"
 import { useNow } from "@/lib/clock"
-import { getCourse } from "@/lib/data/courses"
+import { useCourses } from "@/lib/course-store"
 import { eventTypeLabel, toMinutes } from "@/lib/events"
 import { formatDuration, formatTime, fromDateKey, toDateKey } from "@/lib/format"
 import type { TimelineItem } from "@/lib/planner"
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 export function DayTimeline({ date, items }: { date: string; items: TimelineItem[] }) {
   const now = useNow()
   const { tasks } = useTasks()
+  const { getCourse } = useCourses()
   const isToday = date === toDateKey(now)
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const time = (hhmm: string) => formatTime(fromDateKey(date, hhmm))

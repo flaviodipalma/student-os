@@ -6,21 +6,24 @@ import { courseColorClass } from "@/components/course-tag"
 import { NewTaskButton } from "@/components/tasks/new-task-button"
 import { TaskList } from "@/components/tasks/task-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useCourses } from "@/lib/course-store"
 import { useTasks } from "@/lib/task-store"
 import { byDue, formatDue, isDone, tasksForCourse, upcomingDeadlines } from "@/lib/tasks"
-import type { Course, Task, TaskType } from "@/lib/types"
+import type { Task, TaskType } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 // Open work is split into these groups; finished work goes to "Completed".
 const groups: { title: string; types: TaskType[]; empty: string }[] = [
-  { title: "Upcoming assignments", types: ["assignment"], empty: "No open assignments." },
+  { title: "Upcoming assignments", types: ["assignment", "paper"], empty: "No open assignments." },
   { title: "Exams & quizzes", types: ["exam", "quiz"], empty: "No exams or quizzes coming up." },
-  { title: "Projects", types: ["project"], empty: "No open projects." },
+  { title: "Projects", types: ["project", "presentation"], empty: "No open projects." },
   { title: "Other deadlines", types: ["reading", "lab", "study", "other"], empty: "Nothing else due." },
 ]
 
-export function CourseDetail({ course }: { course: Course }) {
+export function CourseDetail({ courseId }: { courseId: string }) {
   const { tasks, today } = useTasks()
+  const course = useCourses().getCourse(courseId)
+  if (!course) return <CourseNotFound />
   const courseTasks = tasksForCourse(tasks, course.id)
   const open = courseTasks.filter((task) => !isDone(task)).sort(byDue)
   const completed = courseTasks.filter(isDone).sort((a, b) => byDue(b, a))
@@ -28,6 +31,7 @@ export function CourseDetail({ course }: { course: Course }) {
 
   return (
     <div className="space-y-6">
+      <title>{`${course.code} ${course.name} · Student OS`}</title>
       <Link
         href="/courses"
         className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -43,11 +47,11 @@ export function CourseDetail({ course }: { course: Course }) {
             <div>
               <p className="text-sm font-medium text-muted-foreground">{course.code}</p>
               <h1 className="mt-0.5 text-2xl font-semibold tracking-tight md:text-3xl">{course.name}</h1>
-              <p className="mt-1 text-muted-foreground">{course.professor}</p>
+              {course.professor && <p className="mt-1 text-muted-foreground">{course.professor}</p>}
             </div>
             <NewTaskButton courseId={course.id} label="Add task" />
           </div>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed">{course.description}</p>
+          {course.description && <p className="mt-4 max-w-2xl text-sm leading-relaxed">{course.description}</p>}
           <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-4 border-t pt-5 text-sm">
             <Stat label="Open tasks" value={String(open.length)} />
             <Stat label="Completed" value={String(completed.length)} />
@@ -80,6 +84,21 @@ export function CourseDetail({ course }: { course: Course }) {
         />
       ))}
       <TaskGroup title="Completed" tasks={completed} empty="Nothing completed yet." />
+    </div>
+  )
+}
+
+// Courses live in the browser's course store, so an unknown id is handled here
+// rather than by the server.
+function CourseNotFound() {
+  return (
+    <div className="rounded-xl border border-dashed px-6 py-12 text-center">
+      <title>Course not found · Student OS</title>
+      <h1 className="text-lg font-semibold">Course not found</h1>
+      <p className="mt-1 text-sm text-muted-foreground">It may have been removed, or the link is wrong.</p>
+      <Link href="/courses" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+        Back to courses
+      </Link>
     </div>
   )
 }
