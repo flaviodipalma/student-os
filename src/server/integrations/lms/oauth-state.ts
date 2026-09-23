@@ -1,6 +1,6 @@
 import "server-only"
 
-import { randomBytes, timingSafeEqual } from "node:crypto"
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import type { LmsProviderId } from "@/lib/types"
 import type { CredentialVault } from "./credential-vault"
 
@@ -12,12 +12,17 @@ import type { CredentialVault } from "./credential-vault"
 // with the app's key (so it can't be read or forged). The callback accepts only:
 //   the same state (compared in constant time), from the same signed-in student,
 //   for the same provider, within 10 minutes. The cookie is deleted either way.
+//
+// The cookie also carries the PKCE code verifier (RFC 7636) for the attempt, so
+// a stolen authorization code is useless without this student's browser.
 
 export const OAUTH_STATE_MAX_AGE_SECONDS = 600
 
 export const oauthStateCookieName = (provider: LmsProviderId) => `lms_oauth_${provider}`
+// The cookie is only sent to the provider's callback route.
+export const oauthCookiePath = (provider: LmsProviderId) => `/api/integrations/${provider}`
 
-type Payload = { state: string; userId: string; baseUrl: string; issuedAt: number }
+type Payload = { state: string; userId: string; baseUrl: string; issuedAt: number; codeVerifier: string }
 
 const context = (provider: LmsProviderId) => `oauth-state:${provider}`
 
@@ -25,18 +30,25 @@ export function createOAuthState(
   input: { provider: LmsProviderId; userId: string; baseUrl: string },
   vault: CredentialVault,
   now = new Date()
-): { state: string; cookieValue: string } {
+): { state: string; codeVerifier: string; cookieValue: string } {
   const state = randomBytes(32).toString("base64url")
-  const payload: Payload = { state, userId: input.userId, baseUrl: input.baseUrl, issuedAt: now.getTime() }
-  return { state, cookieValue: vault.seal(JSON.stringify(payload), context(input.provider)) }
+  // 43 characters of [A-Za-z0-9_-]: a valid PKCE verifier.
+  const codeVerifier = randomBytes(32).toString("base64url")
+  const payload: Payload = { state, userId: input.userId, baseUrl: input.baseUrl, issuedAt: now.getTime(), codeVerifier }
+  return { state, codeVerifier, cookieValue: vault.seal(JSON.stringify(payload), context(input.provider)) }
 }
 
-// The LMS address the flow was started for, or null if anything doesn't match.
+// PKCE S256: BASE64URL(SHA256(verifier)).
+export function pkceChallenge(codeVerifier: string): string {
+  return createHash("sha256").update(codeVerifier, "ascii").digest("base64url")
+}
+
+// The LMS address (and PKCE verifier) the flow was started with, or null if anything doesn't match.
 export function verifyOAuthState(
   input: { provider: LmsProviderId; userId: string; state: string | null; cookieValue: string | undefined },
   vault: CredentialVault,
   now = new Date()
-): { baseUrl: string } | null {
+): { baseUrl: string; codeVerifier: string } | null {
   if (!input.state || !input.cookieValue) return null
   let payload: Payload
   try {
@@ -49,5 +61,6 @@ export function verifyOAuthState(
   if (expected.length === 0 || expected.length !== received.length || !timingSafeEqual(expected, received)) return null
   if (payload.userId !== input.userId) return null
   if (now.getTime() - payload.issuedAt > OAUTH_STATE_MAX_AGE_SECONDS * 1000 || now.getTime() < payload.issuedAt) return null
-  return { baseUrl: payload.baseUrl }
+  if (typeof payload.codeVerifier !== "string" || !payload.codeVerifier) return null
+  return { baseUrl: payload.baseUrl, codeVerifier: payload.codeVerifier }
 }

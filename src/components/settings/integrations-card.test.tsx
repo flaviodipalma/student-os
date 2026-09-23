@@ -20,6 +20,8 @@ vi.mock("@/app/actions/integrations", () => ({
   disconnectLmsAction: mocks.disconnectLmsAction,
   connectCanvasAction: vi.fn(async () => ({ error: null })),
   connectCanvasFeedAction: vi.fn(async () => ({ error: null, connected: false })),
+  connectBlackboardAction: vi.fn(async () => ({ error: null })),
+  connectBlackboardFeedAction: vi.fn(async () => ({ error: null, connected: false })),
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
 vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({ replaceCoursesAndTasks: mocks.replaceCoursesAndTasks }) }))
@@ -42,7 +44,30 @@ const canvas = (connection: Partial<NonNullable<LmsIntegrationStatus["connection
       ...connection,
     },
   },
-  { provider: "blackboard", name: "Blackboard", available: false, configured: false, connection: null },
+  { provider: "blackboard", name: "Blackboard", available: true, configured: false, connection: null },
+]
+
+const withBlackboard = (
+  connection: Partial<NonNullable<LmsIntegrationStatus["connection"]>> | null,
+  configured = true,
+  canvasConnection: Partial<NonNullable<LmsIntegrationStatus["connection"]>> | null = null
+): LmsIntegrationStatus[] => [
+  canvas(canvasConnection)[0],
+  {
+    provider: "blackboard",
+    name: "Blackboard",
+    available: true,
+    configured,
+    connection: connection && {
+      provider: "blackboard",
+      method: "oauth",
+      status: "connected",
+      connectedAt: "2026-09-23T10:00:00.000Z",
+      lastSyncedAt: null,
+      lastSyncError: null,
+      ...connection,
+    },
+  },
 ]
 
 const result = (overrides: Partial<LmsSyncResult> = {}): LmsSyncResult => ({
@@ -71,7 +96,7 @@ afterEach(cleanup)
 
 describe("Canvas in Settings", () => {
   it("shows the connection and when it last synced", async () => {
-    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} canvasOutcome={null} timeZone="UTC" />)
+    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     expect(screen.getByText("Connected")).toBeTruthy()
     expect(await screen.findByText("just now")).toBeTruthy()
     expect(screen.getByRole("button", { name: /Sync now/ })).toBeTruthy()
@@ -79,7 +104,7 @@ describe("Canvas in Settings", () => {
   })
 
   it("offers 'Import Canvas data' before the first sync", () => {
-    render(<IntegrationsCard integrations={canvas({})} canvasOutcome="connected" timeZone="UTC" />)
+    render(<IntegrationsCard integrations={canvas({})} outcomes={{ canvas: "connected" }} timeZone="UTC" />)
     expect(screen.getByText(/Canvas connected\./)).toBeTruthy()
     expect(screen.getByRole("button", { name: /Import Canvas data/ })).toBeTruthy()
   })
@@ -87,7 +112,7 @@ describe("Canvas in Settings", () => {
   it("syncs once (no double submit), shows progress, then the summary", async () => {
     let finish!: (value: unknown) => void
     mocks.syncLmsAction.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
-    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} canvasOutcome={null} timeZone="UTC" />)
+    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     const user = userEvent.setup()
 
     await user.click(screen.getByRole("button", { name: /Sync now/ }))
@@ -120,7 +145,7 @@ describe("Canvas in Settings", () => {
         tasks: [],
       },
     })
-    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} canvasOutcome={null} timeZone="UTC" />)
+    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     await userEvent.setup().click(screen.getByRole("button", { name: /Sync now/ }))
     expect(await screen.findByText("Canvas sync completed with some issues.")).toBeTruthy()
     expect(screen.getByText("1 task marked done (submitted in Canvas)")).toBeTruthy()
@@ -131,7 +156,7 @@ describe("Canvas in Settings", () => {
 
   it("shows a simple error and lets the student try again", async () => {
     mocks.syncLmsAction.mockResolvedValue({ ok: false, error: "Canvas is busy right now. Please try again in a few minutes.", code: "validation" })
-    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} canvasOutcome={null} timeZone="UTC" />)
+    render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     await userEvent.setup().click(screen.getByRole("button", { name: /Sync now/ }))
     expect((await screen.findByRole("alert")).textContent).toContain("Canvas is busy right now")
     await waitFor(() => expect((screen.getByRole("button", { name: /Sync now/ }) as HTMLButtonElement).disabled).toBe(false))
@@ -141,7 +166,7 @@ describe("Canvas in Settings", () => {
     render(
       <IntegrationsCard
         integrations={canvas({ method: "calendar_feed", status: "needs_reauth", lastSyncError: "This Canvas calendar feed link no longer works. Paste a new one from Canvas." })}
-        canvasOutcome={null}
+        outcomes={{}}
         timeZone="UTC"
       />
     )
@@ -151,17 +176,98 @@ describe("Canvas in Settings", () => {
   })
 
   it("not connected: the feed link first, and 'sign in' only when the school's key is set up", () => {
-    const { rerender } = render(<IntegrationsCard integrations={canvas(null)} canvasOutcome={null} timeZone="UTC" />)
+    const { rerender } = render(<IntegrationsCard integrations={canvas(null)} outcomes={{}} timeZone="UTC" />)
     expect(screen.getByLabelText("Your Canvas Calendar Feed link")).toBeTruthy()
     expect(screen.queryByText(/Or sign in with Canvas/)).toBeNull()
-    rerender(<IntegrationsCard integrations={canvas(null, true)} canvasOutcome={null} timeZone="UTC" />)
+    rerender(<IntegrationsCard integrations={canvas(null, true)} outcomes={{}} timeZone="UTC" />)
     expect(screen.getByText(/Or sign in with Canvas/)).toBeTruthy()
-    expect(screen.getByText("Blackboard integration coming soon.")).toBeTruthy()
+    expect(screen.getByLabelText("Your Blackboard calendar link")).toBeTruthy()
   })
 
   it("never renders a token or feed link (only safe summaries reach it)", () => {
-    const { container } = render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} canvasOutcome={null} timeZone="UTC" />)
+    const { container } = render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     expect(container.innerHTML).not.toMatch(/token|feeds\/calendars\/user_[A-Za-z0-9]/)
+  })
+})
+
+describe("Blackboard in Settings", () => {
+  it("without server sign-in: offers the calendar link only (no admin approval needed)", () => {
+    render(<IntegrationsCard integrations={withBlackboard(null, false)} outcomes={{}} timeZone="UTC" />)
+    expect(screen.getByLabelText("Your Blackboard calendar link")).toBeTruthy()
+    expect(screen.getByText(/Share Calendar/)).toBeTruthy()
+    expect(screen.queryByLabelText("Your school's Blackboard address")).toBeNull()
+    expect(screen.queryByLabelText(/password/i)).toBeNull()
+  })
+
+  it("with server sign-in: the calendar link first, then 'sign in with Blackboard'", () => {
+    render(<IntegrationsCard integrations={withBlackboard(null)} outcomes={{}} timeZone="UTC" />)
+    expect(screen.getByLabelText("Your Blackboard calendar link")).toBeTruthy()
+    expect(screen.getByText(/Or sign in with Blackboard/)).toBeTruthy()
+    expect(screen.getByLabelText("Your school's Blackboard address")).toBeTruthy()
+  })
+
+  it("connected through the calendar link: says so, and asks for a new link when it stops working", () => {
+    const { rerender } = render(
+      <IntegrationsCard integrations={withBlackboard({ method: "calendar_feed", lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />
+    )
+    expect(screen.getByText(/Through your calendar link/)).toBeTruthy()
+    rerender(
+      <IntegrationsCard
+        integrations={withBlackboard({ method: "calendar_feed", status: "needs_reauth", lastSyncError: "This Blackboard calendar link no longer works. Copy a new one from Blackboard." })}
+        outcomes={{}}
+        timeZone="UTC"
+      />
+    )
+    expect(screen.getByText(/calendar link no longer works/)).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Update feed link/ })).toBeTruthy()
+  })
+
+  it("after the callback: 'Blackboard connected' and 'Import Blackboard data'", () => {
+    render(<IntegrationsCard integrations={withBlackboard({})} outcomes={{ blackboard: "connected" }} timeZone="UTC" />)
+    expect(screen.getByText(/Blackboard connected\./)).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Import Blackboard data/ })).toBeTruthy()
+  })
+
+  it("explains an unapproved app, a canceled sign-in and a failed one", () => {
+    const { rerender } = render(<IntegrationsCard integrations={withBlackboard(null)} outcomes={{ blackboard: "not_approved" }} timeZone="UTC" />)
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Your school hasn't enabled Student OS in Blackboard yet. Ask your Blackboard administrator to approve it."
+    )
+    rerender(<IntegrationsCard integrations={withBlackboard(null)} outcomes={{ blackboard: "denied" }} timeZone="UTC" />)
+    expect(screen.getByRole("alert").textContent).toBe("Blackboard authorization was canceled.")
+    rerender(<IntegrationsCard integrations={withBlackboard(null)} outcomes={{ blackboard: "<script>" }} timeZone="UTC" />)
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("syncs Blackboard (not Canvas) and shows the summary in Blackboard's words", async () => {
+    mocks.syncLmsAction.mockResolvedValue({ ok: true, data: { result: result({ provider: "blackboard" }), courses: [], tasks: [] } })
+    render(
+      <IntegrationsCard
+        integrations={withBlackboard({ lastSyncedAt: new Date().toISOString() }, true, { lastSyncedAt: new Date().toISOString() })}
+        outcomes={{}}
+        timeZone="UTC"
+      />
+    )
+    const [, blackboardSync] = screen.getAllByRole("button", { name: /Sync now/ })
+    await userEvent.setup().click(blackboardSync)
+    expect(mocks.syncLmsAction).toHaveBeenCalledWith("blackboard")
+    expect(await screen.findByText("Blackboard sync complete.")).toBeTruthy()
+    expect(screen.getByText("1 assignment without a due date in Blackboard weren't imported")).toBeTruthy()
+    expect(screen.getAllByText("Connected")).toHaveLength(2)
+  })
+
+  it("needs attention: shows the reason and offers to reconnect or disconnect", () => {
+    render(
+      <IntegrationsCard
+        integrations={withBlackboard({ status: "needs_reauth", lastSyncError: "Your Blackboard connection expired. Please reconnect." })}
+        outcomes={{}}
+        timeZone="UTC"
+      />
+    )
+    expect(screen.getByText("Needs attention")).toBeTruthy()
+    expect(screen.getByText("Your Blackboard connection expired. Please reconnect.")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Reconnect" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Disconnect/ })).toBeTruthy()
   })
 })
 

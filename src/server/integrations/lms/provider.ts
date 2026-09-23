@@ -32,6 +32,8 @@ export type LmsAccess = {
   baseUrl: string
   // The student's time zone, for turning LMS timestamps into local dates.
   timeZone: string | undefined
+  // The student's id in the LMS, as saved when they connected (null if unknown).
+  externalUserId: string | null
   // A valid access token (refreshed first if it's about to expire).
   getAccessToken(): Promise<string>
   // Force a refresh, e.g. after the LMS answered 401. Throws if reconnecting is needed.
@@ -50,9 +52,11 @@ export interface LmsProvider {
   // Where to send the student to approve access. `state` is a random, single-use
   // value created and checked by the server (CSRF protection for the callback).
   // The redirect URI is server configuration, never taken from the request.
-  getAuthorizationUrl(request: { baseUrl: string; state: string }): string
-  // The OAuth callback: trade the one-time code for tokens.
-  exchangeCode(request: { baseUrl: string; code: string }): Promise<LmsTokenSet>
+  // `codeVerifier` is the PKCE secret for this attempt (RFC 7636), kept in the
+  // encrypted state cookie; providers that support PKCE send its S256 challenge.
+  getAuthorizationUrl(request: { baseUrl: string; state: string; codeVerifier: string }): string
+  // The OAuth callback: trade the one-time code (and the PKCE verifier) for tokens.
+  exchangeCode(request: { baseUrl: string; code: string; codeVerifier: string }): Promise<LmsTokenSet>
   refreshTokens(request: { baseUrl: string; refreshToken: string }): Promise<LmsTokenSet>
   // Tell the LMS to forget the token (on disconnect), where the provider supports it.
   revokeTokens(request: { baseUrl: string; accessToken: string }): Promise<void>
@@ -73,6 +77,15 @@ export class LmsError extends AppError {
   ) {
     super("validation", message)
     this.name = "LmsError"
+  }
+}
+
+// The LMS rejected Student OS itself (not the student): the school hasn't
+// approved or enabled the app. Only an LMS administrator can fix this.
+export class LmsNotApprovedError extends LmsError {
+  constructor(message: string) {
+    super(message, "connection", false)
+    this.name = "LmsNotApprovedError"
   }
 }
 

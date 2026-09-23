@@ -1,9 +1,10 @@
 import "server-only"
 
 import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
+import { fetchIcsFeed } from "../feed-fetch"
+import { parseIcs, type IcsEvent } from "../ical"
 import { LmsError } from "../provider"
 import { parseCanvasBaseUrl } from "./config"
-import { looksLikeIcs, parseIcs, type IcsEvent } from "./ical"
 import { canvasCourseUrl, canvasDueToLocal, safeCanvasUrl } from "./mapping"
 import type { Fetch } from "./oauth"
 
@@ -22,8 +23,6 @@ import type { Fetch } from "./oauth"
 // The link works like a password (anyone with it can read the calendar): it's
 // stored encrypted, only fetched by the server, never shown again or logged.
 
-const MAX_BYTES = 5 * 1024 * 1024
-const TIMEOUT_MS = 15_000
 const FEED_PATH = /^\/feeds\/calendars\/[A-Za-z0-9_.-]+\.ics$/
 
 // The feed link -> { baseUrl, feedUrl }. Only Canvas feed links on an allowed
@@ -46,40 +45,18 @@ export function parseCanvasFeedUrl(input: string, allowedHosts: string[]): { bas
 }
 
 // Downloads the feed (size- and time-limited; redirects aren't followed).
-export async function fetchCanvasFeed(feedUrl: string, fetchImpl: Fetch = fetch): Promise<string> {
-  let response: Response
-  try {
-    response = await fetchImpl(feedUrl, {
-      headers: { Accept: "text/calendar" },
-      redirect: "error",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-  } catch {
-    throw new LmsError("Canvas is temporarily unavailable. Please try again.")
-  }
-  if (response.status === 404 || response.status === 401 || response.status === 403) {
-    throw new LmsError("This Canvas calendar feed link no longer works. Paste a new one from Canvas.", "connection", true)
-  }
-  if (!response.ok) throw new LmsError("Canvas is temporarily unavailable. Please try again.")
-
-  // Read at most MAX_BYTES.
-  const reader = response.body?.getReader()
-  if (!reader) throw new LmsError("Canvas sent a calendar Student OS couldn't read.")
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > MAX_BYTES) {
-      await reader.cancel()
-      throw new LmsError("This Canvas calendar is too large to import.")
-    }
-    chunks.push(value)
-  }
-  const text = new TextDecoder().decode(Buffer.concat(chunks))
-  if (!looksLikeIcs(text)) throw new LmsError("That link didn't return a Canvas calendar. Check that you copied the Calendar Feed link.")
-  return text
+export function fetchCanvasFeed(feedUrl: string, fetchImpl: Fetch = fetch): Promise<string> {
+  return fetchIcsFeed(
+    feedUrl,
+    {
+      unavailable: "Canvas is temporarily unavailable. Please try again.",
+      linkBroken: "This Canvas calendar feed link no longer works. Paste a new one from Canvas.",
+      unreadable: "Canvas sent a calendar Student OS couldn't read.",
+      tooLarge: "This Canvas calendar is too large to import.",
+      notACalendar: "That link didn't return a Canvas calendar. Check that you copied the Calendar Feed link.",
+    },
+    fetchImpl
+  )
 }
 
 const ASSIGNMENT_UID = /^event-(assignment|sub-assignment)-(\d+)$/

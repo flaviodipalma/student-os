@@ -2,12 +2,12 @@ import "server-only"
 
 import { and, eq } from "drizzle-orm"
 import type { LmsCredentials } from "@/lib/lms/types"
-import type { LmsProviderId } from "@/lib/types"
+import { lmsProviderNames, type LmsProviderId } from "@/lib/types"
 import { lmsConnections } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { NotFoundError } from "../../errors"
-import { credentialContext, type CredentialVault } from "./credential-vault"
-import type { LmsTokenSet } from "./provider"
+import { credentialContext, CredentialVaultError, type CredentialVault } from "./credential-vault"
+import { LmsError, type LmsTokenSet } from "./provider"
 import { listLmsProviders } from "./registry"
 
 // A student's LMS connections. Every function takes the signed-in student's id
@@ -36,6 +36,18 @@ export type LmsIntegrationStatus = {
   // The server has the provider's OAuth app settings.
   configured: boolean
   connection: LmsConnectionSummary | null
+}
+
+// A saved connection that can't be decrypted (e.g. the server's encryption key
+// was replaced) can't be used again: the student reconnects, nothing else breaks.
+function openSaved<T>(provider: LmsProviderId, read: () => T): T {
+  try {
+    return read()
+  } catch (error) {
+    if (!(error instanceof CredentialVaultError)) throw error
+    const name = lmsProviderNames[provider]
+    throw new LmsError(`Student OS can't use your saved ${name} connection anymore. Please connect ${name} again.`, "connection", true)
+  }
 }
 
 const connectionFor = (userId: string, provider: LmsProviderId) =>
@@ -117,10 +129,13 @@ export async function loadLmsCredentials(
   if (!row?.accessTokenEncrypted) throw new NotFoundError("LMS connection")
   const context = credentialContext(userId, provider)
   return {
-    accessToken: vault.open(row.accessTokenEncrypted, context),
-    refreshToken: row.refreshTokenEncrypted ? vault.open(row.refreshTokenEncrypted, context) : null,
+    ...openSaved(provider, () => ({
+      accessToken: vault.open(row.accessTokenEncrypted as string, context),
+      refreshToken: row.refreshTokenEncrypted ? vault.open(row.refreshTokenEncrypted, context) : null,
+    })),
     expiresAt: row.tokenExpiresAt,
     baseUrl: row.baseUrl,
+    externalUserId: row.externalUserId,
   }
 }
 
@@ -214,7 +229,8 @@ export async function loadLmsFeed(
 ): Promise<{ baseUrl: string; feedUrl: string }> {
   const [row] = await db.select().from(lmsConnections).where(connectionFor(userId, provider))
   if (!row?.feedUrlEncrypted || !row.baseUrl) throw new NotFoundError("LMS connection")
-  return { baseUrl: row.baseUrl, feedUrl: vault.open(row.feedUrlEncrypted, feedContext(userId, provider)) }
+  const encrypted = row.feedUrlEncrypted
+  return { baseUrl: row.baseUrl, feedUrl: openSaved(provider, () => vault.open(encrypted, feedContext(userId, provider))) }
 }
 
 export async function getLmsConnectionMethod(

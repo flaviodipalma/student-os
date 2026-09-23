@@ -52,6 +52,8 @@ export type LmsCredentials = {
   expiresAt: Date | null
   // Institution-specific LMS address, e.g. https://school.instructure.com
   baseUrl: string | null
+  // The student's id in the LMS (e.g. Blackboard's "_123_1"), if known.
+  externalUserId: string | null
 }
 
 // What a sync did, shown to the student afterwards.

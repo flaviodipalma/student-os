@@ -17,9 +17,16 @@ import {
   saveLmsConnection,
 } from "./connections"
 import { createCredentialVault, credentialContext, CredentialVaultError } from "./credential-vault"
-import { LmsNotAvailableError, type LmsAccess, type LmsProvider, type LmsTokenSet } from "./provider"
+import { LmsNotAvailableError, UnavailableLmsProvider, type LmsAccess, type LmsProvider, type LmsTokenSet } from "./provider"
 import { getLmsProvider, listLmsProviders } from "./registry"
 import { syncLms } from "./sync"
+
+// An adapter that isn't built yet (every future LMS starts like this).
+class PlaceholderProvider extends UnavailableLmsProvider {
+  readonly id = "blackboard" as const
+  readonly name = "Placeholder LMS"
+  isConfigured = () => false
+}
 
 // The LMS architecture against a real Postgres (PGlite). No Canvas or
 // Blackboard API is called anywhere in here.
@@ -140,22 +147,24 @@ describe("providers", () => {
     expect(getLmsProvider("blackboard").id).toBe("blackboard")
   })
 
-  it("Blackboard isn't implemented yet: every call fails clearly and nothing touches the network", async () => {
+  it("an adapter that isn't built yet fails clearly and never touches the network", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch")
-    const provider = getLmsProvider("blackboard")
-    const access: LmsAccess = {
-      baseUrl: "https://lms.test.invalid",
-      timeZone: undefined,
-      getAccessToken: async () => "x",
-      refreshAccessToken: async () => "x",
-    }
+    const provider = new PlaceholderProvider()
     expect(provider.available).toBe(false)
-    expect(() => provider.getAuthorizationUrl({ baseUrl: "", state: "" })).toThrow(LmsNotAvailableError)
-    await expect(provider.getCourses(access)).rejects.toThrow("Blackboard integration isn't available yet.")
-    await expect(provider.getAssignments(access, "1")).rejects.toBeInstanceOf(LmsNotAvailableError)
-    await expect(provider.exchangeCode({ baseUrl: "", code: "" })).rejects.toBeInstanceOf(LmsNotAvailableError)
+    expect(() => provider.getAuthorizationUrl()).toThrow(LmsNotAvailableError)
+    await expect(provider.getCourses()).rejects.toThrow("Placeholder LMS integration isn't available yet.")
+    await expect(provider.getAssignments()).rejects.toBeInstanceOf(LmsNotAvailableError)
+    await expect(provider.exchangeCode()).rejects.toBeInstanceOf(LmsNotAvailableError)
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+
+  it("Blackboard is implemented, and only usable once the server is configured", () => {
+    const blackboard = getLmsProvider("blackboard")
+    expect(blackboard.available).toBe(true)
+    expect(blackboard.isConfigured()).toBe(
+      Boolean(process.env.BLACKBOARD_CLIENT_ID && process.env.BLACKBOARD_CLIENT_SECRET && process.env.BLACKBOARD_REDIRECT_URI)
+    )
   })
 
   it("Canvas is implemented, and only usable once the server is configured", () => {
@@ -185,11 +194,17 @@ describe("LMS connections", () => {
     expect((await loadLmsCredentials(t.db, user, "canvas", vault)).accessToken).toBe("test-access-token")
   })
 
-  it("shows Canvas as available (if configured) and Blackboard as coming soon in Settings", async () => {
+  it("shows Canvas and Blackboard as available (configured if the server has their app settings)", async () => {
     const user = await t.addUser()
     expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
       { provider: "canvas", name: "Canvas", available: true, configured: getLmsProvider("canvas").isConfigured(), connection: null },
-      { provider: "blackboard", name: "Blackboard", available: false, configured: false, connection: null },
+      {
+        provider: "blackboard",
+        name: "Blackboard",
+        available: true,
+        configured: getLmsProvider("blackboard").isConfigured(),
+        connection: null,
+      },
     ])
   })
 
@@ -212,7 +227,8 @@ describe("LMS connections", () => {
     // Alice's encrypted token copied into Bob's row doesn't decrypt for Bob.
     const [alicesRow] = await t.db.select().from(lmsConnections)
     await t.db.insert(lmsConnections).values({ userId: bob, provider: "canvas", accessTokenEncrypted: alicesRow.accessTokenEncrypted })
-    await expect(loadLmsCredentials(t.db, bob, "canvas", vault)).rejects.toThrow("couldn't be decrypted")
+    // (Bob just sees a "connect again" message; the token is never revealed.)
+    await expect(loadLmsCredentials(t.db, bob, "canvas", vault)).rejects.toThrow("Please connect Canvas again.")
     expect(credentialContext(alice, "canvas")).not.toBe(credentialContext(bob, "canvas"))
   })
 
@@ -365,13 +381,13 @@ describe("syncing (with the test fixture provider)", () => {
   it("an unavailable provider fails safely: nothing imported, a safe message recorded", async () => {
     const user = await t.addUser()
     await saveLmsConnection(t.db, user, "blackboard", tokens(), vault)
-    await expect(syncLms(t.db, user, getLmsProvider("blackboard"), vault, { now: NOW })).rejects.toThrow(
-      "Blackboard integration isn't available yet."
+    await expect(syncLms(t.db, user, new PlaceholderProvider(), vault, { now: NOW })).rejects.toThrow(
+      "Placeholder LMS integration isn't available yet."
     )
     expect((await loadAppData(t.db, user)).courses).toEqual([])
     expect((await listLmsConnections(t.db, user))[0]).toMatchObject({
       status: "error",
-      lastSyncError: "Blackboard integration isn't available yet.",
+      lastSyncError: "Placeholder LMS integration isn't available yet.",
     })
   })
 

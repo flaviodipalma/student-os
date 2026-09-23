@@ -1,10 +1,10 @@
 import "server-only"
 
 import { z } from "zod"
-import { toDateKey } from "@/lib/format"
 import type { LmsAssignment, LmsCourse, LmsSubmissionStatus } from "@/lib/lms/types"
-import { dateFromWallClock, wallClockIn } from "@/lib/time-zone"
 import type { TaskType } from "@/lib/types"
+import { sameOriginUrl } from "../base-url"
+import { htmlToText, utcToLocalDue } from "../normalize"
 
 // Canvas API objects -> Student OS's normalized LMS types. Only the fields
 // Student OS uses are read (per the Canvas Courses and Assignments API docs),
@@ -37,44 +37,12 @@ const canvasAssignment = z.object({
   submission: z.object({ workflow_state: z.string().nullish() }).passthrough().nullish(),
 })
 
-// HTML fragment (Canvas descriptions) -> plain text.
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
-    .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&amp;/gi, "&")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n\s*/g, "\n")
-    .trim()
-}
-
-// Canvas timestamps are ISO 8601 in UTC -> the student's local date and time.
-// Without a known time zone, the server's is used.
-export function canvasDueToLocal(dueAt: string, timeZone: string | undefined): { dueDate: string; dueTime: string } | null {
-  const instant = new Date(dueAt)
-  if (Number.isNaN(instant.getTime())) return null
-  const local = dateFromWallClock(wallClockIn(timeZone, instant))
-  const hh = String(local.getHours()).padStart(2, "0")
-  const mm = String(local.getMinutes()).padStart(2, "0")
-  return { dueDate: toDateKey(local), dueTime: `${hh}:${mm}` }
-}
+// Canvas descriptions are HTML; timestamps are ISO 8601 in UTC (shared LMS helpers).
+export { htmlToText }
+export const canvasDueToLocal = utcToLocalDue
 
 // Only links to the student's own Canvas are kept ("Open in Canvas").
-export function safeCanvasUrl(url: string | null | undefined, baseUrl: string): string | null {
-  if (!url) return null
-  try {
-    const parsed = new URL(url)
-    return parsed.origin === baseUrl && parsed.protocol === "https:" ? parsed.toString() : null
-  } catch {
-    return null
-  }
-}
+export const safeCanvasUrl = sameOriginUrl
 
 // A course's page on the student's Canvas: Canvas's standard /courses/<id> address
 // on the already-validated Canvas host (the Courses API doesn't return a link).

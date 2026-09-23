@@ -67,6 +67,7 @@ export async function createLmsAccess(
   return {
     baseUrl,
     timeZone: options.timeZone,
+    externalUserId: credentials.externalUserId,
     async getAccessToken() {
       if (!fresh && expiresAt && expiresAt.getTime() - EXPIRY_MARGIN_MS <= now().getTime()) return refreshOnce()
       return accessToken

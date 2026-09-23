@@ -3,8 +3,11 @@
 **Status:** Canvas is implemented, read-only, two ways: the student's private
 calendar feed (no school approval needed) or OAuth 2.0 + the REST API (needs a
 developer key from the school).
-Blackboard is not: its adapter makes no network calls and throws
-`LmsNotAvailableError`; Settings shows it as "coming soon".
+Blackboard Learn is implemented, read-only, two ways: the student's private
+calendar link ("Share Calendar", no school approval needed) or three-legged OAuth
+2.0 + the Learn REST API (needs an app registered on the Anthology Developer Portal
+**and approved by the student's school**). Canvas and Blackboard can be connected
+at the same time.
 
 ## Layers
 
@@ -21,9 +24,12 @@ Blackboard API ─> BlackboardProvider ┘        normalized data              p
 | `src/lib/lms/sync-plan.ts` | Pure matching, mapping and the three-way conflict rule |
 | `provider.ts` | The `LmsProvider` contract every adapter implements (OAuth + read) |
 | `canvas/` | Canvas adapter: `config.ts` (settings, address check), `oauth.ts`, `api-client.ts` (pagination, errors), `mapping.ts`, `canvas-provider.ts` |
-| `blackboard/` | Blackboard adapter (not implemented yet) |
+| `blackboard/` | Blackboard Learn adapter: `config.ts`, `oauth.ts` (3LO + PKCE), `api-client.ts` (paging, errors), `mapping.ts`, `blackboard-provider.ts`; calendar link: `feed.ts`, `feed-sync.ts` |
+| `ical.ts`, `feed-fetch.ts` | Shared: iCalendar reader and the safe feed downloader (Canvas and Blackboard feeds) |
+| `base-url.ts`, `normalize.ts` | Shared: LMS address allowlist check, same-origin links, HTML -> text, UTC -> local due dates |
+| `oauth-callback.ts` | The OAuth callback for every provider (`/api/integrations/<provider>/callback`) |
 | `token-service.ts` | The only code that decrypts, refreshes and re-stores tokens (`LmsAccess`) |
-| `oauth-state.ts` | Single-use OAuth `state` in an encrypted HttpOnly cookie (CSRF protection) |
+| `oauth-state.ts` | Single-use OAuth `state` + PKCE verifier in an encrypted HttpOnly cookie (CSRF protection) |
 | `registry.ts` | Picks the adapter for a provider id |
 | `credential-vault.ts` | AES-256-GCM encryption of stored tokens |
 | `connections.ts` | A student's connections: save (encrypted), status (no tokens), disconnect |
@@ -115,11 +121,13 @@ courses no longer in the LMS, safe error messages, and the sync time.
   header, and never returned from a server action, rendered, put in URLs or logged
   (only error *types* are logged).
 - The OAuth `state` is random, single-use, bound to the signed-in student, checked
-  in constant time and expires after 10 minutes. The redirect URI and client secret
-  come from server config, never the request.
-- The student-entered Canvas address is validated against an allowlist before the
-  client secret is ever sent to it (HTTPS only; no IPs, ports or credentials).
-  Pagination links and "Open in Canvas" links are only followed/kept on that same host,
+  in constant time and expires after 10 minutes. It carries a PKCE code verifier
+  (RFC 7636, S256), which Blackboard checks when the code is exchanged. The redirect
+  URI and client secret come from server config, never the request.
+- The student-entered Canvas / Blackboard address is validated against an allowlist
+  (`CANVAS_ALLOWED_HOSTS`, `BLACKBOARD_ALLOWED_HOSTS`) before the client secret is
+  ever sent to it (HTTPS only; no IPs, ports or credentials). Pagination links and
+  "Open in Canvas / Blackboard" links are only followed/kept on that same host,
   and redirects are never followed with a token or secret.
   `LmsConnectionSummary` (what the UI gets) has no tokens or LMS ids.
 - Every query filters by the signed-in student's id (from the session). External
@@ -246,9 +254,136 @@ Without a developer key, `npm test` covers the whole flow against a fake Canvas
   as separate items.
 - Rate-limited or failed requests aren't retried automatically; the student tries again.
 - The OAuth state cookie and tokens depend on `LMS_TOKEN_ENCRYPTION_KEY`; rotating
-  it needs a re-encryption step (the `v1:` prefix allows a `v2` key).
+  it needs a re-encryption step (the `v1:` prefix allows a `v2` key). If the key is
+  lost or replaced, saved connections can't be decrypted: syncing marks them
+  "needs attention" and asks the student to connect again (nothing else breaks).
 
-## Before Blackboard works
+## Blackboard Learn
 
-Implement `blackboard/` like `canvas/` (Blackboard Learn three-legged OAuth and
-REST API), add its callback route and connect action, and remove "coming soon".
+Same architecture as Canvas: `BlackboardProvider` implements `LmsProvider`; the
+connection row, token service, credential vault, OAuth state, sync service,
+matching and conflict rules, summary and Settings UI are all shared. Imported
+records use `external_source = 'blackboard'` with Learn's primary ids
+(`_215_1`), so they never collide with Canvas records, even with identical ids.
+
+Sources: the Learn REST docs (Getting Started > 3-Legged OAuth, Basic
+Authentication, Rate Limits; Hands-on > Gradebook, Calendar APIs) and the Learn
+API spec (Developer Portal, v4000.x).
+
+### Sign-in flow (three-legged OAuth)
+
+1. Settings > Integrations > Blackboard: the student enters their school's
+   Blackboard address and clicks **Connect Blackboard** (`connectBlackboardAction`).
+   The address is validated (`parseBlackboardBaseUrl`). A random `state` and PKCE
+   verifier go into an encrypted HttpOnly cookie (10 minutes, callback path only),
+   and the student is sent to
+   `{learn}/learn/api/public/v1/oauth2/authorizationcode?client_id=<app key>&scope=read offline&state&code_challenge&code_challenge_method=S256`.
+2. The student signs in on the school's own Blackboard page (Student OS never sees
+   the password) and approves.
+3. Learn redirects to `GET /api/integrations/blackboard/callback`. The route checks
+   the state (same as Canvas), then exchanges the code server-side:
+   `POST /learn/api/public/v1/oauth2/token?grant_type=authorization_code&code&redirect_uri&code_verifier`
+   with HTTP Basic `key:secret`. The token names the student by UUID; Student OS
+   looks up their REST primary id once (`GET v1/users/uuid:<id>?fields=id`) and
+   stores it with the encrypted tokens. Outcome codes: `connected`, `denied`,
+   `invalid_state`, `not_approved` (Learn answered 401: the school hasn't approved
+   the app), `not_configured`, `error`.
+4. **Import Blackboard data / Sync now**: `syncLms` with the Blackboard adapter.
+5. **Disconnect** deletes the connection and tokens. Learn's public API has no
+   token revocation endpoint, so nothing is sent to Blackboard; the access token
+   expires within the hour. (A student or admin can remove the app's access in
+   Blackboard.) Imported courses and tasks stay.
+
+Access tokens last about an hour; the `offline` scope gives a refresh token, used by
+the token service like Canvas's (`grant_type=refresh_token`). A rejected refresh
+token marks the connection `needs_reauth`; a 401 for the app itself (approval
+withdrawn) is reported as an error asking the student to contact their admin.
+
+### What is read (all GET, as the student)
+
+| Data | Endpoint | Becomes |
+| --- | --- | --- |
+| Courses | `v1/users/{id}/courses?expand=course` (paged) | `LmsCourse` -> course. Only course role **Student**, membership and course available ("Yes" or "Term"); organizations and courses the student teaches/assists are skipped. Link: the course's `externalAccessUrl` (same host only). |
+| Assignments | `v2/courses/{id}/gradebook/columns` (paged) | `LmsAssignment` -> task. Visible, non-calculated, non-total columns; title `displayName` (Classic) or `name` (Ultra); due `grading.due` in the student's time zone; type from `scoreProviderHandle` (tests -> quiz, discussions/blogs/journals -> other, else assignment); link: the course page (the API has no per-item student link). |
+| Grades | `v2/courses/{id}/gradebook/users/{id}` (1 call per course) | `graded` when a score or text grade exists. Learn's grade `status` field is documented as unreliable and isn't used. |
+| Attempts | `v2/courses/{id}/gradebook/columns/{id}/attempts?userId={id}` | `submitted` if an attempt is NeedsGrading / NeedsGradingAgain / Completed / InProgressAgain, `not_submitted` if none are. Only for ungraded, attempt-based items due in the last 30 days or later, at most 25 per course (Blackboard's default limit is 10,000 calls per day per developer group). |
+
+Anything else is `unknown`: never counted as done. Status rules are Canvas's: done on
+import only if graded/submitted; later only on an observed change to
+graded/submitted while the task isn't done; never un-completed.
+
+**Calendar API:** not used (unsupported, not faked). For students,
+`GET v1/calendars/items` returns gradebook items (already imported above),
+institution and personal events, only in windows of at most 16 weeks, and personal
+items are the student's own Blackboard entries. Class meeting times aren't exposed.
+
+### Calendar link (no school approval)
+
+Blackboard Ultra: **Calendar > Calendar Settings > ⋯ > Share Calendar** gives every
+student a private iCalendar link
+(`https://<school>/webapps/calendar/calendarFeed/<token>/learn.ics`). Settings offers
+it first ("Your Blackboard calendar link"); `connectBlackboardFeedAction` checks it
+(`parseBlackboardFeedUrl`: an allowed Blackboard host, that exact path shape, HTTPS),
+downloads it once, and stores it encrypted (`saveLmsFeedConnection`). Syncs go
+through `syncBlackboardFeed` -> the shared `runSync`.
+
+What the feed contains (checked against a real Learn feed, September 2026; Blackboard
+doesn't document it):
+
+- One event per gradable item, `UID:_blackboard.platform.gradebook2.GradableItem-<column id>`.
+  The column id (`_1598993_1`) is the REST API's gradebook column id, so signing in
+  later reuses the same tasks (tested).
+- `SUMMARY` = title, `DTSTART;TZID=<zone>` = due time, empty `DESCRIPTION`, no URL.
+- **No course information at all.** Items go into one course, "Blackboard" (code
+  `BLACKBOARD`), which the student can rename, or move tasks out of; syncs never
+  move tasks back.
+- Items from a year back to a year ahead. **Only items due today or later are
+  imported**: the feed has no submission status, and importing a year of past work
+  as to-do would flood the Planner. Only those can be reported "no longer in Blackboard".
+- No submission status (always unknown), no estimates, no link.
+
+### Blackboard setup (institution admin required)
+
+1. A developer registers the app at the **Anthology Developer Portal**
+   (developer.anthology.com, formerly developer.blackboard.com) and gets an
+   **Application ID**, **Key** and **Secret**. Register the redirect URI(s):
+   `https://<your domain>/api/integrations/blackboard/callback` (and
+   `http://localhost:3000/...` for development, if the portal allows it).
+2. **The school's Blackboard administrator must add and approve the app** on their
+   Learn server: *System Admin > Integrations > REST API Integrations > Create
+   Integration*, enter the Application ID, choose a user for the integration, and
+   allow **End User Access** (required for three-legged OAuth). Until this is done,
+   Blackboard answers the token request with 401 and Settings says "Your school
+   hasn't enabled Student OS in Blackboard yet."
+3. Schools with a custom login page must use Learn's `<loginUI:loginForm/>` tag,
+   or students get stuck on the Learn landing page after signing in (Blackboard doc
+   "REST Integrations 3-Legged OAuth and Learn Custom Login Pages").
+4. Server env (`.env.local`, never committed):
+   ```
+   BLACKBOARD_CLIENT_ID=<application KEY (not the Application ID)>
+   BLACKBOARD_CLIENT_SECRET=<application secret>
+   BLACKBOARD_REDIRECT_URI=http://localhost:3000/api/integrations/blackboard/callback
+   # schools on their own domain: BLACKBOARD_ALLOWED_HOSTS=*.blackboard.com,learn.myschool.edu
+   ```
+5. In Student OS: Settings > Integrations > Blackboard, enter the school's
+   address, **Connect Blackboard**, sign in, then **Import Blackboard data**.
+
+Without a registered app and an approving school, `npm test` covers the flow
+against a fake Learn server (`blackboard/blackboard.test.ts`,
+`src/app/actions/integrations.test.ts`; fixtures in `src/server/test-utils/fake-blackboard.ts`).
+
+### Known limitations
+
+- Sign-in: one app registration works for every school, but **each school's admin
+  must approve it**. Without that, the calendar link works, with less detail (no
+  course names, no submission status, upcoming items only).
+- The calendar link's path shape comes from a real feed and public school guides;
+  if a school's link looks different, connecting fails with a clear message.
+- Instructors aren't imported (a separate per-course request students often can't make).
+- "Open in Blackboard" opens the course, not the individual item.
+- Items without a due date aren't imported; manual-grade items without a grade stay
+  "unknown"; attempt status is only checked for recent/upcoming items.
+- Courses with the same code in Canvas and Blackboard: the second one is skipped and
+  reported (course codes are unique per student), never merged across LMSs.
+- The live flow hasn't been tested against a real Learn server from this project
+  (no registered app yet): it's built to the official docs and API spec.

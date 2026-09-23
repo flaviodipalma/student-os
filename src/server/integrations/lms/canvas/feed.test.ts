@@ -13,7 +13,7 @@ import { CanvasProvider } from "./canvas-provider"
 import { CANVAS_SCOPES } from "./config"
 import { canvasFeedToLms, fetchCanvasFeed, parseCanvasFeedUrl } from "./feed"
 import { syncCanvasFeed } from "./feed-sync"
-import { parseIcs, unescapeText } from "./ical"
+import { parseIcs, unescapeText } from "../ical"
 
 // Canvas calendar-feed import. TEST FIXTURES: hand-written iCalendar text
 // following the format Canvas's own calendar-feed code produces (UID

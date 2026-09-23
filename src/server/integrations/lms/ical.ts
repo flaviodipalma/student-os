@@ -2,10 +2,10 @@ import "server-only"
 
 import { wallClockIn } from "@/lib/time-zone"
 
-// A small iCalendar (RFC 5545) reader: just what's needed to read a Canvas
-// calendar feed. Handles folded lines, escaped text, and the three kinds of
-// start time Canvas writes: UTC ("...Z" or TZID=UTC), another TZID, and
-// all-day dates (VALUE=DATE).
+// A small iCalendar (RFC 5545) reader: just what's needed to read an LMS
+// calendar feed (Canvas, Blackboard). Handles folded lines, escaped text, and
+// the kinds of start time they write: UTC ("...Z" or TZID=UTC), another TZID
+// (Blackboard: TZID=America/New_York), and all-day dates (VALUE=DATE).
 
 export type IcsStart = { kind: "date"; date: string } | { kind: "instant"; instant: Date }
 

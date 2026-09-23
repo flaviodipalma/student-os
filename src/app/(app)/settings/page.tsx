@@ -1,8 +1,9 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/app-shell/page-header"
-import { IntegrationsCard } from "@/components/settings/integrations-card"
+import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
 import { SettingsView } from "@/components/settings/settings-view"
 import { getNavItem } from "@/lib/navigation"
+import { lmsProviderIds } from "@/lib/types"
 import { requireUser } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { getLmsIntegrationStatus, type LmsIntegrationStatus } from "@/server/integrations/lms/connections"
@@ -22,9 +23,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     console.error("[settings] couldn't load integrations", { name: error instanceof Error ? error.name : typeof error })
   }
 
-  // Where Canvas's sign-in sent the student back to: a short outcome code, never data.
-  const canvas = (await searchParams).canvas
-  const canvasOutcome = typeof canvas === "string" ? canvas : null
+  // Where an LMS sign-in sent the student back to (?canvas=connected, ?blackboard=denied):
+  // a short outcome code, never data.
+  const params = await searchParams
+  const outcomes: IntegrationOutcomes = {}
+  for (const provider of lmsProviderIds) {
+    const outcome = params[provider]
+    if (typeof outcome === "string") outcomes[provider] = outcome
+  }
 
   return (
     <>
@@ -33,7 +39,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <SettingsView />
         <IntegrationsCard
           integrations={integrations}
-          canvasOutcome={canvasOutcome}
+          outcomes={outcomes}
           timeZone={await getStudentTimeZone()}
         />
       </div>

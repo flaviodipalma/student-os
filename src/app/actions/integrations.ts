@@ -5,10 +5,13 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import type { LmsSyncResult } from "@/lib/lms/types"
-import { lmsProviderIds, type Course, type Task } from "@/lib/types"
+import { lmsProviderIds, type Course, type LmsProviderId, type Task } from "@/lib/types"
 import { parse, runAction } from "@/server/actions"
 import { getCurrentUser } from "@/server/auth"
-import { canvasAllowedHosts, canvasConfig, parseCanvasBaseUrl } from "@/server/integrations/lms/canvas/config"
+import { blackboardAllowedHosts, parseBlackboardBaseUrl } from "@/server/integrations/lms/blackboard/config"
+import { fetchBlackboardFeed, parseBlackboardFeedUrl } from "@/server/integrations/lms/blackboard/feed"
+import { syncBlackboardFeed } from "@/server/integrations/lms/blackboard/feed-sync"
+import { canvasAllowedHosts, parseCanvasBaseUrl } from "@/server/integrations/lms/canvas/config"
 import { canvasFeedToLms, fetchCanvasFeed, parseCanvasFeedUrl } from "@/server/integrations/lms/canvas/feed"
 import { syncCanvasFeed } from "@/server/integrations/lms/canvas/feed-sync"
 import {
@@ -18,7 +21,12 @@ import {
   saveLmsFeedConnection,
 } from "@/server/integrations/lms/connections"
 import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
-import { createOAuthState, OAUTH_STATE_MAX_AGE_SECONDS, oauthStateCookieName } from "@/server/integrations/lms/oauth-state"
+import {
+  createOAuthState,
+  OAUTH_STATE_MAX_AGE_SECONDS,
+  oauthCookiePath,
+  oauthStateCookieName,
+} from "@/server/integrations/lms/oauth-state"
 import { LmsError } from "@/server/integrations/lms/provider"
 import { getLmsProvider } from "@/server/integrations/lms/registry"
 import { syncLms } from "@/server/integrations/lms/sync"
@@ -41,36 +49,49 @@ function vault() {
   }
 }
 
-export type ConnectCanvasState = { error: string | null }
+export type ConnectLmsState = { error: string | null }
+export type ConnectCanvasState = ConnectLmsState
 
-// Starts "Connect Canvas": checks the school's Canvas address, remembers a
-// single-use OAuth state in an HttpOnly cookie, and sends the student to Canvas.
-export async function connectCanvasAction(_previous: ConnectCanvasState, form: FormData): Promise<ConnectCanvasState> {
+// Starts signing in with an LMS: checks the school's address, remembers a
+// single-use OAuth state (and PKCE verifier) in an HttpOnly cookie scoped to
+// the callback, and sends the student to the LMS.
+async function startOAuth(provider: LmsProviderId, parseBaseUrl: () => string): Promise<ConnectLmsState> {
   const user = await getCurrentUser()
   if (!user) redirect("/login")
-  const provider = getLmsProvider("canvas")
-  const config = canvasConfig()
-  if (!config) return { error: "Canvas isn't set up on this server yet." }
+  const lms = getLmsProvider(provider)
+  if (!lms.isConfigured()) return { error: `${lms.name} isn't set up on this server yet.` }
 
   let authorizationUrl: string
   try {
-    const baseUrl = parseCanvasBaseUrl(String(form.get("canvasUrl") ?? ""), config.allowedHosts)
-    const { state, cookieValue } = createOAuthState({ provider: "canvas", userId: user.id, baseUrl }, vault())
-    ;(await cookies()).set(oauthStateCookieName("canvas"), cookieValue, {
+    const baseUrl = parseBaseUrl()
+    const { state, codeVerifier, cookieValue } = createOAuthState({ provider, userId: user.id, baseUrl }, vault())
+    ;(await cookies()).set(oauthStateCookieName(provider), cookieValue, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      path: "/api/integrations/canvas",
+      path: oauthCookiePath(provider),
       maxAge: OAUTH_STATE_MAX_AGE_SECONDS,
     })
-    authorizationUrl = provider.getAuthorizationUrl({ baseUrl, state })
+    authorizationUrl = lms.getAuthorizationUrl({ baseUrl, state, codeVerifier })
   } catch (error) {
     if (error instanceof LmsError) return { error: error.message }
-    console.error("[canvas] couldn't start connecting", { name: error instanceof Error ? error.name : typeof error })
-    return { error: "We couldn't start connecting to Canvas. Please try again." }
+    console.error(`[${provider}] couldn't start connecting`, { name: error instanceof Error ? error.name : typeof error })
+    return { error: `We couldn't start connecting to ${lms.name}. Please try again.` }
   }
   // Outside the try: redirect() works by throwing.
   redirect(authorizationUrl)
+}
+
+// "Connect Canvas" (sign in with Canvas, where the school has a developer key).
+export async function connectCanvasAction(_previous: ConnectLmsState, form: FormData): Promise<ConnectLmsState> {
+  return startOAuth("canvas", () => parseCanvasBaseUrl(String(form.get("canvasUrl") ?? ""), canvasAllowedHosts()))
+}
+
+// "Connect Blackboard" (Blackboard Learn three-legged OAuth, where the school has approved Student OS).
+export async function connectBlackboardAction(_previous: ConnectLmsState, form: FormData): Promise<ConnectLmsState> {
+  return startOAuth("blackboard", () =>
+    parseBlackboardBaseUrl(String(form.get("blackboardUrl") ?? ""), blackboardAllowedHosts())
+  )
 }
 
 export type ConnectCanvasFeedState = { error: string | null; connected: boolean }
@@ -93,6 +114,25 @@ export async function connectCanvasFeedAction(
   return result.ok ? { error: null, connected: true } : { error: result.error, connected: false }
 }
 
+export type ConnectBlackboardFeedState = ConnectCanvasFeedState
+
+// Connects Blackboard through the student's private calendar link (Share
+// Calendar): no administrator approval needed. Checked (a Blackboard calendar
+// link on an allowed host), downloaded once to make sure it works, and stored
+// encrypted. It's never sent back to the browser.
+export async function connectBlackboardFeedAction(
+  _previous: ConnectBlackboardFeedState,
+  form: FormData
+): Promise<ConnectBlackboardFeedState> {
+  const result = await runAction(async ({ db, userId }) => {
+    const feed = parseBlackboardFeedUrl(String(form.get("feedUrl") ?? ""), blackboardAllowedHosts())
+    await fetchBlackboardFeed(feed.feedUrl)
+    await saveLmsFeedConnection(db, userId, "blackboard", feed, vault())
+    return null
+  })
+  return result.ok ? { error: null, connected: true } : { error: result.error, connected: false }
+}
+
 export type LmsSyncOutcome = {
   result: LmsSyncResult
   // The student's courses and tasks after the sync, so the app shows them at once.
@@ -107,8 +147,10 @@ export async function syncLmsAction(provider: unknown): Promise<ActionResult<Lms
     // The student's own connection decides how to read: calendar feed or OAuth.
     const method = await getLmsConnectionMethod(db, userId, id)
     const result =
-      id === "canvas" && method === "calendar_feed"
-        ? await syncCanvasFeed(db, userId, vault(), options)
+      method === "calendar_feed"
+        ? id === "canvas"
+          ? await syncCanvasFeed(db, userId, vault(), options)
+          : await syncBlackboardFeed(db, userId, vault(), options)
         : await syncLms(db, userId, getLmsProvider(id), vault(), options)
     const [courses, tasks] = await Promise.all([listCourses(db, userId), listTasks(db, userId)])
     return { result, courses, tasks }

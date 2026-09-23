@@ -127,6 +127,7 @@ const staticAccess = (fetchToken = "canvas-access-1"): LmsAccess & { refreshes: 
   const access = {
     baseUrl: BASE,
     timeZone: "America/New_York",
+    externalUserId: null,
     refreshes: 0,
     getAccessToken: async () => fetchToken,
     refreshAccessToken: async () => {
@@ -242,7 +243,7 @@ describe("OAuth state (CSRF protection)", () => {
   })
 
   it("accepts the matching state from the same student within 10 minutes", () => {
-    expect(check({})).toEqual({ baseUrl: BASE })
+    expect(check({})).toEqual({ baseUrl: BASE, codeVerifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) })
   })
 
   it("rejects a different state, another student, another provider, a tampered or missing cookie, or an old one", () => {
