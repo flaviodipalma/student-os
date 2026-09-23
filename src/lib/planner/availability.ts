@@ -1,16 +1,18 @@
-import { busyRanges, durationMinutes, toMinutes } from "@/lib/events"
+import { busyRanges, toMinutes } from "@/lib/events"
 import { toDateKey } from "@/lib/format"
 import { commitmentsOn } from "@/lib/recurring"
 import type { CalendarEvent, RecurringCommitment } from "@/lib/types"
+import { workedMinutes } from "./scoring"
 import type { PlannerSettings } from "./settings"
 import type { AvailableTimeBlock } from "./types"
 
 // Available study time on one day:
 //
 //   study window (from now, if it's today)
-//   − one-time events
+//   − one-time events (the student's own, Canvas, Blackboard)
 //   − weekly commitments
 //   − study sessions already on the calendar (plus a break after them)
+//   − a transition after fixed events (getting from class/practice to studying)
 //   = free blocks
 //
 // Then a study budget for the day: the daily limit minus study already booked,
@@ -77,17 +79,26 @@ export function dayAvailability(
 
   const free = findFreeSlots(items, dayStart, Math.max(dayStart, dayEnd))
   // A block right after booked study starts after a break; one right before it ends a break early.
-  const studyStarts = new Set(items.filter((e) => e.type === "study").map((e) => toMinutes(e.startTime)))
-  const studyEnds = new Set(items.filter((e) => e.type === "study").map((e) => toMinutes(e.endTime)))
+  // A block right after a fixed event starts after the transition time.
+  const study = items.filter((e) => e.type === "study")
+  const studyStarts = new Set(study.map((e) => toMinutes(e.startTime)))
+  const studyEnds = new Set(study.map((e) => toMinutes(e.endTime)))
+  const fixedEnds = new Set(items.filter((e) => e.type !== "study").map((e) => toMinutes(e.endTime)))
   const slots = free
     .map((slot) => ({
-      start: studyEnds.has(slot.start) ? slot.start + settings.breakMinutes : slot.start,
+      start: studyEnds.has(slot.start)
+        ? slot.start + settings.breakMinutes
+        : fixedEnds.has(slot.start)
+          ? slot.start + settings.transitionMinutes
+          : slot.start,
       end: studyStarts.has(slot.end) ? slot.end - settings.breakMinutes : slot.end,
     }))
     .filter((slot) => slot.end > slot.start)
 
   const freeMinutes = totalMinutes(free)
-  const bookedStudyMinutes = items.filter((e) => e.type === "study").reduce((sum, e) => sum + durationMinutes(e), 0)
+  // Study counted against the daily limit: booked sessions, and the minutes actually
+  // worked in a partly done one (45 of 90 counts 45).
+  const bookedStudyMinutes = study.reduce((sum, e) => sum + workedMinutes(e), 0)
   // Booked study counts as used free time, so accepting a suggestion doesn't make room for more.
   const limitLeft = settings.maxStudyMinutesPerDay - bookedStudyMinutes
   const shareLeft = Math.floor((freeMinutes + bookedStudyMinutes) * settings.maxShareOfFreeTime) - bookedStudyMinutes

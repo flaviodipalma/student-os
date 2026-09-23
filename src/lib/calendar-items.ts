@@ -26,6 +26,7 @@ export function sessionsAsCalendarItems(
         type: "study" as const,
         courseId: task?.courseId,
         completed: session.status === "completed",
+        ...(session.status === "completed" && session.completedMinutes ? { completedMinutes: session.completedMinutes } : {}),
       }
     })
 }

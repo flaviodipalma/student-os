@@ -61,8 +61,12 @@ function busyExcept(date: string, ...free: string[]): CalendarEvent[] {
 const minutes = (s: { startTime: string; endTime: string }) => toMinutes(s.endTime) - toMinutes(s.startTime)
 const total = (sessions: StudySession[]) => sessions.reduce((sum, s) => sum + minutes(s), 0)
 const times = (plan: DailyPlan) => plan.suggestions.map((s) => `${s.startTime}-${s.endTime}`)
-const prefs = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) =>
-  plannerSettingsFor({ ...DEFAULT_STUDENT_PREFERENCES, ...overrides })
+// These tests are about how blocks are placed, so they use no transition time after
+// fixed events (the transition has its own tests in adaptive.test.ts).
+const prefs = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) => ({
+  ...plannerSettingsFor({ ...DEFAULT_STUDENT_PREFERENCES, ...overrides }),
+  transitionMinutes: 0,
+})
 // Plan with no "leave some free time" share, so tests can reason about exact gaps.
 const exact = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) => ({ ...prefs(overrides), maxShareOfFreeTime: 1 })
 
@@ -135,7 +139,7 @@ describe("task scoring", () => {
 // ---------------------------------------------------------------------------
 
 describe("available time", () => {
-  const settings = { ...DEFAULT_PLANNER_SETTINGS, maxShareOfFreeTime: 1, breakMinutes: 15 }
+  const settings = { ...DEFAULT_PLANNER_SETTINGS, maxShareOfFreeTime: 1, breakMinutes: 15, transitionMinutes: 0 }
   const soccer: RecurringCommitment = {
     id: "soccer",
     title: "Soccer",
@@ -163,7 +167,7 @@ describe("available time", () => {
   })
 
   it("keeps some free time: the budget is a share of the free time", () => {
-    const day = dayAvailability(DATE, busyExcept(DATE, "16:00-18:00"), [], NOW, DEFAULT_PLANNER_SETTINGS)
+    const day = dayAvailability(DATE, busyExcept(DATE, "16:00-18:00"), [], NOW, { ...DEFAULT_PLANNER_SETTINGS, transitionMinutes: 0 })
     expect(day.freeMinutes).toBe(120)
     expect(day.budget).toBe(Math.floor(120 * DEFAULT_PLANNER_SETTINGS.maxShareOfFreeTime))
   })

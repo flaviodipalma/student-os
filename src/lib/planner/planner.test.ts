@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest"
 import { toMinutes } from "@/lib/events"
 import { DEFAULT_STUDENT_PREFERENCES, plannerSettingsFor } from "@/lib/preferences"
 import type { CalendarEvent, RecurringCommitment, Task } from "@/lib/types"
-import { buildDayTimeline, calculateTaskUrgency, generatePlan, type StudySession } from "./index"
+import { buildDayTimeline, calculateTaskUrgency, generatePlan as plannerPlan, type PlanInput, type StudySession } from "./index"
+
+// These tests are about placement and scoring, so they use no transition time
+// after fixed events (the transition has its own tests in adaptive.test.ts).
+const generatePlan = (input: PlanInput) => plannerPlan({ ...input, settings: { transitionMinutes: 0, ...input.settings } })
 
 // A fixed Tuesday, 8:00 AM, so results never depend on the real clock.
 const DATE = "2026-09-22"

@@ -107,6 +107,8 @@ export type CalendarEvent = {
   commitmentId?: string
   taskId?: string
   completed?: boolean
+  // Study sessions done only partly: the minutes actually worked.
+  completedMinutes?: number
   // Unset = Student OS. External items (see src/lib/calendar/external-events.ts)
   // also carry their stored event's id, and a location and link when the source has them.
   source?: EventSource
@@ -117,7 +119,17 @@ export type CalendarEvent = {
 
 export type EventInput = Omit<
   CalendarEvent,
-  "id" | "sessionId" | "commitmentId" | "taskId" | "completed" | "source" | "externalEventId" | "location" | "url" | "type"
+  | "id"
+  | "sessionId"
+  | "commitmentId"
+  | "taskId"
+  | "completed"
+  | "completedMinutes"
+  | "source"
+  | "externalEventId"
+  | "location"
+  | "url"
+  | "type"
 > & { type: NativeEventType }
 
 // An event copied from an external calendar, as the app loads it. Instants are
@@ -145,6 +157,8 @@ export type StudySessionRecord = {
   startTime: string
   endTime: string
   status: StudySessionStatus
+  // Partly done: the minutes actually worked (unset/null = the whole session).
+  completedMinutes?: number | null
 }
 
 // The signed-in student's profile.

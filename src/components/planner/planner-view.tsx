@@ -3,13 +3,12 @@
 import { useState } from "react"
 import {
   AlertTriangleIcon,
+  CalendarClockIcon,
   CheckIcon,
   ChevronDownIcon,
   CircleCheckBigIcon,
-  CoffeeIcon,
   ExternalLinkIcon,
   InfoIcon,
-  PlayIcon,
   RotateCcwIcon,
   SparklesIcon,
   XIcon,
@@ -21,11 +20,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { useNow } from "@/lib/clock"
 import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { toMinutes } from "@/lib/events"
-import { addDays, formatDuration, formatRelativeDay, formatTime, fromDateKey } from "@/lib/format"
+import { addDays, formatDuration, formatRelativeDay, fromDateKey } from "@/lib/format"
 import {
   buildDayTimeline,
   type DailyPlan,
@@ -35,10 +33,12 @@ import {
 } from "@/lib/planner"
 import { usePlan, usePlanActions } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
-import { formatDue, priorityLabel } from "@/lib/tasks"
-import type { CalendarEvent, Task } from "@/lib/types"
+import { formatDue } from "@/lib/tasks"
+import type { Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { DayTimeline } from "./day-timeline"
+import { PartlyDoneDialog, RescheduleDialog } from "./session-dialogs"
+import { WhatNowCard } from "./what-now-card"
 
 // The Planner page: "What should I do today?" It only renders the DailyPlan the
 // planner produced (src/lib/planner); no planning happens in here.
@@ -80,6 +80,11 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
             {[
               { label: "Today", value: today },
               { label: "Tomorrow", value: tomorrow },
+              // The next few days (planned ahead: long work is spread over them).
+              ...[2, 3, 4].map((offset) => {
+                const day = addDays(today, offset)
+                return { label: fromDateKey(day).toLocaleDateString("en-US", { weekday: "short" }), value: day }
+              }),
             ].map((option) => (
               <button
                 key={option.label}
@@ -106,7 +111,7 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
         </div>
       </header>
 
-      {date === today && <NowCard plan={plan} dayEvents={dayEvents} taskById={taskById} onShowTask={showTask} />}
+      {date === today && <WhatNowCard onOpenTask={(task) => setOpenTask(task)} />}
 
       <PlanSummary
         plan={plan}
@@ -166,116 +171,6 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
   )
 }
 
-// ---- "What should I do now?" (today only) -----------------------------------
-//
-// From the day's plan and the current time, one clear next step:
-//   1. a study session happening now,
-//   2. a fixed event happening now (and when the next session starts),
-//   3. the next study session later today,
-//   4. otherwise: free.
-
-function NowCard({
-  plan,
-  dayEvents,
-  taskById,
-  onShowTask,
-}: {
-  plan: DailyPlan
-  dayEvents: CalendarEvent[]
-  taskById: Map<string, Task>
-  onShowTask: (taskId: string) => void
-}) {
-  const now = useNow()
-  const actions = usePlanActions()
-  const { getCourse } = useCourses()
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
-  const time = (hhmm: string) => formatTime(fromDateKey(plan.date, hhmm))
-
-  const sessions = [...plan.existingSessions, ...plan.suggestions]
-    .filter((s) => s.status !== "completed")
-    .sort((a, b) => a.startTime.localeCompare(b.startTime))
-  const current = sessions.find((s) => toMinutes(s.startTime) <= nowMinutes && nowMinutes < toMinutes(s.endTime))
-  const next = sessions.find((s) => toMinutes(s.startTime) > nowMinutes)
-  const busyNow = dayEvents.find(
-    (e) => !e.sessionId && toMinutes(e.startTime) <= nowMinutes && nowMinutes < toMinutes(e.endTime)
-  )
-  const session = current ?? (busyNow ? undefined : next)
-  const task = session ? taskById.get(session.taskId) : undefined
-
-  let heading: string
-  if (current) heading = "Right now"
-  else if (busyNow) heading = `You're at ${busyNow.title} until ${time(busyNow.endTime)}.`
-  else if (next) heading = `Your next study session starts at ${time(next.startTime)}.`
-  else heading = "You're free right now."
-
-  const course = task ? getCourse(task.courseId) : undefined
-  // "CSC215 · High priority · Due Friday"
-  const details = task
-    ? [
-        course?.code,
-        task.priority === "high" || task.priority === "critical" ? `${priorityLabel[task.priority]} priority` : null,
-        `Due ${formatDue(task, plan.date)}`,
-      ].filter(Boolean)
-    : []
-
-  return (
-    <section
-      aria-labelledby="now-heading"
-      className="rounded-xl bg-primary p-5 text-primary-foreground shadow-sm sm:p-6"
-    >
-      <h2 id="now-heading" className="text-sm font-medium text-primary-foreground/80">
-        What should I do now?
-      </h2>
-      {session && task ? (
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm text-primary-foreground/80">{heading}</p>
-            <p className="mt-1 text-xl font-semibold leading-snug">
-              {time(session.startTime)} – {time(session.endTime)} · Work on {task.title}
-            </p>
-            <p className="mt-1 text-sm text-primary-foreground/85">{details.join(" · ")}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {session.status === "suggested" ? (
-              <Button variant="secondary" size="lg" onClick={() => actions.accept(session)}>
-                <PlayIcon data-icon="inline-start" />
-                {current ? "Start session" : "Add to calendar"}
-              </Button>
-            ) : (
-              <Button variant="secondary" size="lg" onClick={() => actions.complete(session)}>
-                <CheckIcon data-icon="inline-start" />
-                Mark done
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="lg"
-              className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-              onClick={() => onShowTask(task.id)}
-            >
-              Open task
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-2 flex items-start gap-3">
-          <CoffeeIcon aria-hidden className="mt-1 size-5 shrink-0 text-primary-foreground/80" />
-          <div>
-            <p className="text-xl font-semibold leading-snug">{heading}</p>
-            <p className="mt-1 text-sm text-primary-foreground/85">
-              {busyNow && next
-                ? `Next up: ${taskById.get(next.taskId)?.title ?? "study"} at ${time(next.startTime)}.`
-                : plan.status === "no-tasks" || plan.status === "all-done"
-                  ? "Nothing needs planning today."
-                  : "Nothing else is planned for today. See tomorrow's plan to get ahead."}
-            </p>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
 // ---- One study session's reasons and actions (inside the timeline) ----------
 
 function SessionDetails({
@@ -288,7 +183,10 @@ function SessionDetails({
   onShowTask: () => void
 }) {
   const actions = usePlanActions()
+  const { today } = useTasks()
   const [whyOpen, setWhyOpen] = useState(false)
+  const [partlyOpen, setPartlyOpen] = useState(false)
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const state = session.status
   const reasons = isRecommended(session) ? session.reasons : []
   const whyId = `why-${session.id}`
@@ -323,6 +221,11 @@ function SessionDetails({
           ))}
         </ul>
       )}
+      {state === "missed" && (
+        <p className="text-xs text-muted-foreground">
+          This session ended without being marked done, so its work is back in your plan. Mark it done if you studied.
+        </p>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {state === "suggested" && (
           <Button size="sm" onClick={() => actions.accept(session)}>
@@ -331,10 +234,19 @@ function SessionDetails({
           </Button>
         )}
         {state !== "completed" ? (
-          <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
-            <CircleCheckBigIcon data-icon="inline-start" />
-            Done
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
+              <CircleCheckBigIcon data-icon="inline-start" />
+              Done
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setPartlyOpen(true)}>
+              Partly done
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRescheduleOpen(true)}>
+              <CalendarClockIcon data-icon="inline-start" />
+              {state === "suggested" ? "Other time" : "Reschedule"}
+            </Button>
+          </>
         ) : (
           <Button size="sm" variant="outline" onClick={() => actions.undoComplete(session)}>
             <RotateCcwIcon data-icon="inline-start" />
@@ -352,6 +264,10 @@ function SessionDetails({
           Open task
         </Button>
       </div>
+      {partlyOpen && <PartlyDoneDialog session={session} taskTitle={task.title} open onOpenChange={setPartlyOpen} />}
+      {rescheduleOpen && (
+        <RescheduleDialog session={session} taskTitle={task.title} minDate={today} open onOpenChange={setRescheduleOpen} />
+      )}
     </div>
   )
 }
@@ -440,6 +356,11 @@ function headline(plan: DailyPlan, dayWord: string): { title: string; detail: st
 
 function PlanSummary({ plan, dayWord, commitmentMinutes }: { plan: DailyPlan; dayWord: string; commitmentMinutes: number }) {
   const suggestedMinutes = plan.suggestions.reduce((sum, s) => sum + sessionMinutes(s), 0)
+  // Study on this day: done (minutes actually worked) and still to do, against the daily limit.
+  const doneMinutes = plan.existingSessions
+    .filter((s) => s.status === "completed")
+    .reduce((sum, s) => sum + (s.completedMinutes ?? sessionMinutes(s)), 0)
+  const roomLeft = Math.max(0, plan.studyLimit - plan.studyMinutes)
   const stays = Math.max(0, plan.freeMinutes - suggestedMinutes)
   const percent = Math.min(100, Math.round((plan.studyMinutes / plan.studyLimit) * 100))
   const { title, detail } = headline(plan, dayWord)
@@ -470,6 +391,9 @@ function PlanSummary({ plan, dayWord, commitmentMinutes }: { plan: DailyPlan; da
               <span className="font-normal text-muted-foreground"> / {formatDuration(plan.studyLimit)}</span>
             </dd>
             <Progress value={percent} aria-label="Study planned against the daily limit" className="mt-1.5 w-24" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatDuration(doneMinutes)} done · {formatDuration(roomLeft)} room left
+            </p>
           </div>
           <div>
             <dt className="text-muted-foreground">Commitments</dt>

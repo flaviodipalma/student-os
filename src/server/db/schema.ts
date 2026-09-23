@@ -286,6 +286,9 @@ export const studySessions = pgTable(
     endTime: time("end_time").notNull(),
     // skipped = the student removed this task from that day's plan.
     status: studySessionStatus("status").notNull().default("scheduled"),
+    // Minutes actually worked, for a session done only partly ("45 of 90 minutes").
+    // Null = the whole session. Only meaningful when completed.
+    completedMinutes: integer("completed_minutes"),
     ...timestamps,
   },
   (t) => [
@@ -298,6 +301,7 @@ export const studySessions = pgTable(
       foreignColumns: [tasks.id, tasks.userId],
     }).onDelete("cascade"),
     check("study_sessions_end_after_start", sql`${t.endTime} > ${t.startTime}`),
+    check("study_sessions_completed_minutes", sql`${t.completedMinutes} between 1 and 720`),
   ]
 ).enableRLS()
 

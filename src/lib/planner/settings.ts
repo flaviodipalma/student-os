@@ -14,7 +14,8 @@ export const DEFAULT_MAX_STUDY_MINUTES_PER_DAY = DEFAULT_STUDENT_PREFERENCES.max
 //
 // A task's planning score is the sum of a few simple factors (see scoring.ts):
 //
-//   deadline  + priority  + major work  + large task  + already started  + tight on time
+//   deadline  + priority  + major work  + large task  + already started
+//   + tight on time  + competing deadlines  + missed session
 //
 // Higher score = planned first. The deadline and priority carry most of the
 // weight, so e.g. a critical task due tomorrow (75 + 40) comes well before a
@@ -45,6 +46,11 @@ export type ScoringWeights = {
   inProgress: number
   // The remaining work doesn't fit in the study time left before the deadline.
   tightOnTime: number
+  // It would fit on its own, but not together with the other work due by the
+  // same deadline (fewer real opportunities than it looks).
+  competingDeadlines: number
+  // A planned session for it was missed recently: its work is back in the plan.
+  missedSession: number
 }
 
 export const DEFAULT_SCORING: ScoringWeights = {
@@ -58,6 +64,8 @@ export const DEFAULT_SCORING: ScoringWeights = {
   largeTaskDays: 7,
   inProgress: 5,
   tightOnTime: 15,
+  competingDeadlines: 8,
+  missedSession: 8,
 }
 
 // ---- Scheduling ------------------------------------------------------------
@@ -80,6 +88,9 @@ export type PlannerSettings = {
   preferredBlockMinutes?: number
   // Rest between two study blocks (also after study already on the calendar).
   breakMinutes: number
+  // Time to get from a fixed event (class, practice, work) to studying: no study
+  // block starts right as one ends.
+  transitionMinutes: number
   // Used when a task has no usable time estimate; the student is asked to add one.
   fallbackEstimateMinutes: number
   // How many days ahead the planner simulates when planning a later date, and
@@ -100,6 +111,7 @@ export const DEFAULT_PLANNER_SETTINGS: PlannerSettings = {
   minBlockMinutes: 30,
   maxBlockMinutes: 120,
   breakMinutes: DEFAULT_STUDENT_PREFERENCES.breakMinutes,
+  transitionMinutes: 15,
   fallbackEstimateMinutes: 60,
   lookaheadDays: 14,
   lowTimeMinutes: 60,

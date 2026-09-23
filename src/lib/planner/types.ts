@@ -31,7 +31,15 @@ export type AvailableTimeBlock = {
 // One reason a task scored the way it did. `label` is what the student sees
 // under "Why this?"; null = counted, but not worth mentioning (e.g. low priority).
 export type ScoreFactor = {
-  key: "deadline" | "priority" | "major-work" | "large-task" | "in-progress" | "tight-on-time"
+  key:
+    | "deadline"
+    | "priority"
+    | "major-work"
+    | "large-task"
+    | "in-progress"
+    | "tight-on-time"
+    | "competing-deadlines"
+    | "missed-session"
   label: string | null
   points: number
 }
@@ -47,12 +55,17 @@ export type ScoredTask = {
   remainingMinutes: number
   // The task had no usable estimate, so the fallback estimate was used.
   estimateMissing: boolean
+  // Study time the planner could find from the plan date until the day before the deadline (Infinity = plenty).
+  capacityBeforeDue: number
+  // …and including the due day itself (what "Needs attention" compares against).
+  capacityThroughDue?: number
 }
 
 export type StudySessionStatus =
   | "suggested" // recommended by the planner, not on the calendar yet
   | "scheduled" // accepted: on the calendar
   | "completed" // done
+  | "missed" // scheduled, but it ended without being marked done (its work is re-planned)
 
 export type StudySession = {
   id: string
@@ -63,6 +76,8 @@ export type StudySession = {
   status: StudySessionStatus
   // Set once the session is stored (scheduled or completed).
   eventId?: string
+  // Done only partly: the minutes actually worked.
+  completedMinutes?: number
 }
 
 // A new study session the planner recommends, with its reasons ("Why this?").
@@ -89,7 +104,7 @@ export type UnscheduledTask = {
 // Something the student should know about the day ("Needs attention").
 export type PlannerWarning = {
   id: string
-  kind: "overdue" | "unscheduled" | "due-soon" | "limited-time" | "no-estimate"
+  kind: "overdue" | "unscheduled" | "due-soon" | "limited-time" | "no-estimate" | "not-enough-time" | "missed"
   severity: "high" | "medium" | "low"
   message: string
   taskIds: string[]

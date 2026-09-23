@@ -74,5 +74,6 @@ export function toStudySession(row: typeof studySessions.$inferSelect): StudySes
     startTime: hhmm(row.startTime),
     endTime: hhmm(row.endTime),
     status: row.status,
+    completedMinutes: row.completedMinutes,
   }
 }

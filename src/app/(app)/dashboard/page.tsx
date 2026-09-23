@@ -4,6 +4,7 @@ import { DailyProgress } from "@/components/dashboard/daily-progress"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { GettingStarted } from "@/components/dashboard/getting-started"
 import { NeedsAttention } from "@/components/dashboard/needs-attention"
+import { DashboardWhatNow } from "@/components/dashboard/what-now"
 import { PriorityTasks } from "@/components/dashboard/priority-tasks"
 import { TodaySchedule } from "@/components/dashboard/today-schedule"
 import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines"
@@ -28,6 +29,8 @@ export default async function DashboardPage() {
       </div>
 
       <GettingStarted />
+
+      <DashboardWhatNow />
 
       <NeedsAttention />
 

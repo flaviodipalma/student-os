@@ -3,7 +3,17 @@ import { addDays, daysBetween, formatDuration, fromDateKey, toDateKey } from "@/
 import { isDone } from "@/lib/tasks"
 import type { CalendarEvent, Task } from "@/lib/types"
 import { dayAvailability, roundDown, roundUp, type DayAvailability } from "./availability"
-import { compareScored, completedMinutesFor, estimateOf, plannedMinutesFor, reasonsOf, scoreTask } from "./scoring"
+import {
+  compareScored,
+  completedMinutesFor,
+  estimateOf,
+  isMissed,
+  missedSessionsFor,
+  plannedMinutesFor,
+  reasonsOf,
+  scoreTask,
+  workedMinutes,
+} from "./scoring"
 import { DEFAULT_PLANNER_SETTINGS, DEFAULT_SCORING, type PlannerSettings } from "./settings"
 import type { DailyPlan, PlannerInput, ScoredTask, StudySession, UnscheduledTask } from "./types"
 import { buildWarnings } from "./warnings"
@@ -13,7 +23,9 @@ import { buildWarnings } from "./warnings"
 //
 //   1. Normalize the schedule: events, study sessions and weekly commitments on that day
 //   2. Available time: free blocks in the study window, and the day's study budget
-//   3. Remaining work per task: estimate − completed − already booked − planned on earlier days
+//   3. Remaining work per task: estimate − work done (partly done sessions count
+//      the minutes worked) − booked sessions still ahead − planned on earlier days.
+//      Missed sessions don't count, so their work is planned again.
 //   4. Score the open tasks (scoring.ts) and sort them, highest first
 //   5. Give each task its share of the day, in the earliest free blocks that fit,
 //      in the student's preferred block length, with breaks, within the budget
@@ -38,6 +50,7 @@ export function createPlanner(input: PlannerInput): Planner {
   }
   const { now, events } = input
   const today = toDateKey(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const commitments = input.recurringCommitments ?? []
   const openTasks = input.tasks.filter((task) => !isDone(task))
 
@@ -48,7 +61,10 @@ export function createPlanner(input: PlannerInput): Planner {
   )
   const baselineRemaining = () =>
     new Map(
-      openTasks.map((task) => [task.id, Math.max(0, estimates.get(task.id)!.minutes - plannedMinutesFor(task.id, events, today))])
+      openTasks.map((task) => [
+        task.id,
+        Math.max(0, estimates.get(task.id)!.minutes - plannedMinutesFor(task.id, events, today, nowMinutes)),
+      ])
     )
 
   // Each day's availability before the planner adds anything (for lookahead).
@@ -67,6 +83,12 @@ export function createPlanner(input: PlannerInput): Planner {
     return total
   }
 
+  // Remaining work of the other open tasks due on or before `task`'s deadline.
+  const competingMinutes = (task: Task, remaining: Map<string, number>) =>
+    openTasks
+      .filter((other) => other.id !== task.id && other.dueDate <= task.dueDate)
+      .reduce((sum, other) => sum + (remaining.get(other.id) ?? 0), 0)
+
   function planDay(date: string, remaining: Map<string, number>): DailyPlan {
     // 1-2. The day's schedule and free time (a fresh copy: placing sessions uses it up).
     const day = dayAvailability(date, events, commitments, now, settings)
@@ -75,7 +97,7 @@ export function createPlanner(input: PlannerInput): Planner {
       date,
       status: "ok",
       suggestions: [],
-      existingSessions: existingSessionsOn(day.items, date),
+      existingSessions: existingSessionsOn(day.items, date, today, nowMinutes),
       unscheduled: [],
       skippedTaskIds: skipped,
       ranked: [],
@@ -102,10 +124,13 @@ export function createPlanner(input: PlannerInput): Planner {
             estimateMissing: estimates.get(task.id)!.missing,
             started: started.get(task.id)!,
             capacityBeforeDue: capacityBetween(date, task.dueDate <= date ? date : addDays(task.dueDate, -1)),
+            competingMinutes: competingMinutes(task, remaining),
+            missedSessions: missedSessionsFor(task.id, events, today, nowMinutes),
           },
           settings.scoring
         )
       )
+      .map((scored) => ({ ...scored, capacityThroughDue: capacityBetween(date, scored.task.dueDate < date ? date : scored.task.dueDate) }))
       .sort(compareScored)
 
     if (plan.ranked.length === 0) {
@@ -237,7 +262,7 @@ export function createPlanner(input: PlannerInput): Planner {
       date,
       status: "past",
       suggestions: [],
-      existingSessions: existingSessionsOn(day.items, date),
+      existingSessions: existingSessionsOn(day.items, date, today, nowMinutes),
       unscheduled: [],
       skippedTaskIds: input.skipped?.[date] ?? [],
       ranked: [],
@@ -263,8 +288,9 @@ export function generatePlan({ date, skippedTaskIds, ...input }: PlanInput): Dai
   return createPlanner({ ...input, skipped: skippedTaskIds ? { [date]: skippedTaskIds } : undefined }).planFor(date)
 }
 
-// Study sessions already on the calendar for the day, linked to a task.
-function existingSessionsOn(items: CalendarEvent[], date: string): StudySession[] {
+// Study sessions already on the calendar for the day, linked to a task. One that
+// ended without being marked done is "missed" (never marked done automatically).
+function existingSessionsOn(items: CalendarEvent[], date: string, today: string, nowMinutes: number): StudySession[] {
   return items
     .filter((e) => e.type === "study" && e.taskId)
     .sort(byStart)
@@ -275,7 +301,8 @@ function existingSessionsOn(items: CalendarEvent[], date: string): StudySession[
       date,
       startTime: e.startTime,
       endTime: e.endTime,
-      status: e.completed ? "completed" : "scheduled",
+      status: e.completed ? "completed" : isMissed(e, today, nowMinutes) ? "missed" : "scheduled",
+      ...(e.completed && e.completedMinutes ? { completedMinutes: workedMinutes(e) } : {}),
     }))
 }
 

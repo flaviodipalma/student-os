@@ -1,0 +1,2 @@
+ALTER TABLE "study_sessions" ADD COLUMN "completed_minutes" integer;--> statement-breakpoint
+ALTER TABLE "study_sessions" ADD CONSTRAINT "study_sessions_completed_minutes" CHECK ("study_sessions"."completed_minutes" between 1 and 720);

@@ -15,7 +15,10 @@ vi.mock("@/server/auth", () => ({
 }))
 vi.mock("@/server/db", () => ({ getDb: () => session.db }))
 
-const { createTaskAction, deleteEventAction, updateEventAction, updateTaskAction } = await import("./data")
+const { createStudySessionAction, createTaskAction, deleteEventAction, updateEventAction, updateStudySessionAction, updateTaskAction } =
+  await import("./data")
+const { createPlanner, whatNow } = await import("@/lib/planner")
+const { plannerInputFor } = await import("@/lib/planner-input")
 
 let t: Awaited<ReturnType<typeof createTestDb>>
 beforeEach(async () => {
@@ -91,5 +94,57 @@ describe("server actions", () => {
     })
     expect(created).toMatchObject({ ok: true, data: { id, title: "Problem Set 3" } })
     expect((await loadAppData(t.db, alice)).tasks.map((task) => task.id)).toEqual([id])
+  })
+})
+
+describe("study session progress (partly done)", () => {
+  it("saves the minutes worked; the planner then plans only what's left, and 'What now' uses it", async () => {
+    const alice = await t.addUser("Alice")
+    session.userId = alice
+    const course = await createCourse(t.db, alice, { code: "PSY101", name: "Psychology", professor: "", description: "" })
+    const created = await createTaskAction({
+      id: crypto.randomUUID(),
+      courseId: course.id,
+      title: "Psychology Reading",
+      description: "",
+      type: "reading",
+      dueDate: "2026-09-23",
+      priority: "medium",
+      estimateMinutes: 90,
+      status: "not_started",
+    })
+    if (!created.ok) throw new Error(created.error)
+    const planned = await createStudySessionAction({
+      id: crypto.randomUUID(),
+      taskId: created.data.id,
+      date: "2026-09-21",
+      startTime: "18:00",
+      endTime: "19:30",
+      status: "scheduled",
+    })
+    if (!planned.ok) throw new Error(planned.error)
+
+    // Worked 45 of the 90 minutes.
+    expect(await updateStudySessionAction(planned.data.id, { status: "completed", completedMinutes: 45 })).toMatchObject({
+      ok: true,
+      data: { status: "completed", completedMinutes: 45 },
+    })
+    expect(await updateStudySessionAction(planned.data.id, { completedMinutes: 0 })).toMatchObject({ ok: false, code: "validation" })
+    expect(await updateStudySessionAction(planned.data.id, { completedMinutes: 10_000 })).toMatchObject({ ok: false, code: "validation" })
+
+    const data = await loadAppData(t.db, alice)
+    const now = new Date(2026, 8, 22, 16, 0)
+    const planner = createPlanner(plannerInputFor(data, now))
+    const plan = planner.planFor("2026-09-22")
+    expect(plan.ranked[0].remainingMinutes).toBe(45)
+    expect(plan.suggestions.reduce((sum, s) => sum + (Number(s.endTime.slice(0, 2)) * 60 + Number(s.endTime.slice(3)) - (Number(s.startTime.slice(0, 2)) * 60 + Number(s.startTime.slice(3)))), 0)).toBe(45)
+    const answer = whatNow({ planner, now, today: "2026-09-22", schedule: [], events: [], tasks: data.tasks })
+    expect(answer).toMatchObject({ kind: "work", task: { title: "Psychology Reading" } })
+
+    // Undo: back to the whole session planned (not done).
+    expect(await updateStudySessionAction(planned.data.id, { status: "scheduled", completedMinutes: null })).toMatchObject({
+      ok: true,
+      data: { completedMinutes: null },
+    })
   })
 })

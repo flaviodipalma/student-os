@@ -1,5 +1,5 @@
-import { durationMinutes } from "@/lib/events"
-import { daysBetween, fromDateKey } from "@/lib/format"
+import { durationMinutes, toMinutes } from "@/lib/events"
+import { addDays, daysBetween, fromDateKey } from "@/lib/format"
 import { typeLabel } from "@/lib/tasks"
 import type { CalendarEvent, Task } from "@/lib/types"
 import { DEFAULT_PLANNER_SETTINGS, DEFAULT_SCORING, type PlannerSettings, type ScoringWeights } from "./settings"
@@ -9,9 +9,23 @@ import type { ScoreFactor, ScoredTask } from "./types"
 //
 // A task stays one task; study sessions record the work done or planned on it.
 //
-//   remaining = estimate − completed study (any day) − booked study (today onward)
+//   remaining = estimate − work done (completed sessions; a partly done session
+//               counts the minutes actually worked) − booked study still ahead
 //
-// A past session that wasn't marked done doesn't count: it was probably missed.
+// A session that ended without being marked done doesn't count: it was missed,
+// so its work goes back into the plan (it's never marked done automatically).
+
+// Minutes of work a study session stands for: what was actually worked if it was
+// done only partly, otherwise its length.
+export function workedMinutes(event: CalendarEvent): number {
+  return event.completed && event.completedMinutes ? Math.min(event.completedMinutes, durationMinutes(event)) : durationMinutes(event)
+}
+
+// Scheduled (not done) and already over: missed. `nowMinutes` = the time today.
+export function isMissed(event: CalendarEvent, today: string, nowMinutes: number): boolean {
+  if (event.type !== "study" || !event.taskId || event.completed) return false
+  return event.date < today || (event.date === today && toMinutes(event.endTime) <= nowMinutes)
+}
 
 // The estimate the planner works with. Tasks without a usable estimate get the
 // fallback (and the student is asked to add one).
@@ -23,18 +37,27 @@ export function estimateOf(task: Task, settings: Pick<PlannerSettings, "fallback
   return { minutes, missing: false }
 }
 
-// Minutes of a task already covered by study sessions on the calendar.
-export function plannedMinutesFor(taskId: string, events: CalendarEvent[], today: string): number {
+// Minutes of a task already covered by study sessions: work done, plus booked
+// sessions that haven't ended yet (`nowMinutes`: the time today; by default the
+// whole of today counts as ahead).
+export function plannedMinutesFor(taskId: string, events: CalendarEvent[], today: string, nowMinutes = -1): number {
   return events
-    .filter((e) => e.type === "study" && e.taskId === taskId && (e.completed || e.date >= today))
-    .reduce((sum, e) => sum + durationMinutes(e), 0)
+    .filter((e) => e.type === "study" && e.taskId === taskId && (e.completed || !isMissed(e, today, nowMinutes)))
+    .filter((e) => e.completed || e.date >= today)
+    .reduce((sum, e) => sum + workedMinutes(e), 0)
 }
 
 // Minutes of completed study on a task (any day).
 export function completedMinutesFor(taskId: string, events: CalendarEvent[]): number {
   return events
     .filter((e) => e.type === "study" && e.taskId === taskId && e.completed)
-    .reduce((sum, e) => sum + durationMinutes(e), 0)
+    .reduce((sum, e) => sum + workedMinutes(e), 0)
+}
+
+// Sessions for a task missed in the last `days` days (including earlier today).
+export function missedSessionsFor(taskId: string, events: CalendarEvent[], today: string, nowMinutes: number, days = 7): number {
+  const since = addDays(today, -days)
+  return events.filter((e) => e.taskId === taskId && e.date >= since && isMissed(e, today, nowMinutes)).length
 }
 
 // ---- Scoring ----------------------------------------------------------------
@@ -56,6 +79,10 @@ export type ScoringContext = {
   // Study time the planner could still find from `date` until the deadline
   // (Infinity when unknown). Less than the remaining work = tight on time.
   capacityBeforeDue: number
+  // Remaining work of the OTHER open tasks due on or before this task's deadline.
+  competingMinutes?: number
+  // Planned sessions for this task missed recently.
+  missedSessions?: number
 }
 
 // Points come from the days left on the planned day; the label says when it's due from today.
@@ -108,6 +135,16 @@ export function scoreTask(task: Task, context: ScoringContext, weights: ScoringW
   // 6. Not enough study time left before the deadline for the remaining work.
   if (context.remainingMinutes > context.capacityBeforeDue) {
     factors.push({ key: "tight-on-time", label: "Tight on time before the deadline", points: weights.tightOnTime })
+  } else if (
+    // 7. It fits on its own, but not with everything else due by then.
+    (context.competingMinutes ?? 0) > 0 &&
+    context.remainingMinutes + (context.competingMinutes ?? 0) > context.capacityBeforeDue
+  ) {
+    factors.push({ key: "competing-deadlines", label: "Other deadlines compete for the same time", points: weights.competingDeadlines })
+  }
+  // 8. A planned session was missed: the work is back, a little more urgent.
+  if ((context.missedSessions ?? 0) > 0) {
+    factors.push({ key: "missed-session", label: "You missed a planned session for this", points: weights.missedSession })
   }
 
   return {
@@ -117,6 +154,7 @@ export function scoreTask(task: Task, context: ScoringContext, weights: ScoringW
     daysLeft,
     remainingMinutes: context.remainingMinutes,
     estimateMissing: context.estimateMissing,
+    capacityBeforeDue: context.capacityBeforeDue,
   }
 }
 

@@ -100,6 +100,8 @@ const sessionFields = z.object({
   startTime: timeOfDay,
   endTime: timeOfDay,
   status: sessionStatus,
+  // Partly done: minutes actually worked (null = the whole session).
+  completedMinutes: z.int("Use whole minutes.").min(1, "Log at least 1 minute.").max(720).nullable().optional(),
 })
 export const createSessionSchema = sessionFields.extend({ id }).refine(endAfterStart, endAfterStartIssue)
 export const updateSessionSchema = sessionFields

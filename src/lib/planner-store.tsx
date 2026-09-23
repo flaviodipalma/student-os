@@ -3,7 +3,8 @@
 import { createContext, use, useMemo } from "react"
 import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
-import { createPlanner, type DailyPlan, type Planner, type StudySession } from "@/lib/planner"
+import { toDateKey } from "@/lib/format"
+import { createPlanner, whatNow, type DailyPlan, type Planner, type StudySession, type WhatNow } from "@/lib/planner"
 import { plannerInputFor } from "@/lib/planner-input"
 
 // Connects the planner (pure logic in src/lib/planner) to the student's saved data.
@@ -47,6 +48,25 @@ export function usePlan(date: string): DailyPlan {
   return useMemo(() => planner.planFor(date), [planner, date])
 }
 
+// "What should I do now?" from today's plan and the current minute (same planner as
+// every page; recomputed only when the planner or the minute changes).
+export function useWhatNow(): WhatNow {
+  const planner = use(PlannerContext)
+  if (!planner) throw new Error("useWhatNow must be used inside PlannerProvider")
+  const { tasks, calendarItems, scheduleBetween } = useAppStore()
+  const now = useNow()
+  const minute = Math.floor(now.getTime() / 60_000)
+  return useMemo(() => {
+    const at = new Date(minute * 60_000)
+    const today = toDateKey(at)
+    return whatNow({ planner, now: at, today, schedule: scheduleBetween(today, today), events: calendarItems, tasks })
+    // scheduleBetween is derived from calendarItems and commitments (both in the planner's inputs).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planner, minute, tasks, calendarItems])
+}
+
+export type SessionTimes = { date: string; startTime: string; endTime: string }
+
 export function usePlanActions() {
   const { studySessions, addStudySession, updateStudySession, deleteStudySession } = useAppStore()
 
@@ -64,12 +84,30 @@ export function usePlanActions() {
     // Put a suggestion on the calendar.
     accept: (session: StudySession) => store(session, "scheduled"),
 
-    // Mark a session done (a suggestion is saved as done straight away).
-    complete: (session: StudySession) =>
-      session.eventId ? updateStudySession(session.eventId, { status: "completed" }) : store(session, "completed"),
+    // Mark a session done (a suggestion is saved as done straight away). With
+    // `minutes`, only that much was done ("partly done"): the rest is planned again.
+    complete: (session: StudySession, minutes?: number) => {
+      const completedMinutes = minutes ?? null
+      if (session.eventId) return updateStudySession(session.eventId, { status: "completed", completedMinutes })
+      return addStudySession({
+        taskId: session.taskId,
+        date: session.date,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        status: "completed",
+        completedMinutes,
+      })
+    },
 
     undoComplete: (session: StudySession) =>
-      session.eventId && updateStudySession(session.eventId, { status: "scheduled" }),
+      session.eventId && updateStudySession(session.eventId, { status: "scheduled", completedMinutes: null }),
+
+    // Move a session (or put a recommendation on the calendar at another time).
+    // Notifications follow the stored session automatically.
+    reschedule: (session: StudySession, times: SessionTimes) =>
+      session.eventId
+        ? updateStudySession(session.eventId, { ...times, status: "scheduled", completedMinutes: null })
+        : addStudySession({ taskId: session.taskId, ...times, status: "scheduled" }),
 
     // Drop a session from this day's plan; the task isn't suggested again that day.
     remove: (session: StudySession) =>
