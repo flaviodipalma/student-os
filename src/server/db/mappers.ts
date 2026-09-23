@@ -1,10 +1,20 @@
-import type { CalendarEvent, Course, StudySessionRecord, Task } from "@/lib/types"
+import type { CalendarEvent, Course, ExternalSource, StudySessionRecord, Task } from "@/lib/types"
 import type { courses, events, studySessions, tasks } from "./schema"
 
 // Database rows -> the shapes the app already uses (src/lib/types.ts).
 // Postgres returns times as "HH:MM:SS"; the app uses "HH:MM".
 
 const hhmm = (time: string) => time.slice(0, 5)
+
+// Where an imported record came from (undefined for the student's own records).
+function sourceOf(row: {
+  externalSource: ExternalSource["provider"] | null
+  externalId: string | null
+  externalUrl: string | null
+}): ExternalSource | undefined {
+  if (!row.externalSource || !row.externalId) return undefined
+  return { provider: row.externalSource, externalId: row.externalId, url: row.externalUrl ?? undefined }
+}
 
 export function toCourse(row: typeof courses.$inferSelect): Course {
   return {
@@ -14,6 +24,7 @@ export function toCourse(row: typeof courses.$inferSelect): Course {
     professor: row.professor,
     description: row.description,
     color: row.color,
+    source: sourceOf(row),
   }
 }
 
@@ -30,6 +41,7 @@ export function toTask(row: typeof tasks.$inferSelect): Task {
     estimateMinutes: row.estimatedMinutes,
     status: row.status,
     plannedDate: row.plannedDate ?? undefined,
+    source: sourceOf(row),
   }
 }
 

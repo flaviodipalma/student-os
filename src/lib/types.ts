@@ -4,6 +4,20 @@
 
 export type CourseColor = "sky" | "emerald" | "violet" | "orange" | "rose"
 
+// Learning management systems Student OS can import from.
+export const lmsProviderIds = ["canvas", "blackboard"] as const
+export type LmsProviderId = (typeof lmsProviderIds)[number]
+
+// Set on courses and tasks imported from an LMS. The record is otherwise a
+// normal course or task: the Dashboard, Tasks and Planner treat it the same.
+export type ExternalSource = {
+  provider: LmsProviderId
+  // The LMS's own id for it.
+  externalId: string
+  // Link back to it in the LMS.
+  url?: string
+}
+
 export type Course = {
   id: string
   code: string
@@ -12,9 +26,11 @@ export type Course = {
   professor: string
   description: string
   color: CourseColor
+  // Only on courses imported from an LMS.
+  source?: ExternalSource
 }
 
-export type CourseInput = Omit<Course, "id" | "color">
+export type CourseInput = Omit<Course, "id" | "color" | "source">
 
 export type Priority = "low" | "medium" | "high" | "critical"
 
@@ -47,10 +63,12 @@ export type Task = {
   // The day the student plans to work on it. Set by hand in the mock data for now;
   // the planner will fill this in later.
   plannedDate?: string
+  // Only on tasks imported from an LMS.
+  source?: ExternalSource
 }
 
 // What the create/edit form produces.
-export type TaskInput = Omit<Task, "id">
+export type TaskInput = Omit<Task, "id" | "source">
 
 // Something that occupies time on the calendar. Events are single-day: they
 // start and end on `date`. (Tasks are different: things to get done, with a due date.)

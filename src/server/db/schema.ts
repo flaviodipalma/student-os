@@ -6,6 +6,7 @@ import {
   index,
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   smallint,
@@ -43,6 +44,9 @@ export const taskType = pgEnum("task_type", [
 ])
 export const eventType = pgEnum("event_type", ["class", "sports", "work", "personal", "study"])
 export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "completed", "skipped"])
+// Learning management systems Student OS can import from (see src/server/integrations/lms).
+export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
+export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
 export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
@@ -51,6 +55,21 @@ const timestamps = {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+}
+
+// Imported records remember their source, so a later sync recognises them
+// (see src/lib/lms/sync-plan.ts):
+//   external_source  which LMS ("canvas" | "blackboard")
+//   external_id      the LMS's id for it, only meaningful together with the source
+//   external_url     link back to it in the LMS
+//   external_synced  the values as last synced from the LMS. Comparing them with
+//                    the current record shows what the student changed since.
+const externalSourceColumns = {
+  externalSource: lmsProvider("external_source"),
+  externalId: text("external_id"),
+  externalUrl: text("external_url"),
+  externalSynced: jsonb("external_synced").$type<Record<string, string | number | null>>(),
+  externalSyncedAt: timestamp("external_synced_at", { withTimezone: true }),
 }
 
 // The User model. Sign-in details (email, password) live in Supabase's auth.users;
@@ -147,10 +166,15 @@ export const courses = pgTable(
     professor: text("professor").notNull().default(""),
     description: text("description").notNull().default(""),
     color: courseColor("color").notNull(),
+    // Where the course was imported from (null = added by the student or from a syllabus).
+    ...externalSourceColumns,
     ...timestamps,
   },
   (t) => [
     index("courses_user_id_idx").on(t.userId),
+    // One Student OS course per LMS course, per student.
+    unique("courses_user_external_key").on(t.userId, t.externalSource, t.externalId),
+    check("courses_external_pair", sql`(${t.externalSource} is null) = (${t.externalId} is null)`),
     // Lets tasks reference (course, owner) so a task can't point at another user's course.
     unique("courses_id_user_id_key").on(t.id, t.userId),
     unique("courses_user_id_course_code_key").on(t.userId, t.courseCode),
@@ -176,10 +200,15 @@ export const tasks = pgTable(
     estimatedMinutes: integer("estimated_minutes").notNull(),
     status: taskStatus("status").notNull().default("not_started"),
     plannedDate: date("planned_date"),
+    // Where the task was imported from (null = added by the student or from a syllabus).
+    ...externalSourceColumns,
     ...timestamps,
   },
   (t) => [
     index("tasks_user_id_due_date_idx").on(t.userId, t.dueDate),
+    // One Student OS task per LMS assignment, per student.
+    unique("tasks_user_external_key").on(t.userId, t.externalSource, t.externalId),
+    check("tasks_external_pair", sql`(${t.externalSource} is null) = (${t.externalId} is null)`),
     index("tasks_course_id_idx").on(t.courseId),
     unique("tasks_id_user_id_key").on(t.id, t.userId),
     // The course must belong to the same user. Deleting a course deletes its tasks.
@@ -263,4 +292,33 @@ export const syllabusImports = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("syllabus_imports_user_id_idx").on(t.userId)]
+).enableRLS()
+
+// A student's connection to a learning management system (one per provider).
+// Access and refresh tokens are stored ENCRYPTED (AES-256-GCM, see
+// src/server/integrations/lms/credential-vault.ts), never in plain text, and
+// never leave the server. Disconnecting deletes the row; imported courses and
+// tasks stay, as normal Student OS data.
+export const lmsConnections = pgTable(
+  "lms_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    provider: lmsProvider("provider").notNull(),
+    // The student's id in the LMS, if the provider reports one.
+    externalUserId: text("external_user_id"),
+    // Institution-specific LMS address (Canvas and Blackboard are hosted per school).
+    baseUrl: text("base_url"),
+    accessTokenEncrypted: text("access_token_encrypted"),
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    status: lmsConnectionStatus("status").notNull().default("connected"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    // A safe, student-facing message about the last failed sync (never provider internals).
+    lastSyncError: text("last_sync_error"),
+    ...timestamps,
+  },
+  (t) => [unique("lms_connections_user_provider_key").on(t.userId, t.provider)]
 ).enableRLS()
