@@ -426,7 +426,11 @@ describe("syncing Canvas into Student OS", () => {
 
     const data = await loadAppData(t.db, user)
     expect(data.courses).toEqual([
-      expect.objectContaining({ code: "CSC 215", name: "Data Structures", source: { provider: "canvas", externalId: "215", url: undefined } }),
+      expect.objectContaining({
+        code: "CSC 215",
+        name: "Data Structures",
+        source: { provider: "canvas", externalId: "215", url: `${BASE}/courses/215` },
+      }),
     ])
     expect(data.tasks).toEqual([
       expect.objectContaining({
@@ -434,8 +438,13 @@ describe("syncing Canvas into Student OS", () => {
         dueDate: "2026-09-25",
         dueTime: "23:59",
         priority: "medium",
-        estimateMinutes: 90, // the same default a syllabus import uses; Canvas has no estimate
-        source: { provider: "canvas", externalId: "1", url: `${BASE}/courses/215/assignments/1` },
+        estimateMinutes: null, // Canvas has no estimate, so none is invented
+        source: {
+          provider: "canvas",
+          externalId: "1",
+          url: `${BASE}/courses/215/assignments/1`,
+          submissionStatus: "not_submitted",
+        },
       }),
     ])
     // Only reads: every request to the API was a GET.
@@ -533,5 +542,125 @@ describe("syncing Canvas into Student OS", () => {
     await connected("Alice")
     const bob = await t.addUser("Bob")
     await expect(createLmsAccess(t.db, bob, new CanvasProvider({ config: () => config }), vault)).rejects.toThrow("doesn't exist")
+  })
+})
+
+// ---- Keeping Canvas and Student OS in sync over time --------------------------------
+
+describe("syncing over time", () => {
+  it("marks tasks done from Canvas only conservatively, and never un-completes", async () => {
+    const user = await connected("Alex")
+    const canvas = fakeCanvas({
+      courses: [course(215)],
+      assignments: {
+        "215": [
+          assignment(1, 215), // not submitted
+          assignment(2, 215, { submission: { workflow_state: "graded" } }), // already graded
+        ],
+      },
+    })
+    const first = await sync(user, canvas)
+    expect(first.assignmentsCompleted).toBe(1)
+    let tasks = (await loadAppData(t.db, user)).tasks
+    expect(tasks.find((task) => task.title === "Assignment 1")?.status).toBe("not_started")
+    expect(tasks.find((task) => task.title === "Assignment 2")?.status).toBe("completed")
+
+    // The student submits assignment 1 in Canvas: the next sync marks it done.
+    canvas.state.assignments["215"] = [
+      assignment(1, 215, { submission: { workflow_state: "submitted" } }),
+      assignment(2, 215, { submission: { workflow_state: "graded" } }),
+    ]
+    expect((await sync(user, canvas)).assignmentsCompleted).toBe(1)
+    tasks = (await loadAppData(t.db, user)).tasks
+    const one = tasks.find((task) => task.title === "Assignment 1")!
+    expect(one.status).toBe("completed")
+
+    // The student reopens it (e.g. to revise): later syncs leave it open.
+    await updateTask(t.db, user, one.id, { status: "in_progress" })
+    expect((await sync(user, canvas)).assignmentsCompleted).toBe(0)
+    expect((await loadAppData(t.db, user)).tasks.find((task) => task.id === one.id)?.status).toBe("in_progress")
+  })
+
+  it("updates Canvas's fields but never the student's: priority, estimate, notes, status", async () => {
+    const user = await connected("Alex")
+    const canvas = fakeCanvas({ courses: [course(215)], assignments: { "215": [assignment(1, 215)] } })
+    await sync(user, canvas)
+    const [task] = (await loadAppData(t.db, user)).tasks
+    expect(task.estimateMinutes).toBeNull()
+    await updateTask(t.db, user, task.id, { priority: "critical", estimateMinutes: 150, notes: "Ask about Q3", status: "in_progress" })
+
+    // Canvas renames the assignment, rewrites the description and moves it from Sep 25 to Sep 27.
+    canvas.state.assignments["215"] = [
+      assignment(1, 215, { name: "Assignment 1 (updated)", description: "<p>New brief</p>", due_at: "2026-09-28T03:59:00Z" }),
+    ]
+    const result = await sync(user, canvas)
+    expect(result).toMatchObject({ assignmentsUpdated: 1, assignmentsCreated: 0, conflicts: [] })
+    expect((await loadAppData(t.db, user)).tasks).toEqual([
+      expect.objectContaining({
+        id: task.id,
+        title: "Assignment 1 (updated)",
+        description: "New brief",
+        dueDate: "2026-09-27",
+        priority: "critical",
+        estimateMinutes: 150,
+        notes: "Ask about Q3",
+        status: "in_progress",
+      }),
+    ])
+  })
+
+  it("updates a renamed course, unless the student renamed it; reports courses that left Canvas", async () => {
+    const user = await connected("Alex")
+    const canvas = fakeCanvas({ courses: [course(1, { name: "Algebra" }), course(2, { name: "Biology" })], assignments: {} })
+    await sync(user, canvas)
+    const biology = (await loadAppData(t.db, user)).courses.find((c) => c.name === "Biology")!
+    await (await import("../../../services/courses")).updateCourse(t.db, user, biology.id, { name: "Bio (my name)" })
+
+    canvas.state.courses = [course(1, { name: "Algebra II" }), course(2, { name: "Biology 101" })]
+    expect(await sync(user, canvas)).toMatchObject({ coursesUpdated: 1, coursesCreated: 0 })
+    let names = (await loadAppData(t.db, user)).courses.map((c) => c.name).sort()
+    expect(names).toEqual(["Algebra II", "Bio (my name)"])
+
+    // The term ends: Canvas stops listing Algebra. It's reported, and kept.
+    canvas.state.courses = [course(2, { name: "Biology 101" })]
+    const ended = await sync(user, canvas)
+    expect(ended.missingCourses.map((c) => c.name)).toEqual(["Algebra II"])
+    names = (await loadAppData(t.db, user)).courses.map((c) => c.name).sort()
+    expect(names).toEqual(["Algebra II", "Bio (my name)"])
+  })
+
+  it("one item that can't be saved doesn't stop the rest (partial failure)", async () => {
+    const user = await connected("Alex")
+    // Two Canvas courses whose codes are the same to Student OS ("CSC 215" and "CSC215"):
+    // the second can't be created, but everything else still syncs.
+    const canvas = fakeCanvas({
+      courses: [course(1, { course_code: "CSC 215", name: "Data Structures" }), course(2, { course_code: "CSC215", name: "Data Structures (lab)" }), course(3)],
+      assignments: { "1": [assignment(10, 1)], "2": [assignment(20, 2)], "3": [assignment(30, 3)] },
+    })
+    const result = await sync(user, canvas)
+    expect(result.coursesCreated).toBe(2)
+    expect(result.coursesSkipped).toBe(1)
+    expect(result.errors).toEqual(["Data Structures (lab): You already have a course with the code CSC 215."])
+    expect(result.assignmentsCreated).toBe(2) // the lab's assignment has no course to go in
+    expect((await loadAppData(t.db, user)).tasks.map((task) => task.title).sort()).toEqual(["Assignment 10", "Assignment 30"])
+  })
+
+  it("keeps due dates right around midnight and across time zones", () => {
+    const ny = "America/New_York"
+    expect(canvasDueToLocal("2026-09-26T04:00:00Z", ny)).toEqual({ dueDate: "2026-09-26", dueTime: "00:00" }) // midnight
+    expect(canvasDueToLocal("2026-09-26T03:59:59Z", ny)).toEqual({ dueDate: "2026-09-25", dueTime: "23:59" }) // just before
+    // Daylight saving ends Nov 1, 2026 at 06:00 UTC: before it is EDT (-4), after it EST (-5).
+    expect(canvasDueToLocal("2026-11-01T05:30:00Z", ny)).toEqual({ dueDate: "2026-11-01", dueTime: "01:30" })
+    expect(canvasDueToLocal("2026-11-01T07:30:00Z", ny)).toEqual({ dueDate: "2026-11-01", dueTime: "02:30" })
+    expect(canvasDueToLocal("2026-09-26T03:59:00Z", "Europe/Berlin")).toEqual({ dueDate: "2026-09-26", dueTime: "05:59" })
+    // An assignment with only optional fields missing still maps; only the due date is empty.
+    expect(canvasAssignmentToLms({ id: 5, name: "Bare" }, "215", { baseUrl: BASE, timeZone: ny })).toMatchObject({
+      title: "Bare",
+      description: null,
+      dueDate: null,
+      dueTime: null,
+      url: null,
+      submissionStatus: "unknown",
+    })
   })
 })

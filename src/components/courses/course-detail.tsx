@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 import { courseColorClass } from "@/components/course-tag"
 import { NewTaskButton } from "@/components/tasks/new-task-button"
+import { SourceBadge } from "@/components/tasks/task-badges"
 import { CourseActions } from "./course-actions"
 import { TaskList } from "@/components/tasks/task-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +50,11 @@ export function CourseDetail({ courseId }: { courseId: string }) {
               <p className="text-sm font-medium text-muted-foreground">{course.code}</p>
               <h1 className="mt-0.5 text-2xl font-semibold tracking-tight md:text-3xl">{course.name}</h1>
               {course.professor && <p className="mt-1 text-muted-foreground">{course.professor}</p>}
+              {course.source && (
+                <p className="mt-2">
+                  <SourceBadge source={course.source} />
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <NewTaskButton courseId={course.id} label="Add task" />

@@ -43,6 +43,11 @@ export function SourceBadge({ source }: { source: ExternalSource }) {
   return (
     <span className="inline-flex items-center gap-2">
       <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">From {name}</span>
+      {(source.submissionStatus === "submitted" || source.submissionStatus === "graded") && (
+        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-600/15 ring-inset">
+          {source.submissionStatus === "graded" ? "Graded" : "Submitted"} in {name}
+        </span>
+      )}
       {url && (
         <a
           href={url}

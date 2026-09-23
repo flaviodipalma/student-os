@@ -44,6 +44,7 @@ export async function createTask(db: Database, userId: string, input: TaskInput 
       dueTime: input.dueTime ?? null,
       priority: input.priority,
       estimatedMinutes: input.estimateMinutes,
+      notes: input.notes ?? "",
       status: input.status,
       plannedDate: input.plannedDate ?? null,
     })
@@ -62,6 +63,7 @@ export async function updateTask(db: Database, userId: string, taskId: string, c
     dueTime: changes.dueTime,
     priority: changes.priority,
     estimatedMinutes: changes.estimateMinutes,
+    notes: changes.notes,
     status: changes.status,
     plannedDate: changes.plannedDate,
   }

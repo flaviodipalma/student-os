@@ -17,6 +17,8 @@ export type ExternalSource = {
   externalId: string
   // Link back to it in the LMS.
   url?: string
+  // Tasks only: where the student stands in the LMS, as of the last sync.
+  submissionStatus?: "not_submitted" | "submitted" | "graded" | "unknown"
 }
 
 export type Course = {
@@ -59,11 +61,14 @@ export type Task = {
   dueDate: string
   dueTime?: string
   priority: Priority
-  estimateMinutes: number
+  // Null when unknown (e.g. Canvas doesn't give one); the Planner uses a fallback.
+  estimateMinutes: number | null
   status: TaskStatus
   // The day the student plans to work on it. Set by hand in the mock data for now;
   // the planner will fill this in later.
   plannedDate?: string
+  // The student's own notes (imported tasks keep the LMS's description separately).
+  notes?: string
   // Only on tasks imported from an LMS.
   source?: ExternalSource
 }

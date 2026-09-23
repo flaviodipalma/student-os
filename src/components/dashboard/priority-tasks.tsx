@@ -11,7 +11,7 @@ export function PriorityTasks({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
   const todays = todaysTasks(tasks, today)
   const remaining = todays.filter((task) => !isDone(task))
-  const minutesLeft = remaining.reduce((sum, task) => sum + task.estimateMinutes, 0)
+  const minutesLeft = remaining.reduce((sum, task) => sum + (task.estimateMinutes ?? 0), 0)
   // Nothing due or planned today: the plan and deadlines already say so.
   if (todays.length === 0) return null
 

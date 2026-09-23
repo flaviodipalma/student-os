@@ -67,7 +67,7 @@ const prefs = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) =>
 const exact = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) => ({ ...prefs(overrides), maxShareOfFreeTime: 1 })
 
 const scoreOf = (t: Task, date = DATE) =>
-  scoreTask(t, { date, remainingMinutes: t.estimateMinutes, estimateMissing: false, started: false, capacityBeforeDue: Infinity })
+  scoreTask(t, { date, remainingMinutes: t.estimateMinutes ?? 0, estimateMissing: false, started: false, capacityBeforeDue: Infinity })
 
 // ---------------------------------------------------------------------------
 

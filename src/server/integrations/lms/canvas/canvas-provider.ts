@@ -58,12 +58,12 @@ export class CanvasProvider implements LmsProvider {
       ["enrollment_state", "active"],
       ["include[]", "teachers"],
     ])
-    return raw.map(canvasCourseToLms).filter((course): course is LmsCourse => course !== null)
+    return raw.map((item) => canvasCourseToLms(item, access.baseUrl)).filter((course): course is LmsCourse => course !== null)
   }
 
   async getCourseDetails(access: LmsAccess, courseExternalId: string): Promise<LmsCourse> {
     const raw = await this.client(access).getOne(`/courses/${encodeURIComponent(courseExternalId)}`, [["include[]", "teachers"]], "course")
-    const course = canvasCourseToLms(raw)
+    const course = canvasCourseToLms(raw, access.baseUrl)
     if (!course) throw new LmsError("This course isn't available in Canvas.", "course")
     return course
   }

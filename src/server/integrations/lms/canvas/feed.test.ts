@@ -109,8 +109,8 @@ describe("feed -> normalized Canvas data", () => {
     ])
     const data = canvasFeedToLms(text, { baseUrl: BASE, timeZone: "America/New_York" })
     expect(data.courses).toEqual([
-      { provider: "canvas", externalId: "215", courseCode: "CSC 215", courseName: "CSC 215", description: null, instructor: null, url: null },
-      { provider: "canvas", externalId: "101", courseCode: "PSY101", courseName: "PSY101", description: null, instructor: null, url: null },
+      { provider: "canvas", externalId: "215", courseCode: "CSC 215", courseName: "CSC 215", description: null, instructor: null, url: `${BASE}/courses/215` },
+      { provider: "canvas", externalId: "101", courseCode: "PSY101", courseName: "PSY101", description: null, instructor: null, url: `${BASE}/courses/101` },
     ])
     expect(data.assignments.map((a) => [a.externalId, a.courseExternalId, a.title, a.dueDate, a.dueTime])).toEqual([
       ["11", "215", "Project 1", "2026-09-25", "23:59"],

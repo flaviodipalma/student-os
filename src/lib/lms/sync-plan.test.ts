@@ -133,7 +133,7 @@ describe("course matching", () => {
 })
 
 describe("assignment -> task matching", () => {
-  it("creates a normal Student OS task, with the importer's default estimate when the LMS has none", () => {
+  it("creates a normal Student OS task, with no estimate when the LMS gives none (never guessed)", () => {
     const { actions } = planTasks([], [lmsAssignment()], inCourse1, scope)
     expect(actions[0]).toMatchObject({
       kind: "create",
@@ -144,7 +144,7 @@ describe("assignment -> task matching", () => {
         dueDate: "2026-10-10",
         dueTime: "23:59",
         priority: "medium",
-        estimateMinutes: 240,
+        estimateMinutes: null,
         status: "not_started",
       },
     })

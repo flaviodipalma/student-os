@@ -2,7 +2,7 @@ import { durationMinutes } from "@/lib/events"
 import { daysBetween, fromDateKey } from "@/lib/format"
 import { typeLabel } from "@/lib/tasks"
 import type { CalendarEvent, Task } from "@/lib/types"
-import { DEFAULT_SCORING, type PlannerSettings, type ScoringWeights } from "./settings"
+import { DEFAULT_PLANNER_SETTINGS, DEFAULT_SCORING, type PlannerSettings, type ScoringWeights } from "./settings"
 import type { ScoreFactor, ScoredTask } from "./types"
 
 // ---- Remaining work --------------------------------------------------------
@@ -16,8 +16,11 @@ import type { ScoreFactor, ScoredTask } from "./types"
 // The estimate the planner works with. Tasks without a usable estimate get the
 // fallback (and the student is asked to add one).
 export function estimateOf(task: Task, settings: Pick<PlannerSettings, "fallbackEstimateMinutes">) {
-  const missing = !Number.isFinite(task.estimateMinutes) || task.estimateMinutes <= 0
-  return { minutes: missing ? settings.fallbackEstimateMinutes : task.estimateMinutes, missing }
+  const minutes = task.estimateMinutes
+  if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) {
+    return { minutes: settings.fallbackEstimateMinutes, missing: true }
+  }
+  return { minutes, missing: false }
 }
 
 // Minutes of a task already covered by study sessions on the calendar.
@@ -137,7 +140,13 @@ export function compareScored(a: ScoredTask, b: ScoredTask): number {
 export function calculateTaskUrgency(task: Task, date: string, weights: ScoringWeights = DEFAULT_SCORING): number {
   return scoreTask(
     task,
-    { date, remainingMinutes: task.estimateMinutes, estimateMissing: false, started: false, capacityBeforeDue: Infinity },
+    {
+      date,
+      remainingMinutes: estimateOf(task, DEFAULT_PLANNER_SETTINGS).minutes,
+      estimateMissing: false,
+      started: false,
+      capacityBeforeDue: Infinity,
+    },
     weights
   ).score
 }

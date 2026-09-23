@@ -11,9 +11,16 @@ function sourceOf(row: {
   externalSource: ExternalSource["provider"] | null
   externalId: string | null
   externalUrl: string | null
+  externalSynced?: Record<string, string | number | null> | null
 }): ExternalSource | undefined {
   if (!row.externalSource || !row.externalId) return undefined
-  return { provider: row.externalSource, externalId: row.externalId, url: row.externalUrl ?? undefined }
+  const status = row.externalSynced?.submissionStatus
+  return {
+    provider: row.externalSource,
+    externalId: row.externalId,
+    url: row.externalUrl ?? undefined,
+    ...(status === "not_submitted" || status === "submitted" || status === "graded" ? { submissionStatus: status } : {}),
+  }
 }
 
 export function toCourse(row: typeof courses.$inferSelect): Course {
@@ -39,6 +46,7 @@ export function toTask(row: typeof tasks.$inferSelect): Task {
     dueTime: row.dueTime ? hhmm(row.dueTime) : undefined,
     priority: row.priority,
     estimateMinutes: row.estimatedMinutes,
+    notes: row.notes || undefined,
     status: row.status,
     plannedDate: row.plannedDate ?? undefined,
     source: sourceOf(row),

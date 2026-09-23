@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertTriangleIcon, CircleCheckIcon, InfoIcon, PlugZapIcon, RefreshCwIcon, UnplugIcon } from "lucide-react"
 import {
@@ -143,16 +143,6 @@ function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatu
   const connection = integration.connection
   const viaFeed = connection?.method === "calendar_feed"
   const needsAttention = connection && connection.status !== "connected"
-  const lastSynced = connection?.lastSyncedAt
-    ? new Date(connection.lastSyncedAt).toLocaleString("en-US", {
-        timeZone,
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : null
 
   return (
     <div className="space-y-3">
@@ -177,7 +167,18 @@ function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatu
               ? "Bring in your Canvas courses and assignment deadlines."
               : needsAttention
                 ? "Connection needs attention."
-                : [viaFeed ? "Through your calendar feed" : "Signed in with Canvas", lastSynced ? `last synced ${lastSynced}` : "nothing imported yet"].join(" · ")}
+                : (
+                  <>
+                    {viaFeed ? "Through your calendar feed" : "Signed in with Canvas"} ·{" "}
+                    {connection.lastSyncedAt ? (
+                      <>
+                        last synced <SyncedAgo iso={connection.lastSyncedAt} timeZone={timeZone} />
+                      </>
+                    ) : (
+                      "nothing imported yet"
+                    )}
+                  </>
+                )}
           </p>
         </div>
       </div>
@@ -322,8 +323,11 @@ function SyncSummary({ result }: { result: LmsSyncResult }) {
     result.assignmentsCreated > 0 && `${plural(result.assignmentsCreated, "assignment")} added as tasks`,
     result.assignmentsLinked > 0 && `${plural(result.assignmentsLinked, "existing task")} linked to Canvas`,
     result.assignmentsUpdated > 0 && `${plural(result.assignmentsUpdated, "assignment")} updated`,
+    result.assignmentsCompleted > 0 &&
+      `${plural(result.assignmentsCompleted, "task")} marked done (submitted in Canvas)`,
     result.assignmentsWithoutDueDate > 0 &&
       `${plural(result.assignmentsWithoutDueDate, "assignment")} without a due date in Canvas weren't imported`,
+    result.coursesSkipped > 0 && `${plural(result.coursesSkipped, "course")} skipped (see below)`,
   ].filter(Boolean)
 
   return (
@@ -353,6 +357,16 @@ function SyncSummary({ result }: { result: LmsSyncResult }) {
                 {conflict.title}: you set the {fieldLabel[conflict.field]} to {conflict.studentValue ?? "nothing"}; Canvas
                 now says {conflict.lmsValue ?? "nothing"}.
               </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.missingCourses.length > 0 && (
+        <div>
+          <p className="font-medium">Courses no longer in Canvas (kept in Student OS):</p>
+          <ul className="list-inside list-disc space-y-0.5">
+            {result.missingCourses.map((course) => (
+              <li key={course.courseId}>{course.name}</li>
             ))}
           </ul>
         </div>
@@ -421,4 +435,41 @@ function DisconnectButton() {
       </AlertDialog>
     </>
   )
+}
+
+// "just now", "5 minutes ago", "3 hours ago", or the date. Rendered as the date
+// first (server and browser agree on it), then relative once in the browser.
+export function SyncedAgo({ iso, timeZone }: { iso: string; timeZone: string | undefined }) {
+  const absolute = new Date(iso).toLocaleString("en-US", {
+    timeZone,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  const [text, setText] = useState(absolute)
+  useEffect(() => {
+    const update = () => setText(formatSyncedAgo(new Date(iso), new Date(), absolute))
+    const first = setTimeout(update, 0)
+    const timer = setInterval(update, 30_000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(timer)
+    }
+  }, [iso, absolute])
+  return (
+    <time dateTime={iso} title={absolute}>
+      {text}
+    </time>
+  )
+}
+
+export function formatSyncedAgo(then: Date, now: Date, fallback: string): string {
+  const minutes = Math.floor((now.getTime() - then.getTime()) / 60_000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`
+  return fallback
 }

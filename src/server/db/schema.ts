@@ -199,7 +199,11 @@ export const tasks = pgTable(
     dueDate: date("due_date").notNull(),
     dueTime: time("due_time"),
     priority: taskPriority("priority").notNull().default("medium"),
-    estimatedMinutes: integer("estimated_minutes").notNull(),
+    // Null = not estimated (e.g. imported from an LMS that doesn't say); the Planner then
+    // uses a fallback length and asks the student to add one.
+    estimatedMinutes: integer("estimated_minutes"),
+    // The student's own notes. Never synced from or to an LMS (unlike description).
+    notes: text("notes").notNull().default(""),
     status: taskStatus("status").notNull().default("not_started"),
     plannedDate: date("planned_date"),
     // Where the task was imported from (null = added by the student or from a syllabus).

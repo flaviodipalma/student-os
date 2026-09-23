@@ -1,7 +1,6 @@
 import { findDuplicateTask, normalizeCourseCode } from "@/lib/syllabus/duplicates"
-import { defaultEstimateMinutes } from "@/lib/syllabus/review"
 import type { Course, LmsProviderId, Task, TaskInput } from "@/lib/types"
-import type { LmsAssignment, LmsCourse, LmsSyncConflict } from "./types"
+import type { LmsAssignment, LmsCourse, LmsSubmissionStatus, LmsSyncConflict } from "./types"
 
 // How LMS data becomes normal Student OS data, as a PLAN: pure functions that
 // compare what the LMS says with what the student has, and decide what to do.
@@ -24,10 +23,14 @@ import type { LmsAssignment, LmsCourse, LmsSyncConflict } from "./types"
 // Who owns what
 //   Synced from the LMS:   title, description, due date, due time (+ course code,
 //                          name, professor, description for courses)
-//   Set once, on create:   type, estimate (the LMS's if stated, else the same
-//                          default the syllabus importer uses)
-//   Always the student's:  priority, status, planned date, study sessions
-//   An assignment submitted in the LMS does NOT complete the task; the student does.
+//   Set once, on create:   type, estimate (only if the LMS states one; otherwise
+//                          none, and the Planner uses its fallback)
+//   Always the student's:  priority, estimate, notes, planned date, study sessions
+//   Status, conservatively: an assignment already submitted/graded in the LMS is
+//                          imported as done; an existing task is marked done only
+//                          when a sync sees the LMS change from not submitted to
+//                          submitted/graded and the student hasn't marked it done.
+//                          The LMS never un-completes a task.
 //
 // Changes on both sides: a three-way comparison per field
 //   base   = the value last synced from the LMS (stored with the record)
@@ -48,10 +51,15 @@ import type { LmsAssignment, LmsCourse, LmsSyncConflict } from "./types"
 
 export type SyncedCourseFields = { code: string; name: string; professor: string; description: string }
 export type SyncedTaskFields = { title: string; description: string; dueDate: string; dueTime: string | null }
+// What's stored as the last-synced snapshot of a task: the merged fields plus
+// the LMS's submission status (to notice when it changes).
+export type TaskSnapshot = SyncedTaskFields & { submissionStatus: LmsSubmissionStatus }
 
 // Existing records, with the values last synced from the LMS (null = never synced).
 export type ExistingCourse = Course & { synced: Partial<SyncedCourseFields> | null }
-export type ExistingTask = Task & { synced: Partial<SyncedTaskFields> | null }
+export type ExistingTask = Task & { synced: Partial<TaskSnapshot> | null }
+
+const turnedIn = (status: LmsSubmissionStatus | undefined) => status === "submitted" || status === "graded"
 
 export function courseFieldsFrom(lms: LmsCourse): SyncedCourseFields {
   const name = lms.courseName.trim().slice(0, 150) || "Untitled course"
@@ -134,13 +142,28 @@ export function planCourses(existing: ExistingCourse[], lmsCourses: LmsCourse[])
   })
 }
 
+// Imported courses the LMS no longer lists (ended, dropped or deleted). They're
+// kept: the student's data (and any tasks in them) is never deleted by a sync.
+export function missingCourses(existing: ExistingCourse[], lmsCourses: LmsCourse[], provider: LmsProviderId): ExistingCourse[] {
+  const listed = new Set(lmsCourses.map((course) => course.externalId))
+  return existing.filter((course) => course.source?.provider === provider && !listed.has(course.source.externalId))
+}
+
 // ---- Assignments -> tasks ---------------------------------------------------
 
+// `complete`: mark the task done because the LMS now shows it turned in (see the rule above).
 export type TaskAction =
-  | { kind: "create"; lms: LmsAssignment; input: TaskInput; synced: SyncedTaskFields }
-  | { kind: "update"; taskId: string; lms: LmsAssignment; changes: Partial<SyncedTaskFields>; synced: SyncedTaskFields }
-  | { kind: "link"; taskId: string; lms: LmsAssignment; synced: SyncedTaskFields }
-  | { kind: "unchanged"; taskId: string; lms: LmsAssignment; synced: SyncedTaskFields }
+  | { kind: "create"; lms: LmsAssignment; input: TaskInput; synced: TaskSnapshot }
+  | {
+      kind: "update"
+      taskId: string
+      lms: LmsAssignment
+      changes: Partial<SyncedTaskFields>
+      synced: TaskSnapshot
+      complete: boolean
+    }
+  | { kind: "link"; taskId: string; lms: LmsAssignment; synced: TaskSnapshot; complete: boolean }
+  | { kind: "unchanged"; taskId: string; lms: LmsAssignment; synced: TaskSnapshot; complete: boolean }
   | { kind: "skip"; lms: LmsAssignment; reason: "no-due-date" | "unknown-course" }
 
 export type TaskPlan = {
@@ -168,6 +191,10 @@ export function planTasks(
     if (!courseId) return { kind: "skip", lms, reason: "unknown-course" }
     if (!lms.dueDate) return { kind: "skip", lms, reason: "no-due-date" }
     const remote = taskFieldsFrom({ ...lms, dueDate: lms.dueDate })
+    const snapshot: TaskSnapshot = { ...remote, submissionStatus: lms.submissionStatus }
+    // Newly turned in since the last sync, and not already done in Student OS.
+    const completes = (task: ExistingTask) =>
+      turnedIn(lms.submissionStatus) && !turnedIn(task.synced?.submissionStatus) && task.status !== "completed"
 
     const imported = existing.find((task) => isFrom(task.source, lms.provider, lms.externalId))
     if (imported) {
@@ -182,9 +209,10 @@ export function planTasks(
       for (const field of merged.conflicts) {
         conflicts.push({ taskId: imported.id, title: imported.title, field, studentValue: local[field], lmsValue: remote[field] })
       }
+      const complete = completes(imported)
       return Object.keys(merged.changed).length > 0
-        ? { kind: "update", taskId: imported.id, lms, changes: merged.changed, synced: remote }
-        : { kind: "unchanged", taskId: imported.id, lms, synced: remote }
+        ? { kind: "update", taskId: imported.id, lms, changes: merged.changed, synced: snapshot, complete }
+        : { kind: "unchanged", taskId: imported.id, lms, synced: snapshot, complete }
     }
 
     // Already in Student OS (added by hand or from a syllabus): link it, don't duplicate it.
@@ -192,13 +220,13 @@ export function planTasks(
     const same = findDuplicateTask({ title: remote.title, dueDate: remote.dueDate, type: lms.type }, courseId, unlinked)
     if (same) {
       claimed.add(same.id)
-      return { kind: "link", taskId: same.id, lms, synced: remote }
+      return { kind: "link", taskId: same.id, lms, synced: snapshot, complete: completes({ ...same, synced: null }) }
     }
 
     return {
       kind: "create",
       lms,
-      synced: remote,
+      synced: snapshot,
       input: {
         courseId,
         title: remote.title,
@@ -206,9 +234,12 @@ export function planTasks(
         type: lms.type,
         dueDate: remote.dueDate,
         dueTime: remote.dueTime ?? undefined,
+        // The Student OS default: the LMS doesn't set priority.
         priority: "medium",
-        estimateMinutes: lms.estimatedMinutes ?? defaultEstimateMinutes[lms.type],
-        status: "not_started",
+        // Only the LMS's own estimate; otherwise none (never guessed).
+        estimateMinutes: lms.estimatedMinutes,
+        // Already turned in in the LMS: nothing left to plan.
+        status: turnedIn(lms.submissionStatus) ? "completed" : "not_started",
       },
     }
   })

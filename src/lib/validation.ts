@@ -51,10 +51,13 @@ export const taskFields = z.object({
   dueDate: dateKey,
   dueTime: timeOfDay.optional(),
   priority,
+  // Optional: null = not estimated yet.
   estimateMinutes: z
     .int("Estimated duration must be a whole number of minutes.")
     .min(1, "Estimated duration must be at least 1 minute.")
-    .max(10000, "That's more than 10,000 minutes. Split it into smaller tasks."),
+    .max(10000, "That's more than 10,000 minutes. Split it into smaller tasks.")
+    .nullable(),
+  notes: z.string().trim().max(2000, "Keep notes under 2,000 characters.").optional(),
   status: taskStatus,
   plannedDate: dateKey.optional(),
 })

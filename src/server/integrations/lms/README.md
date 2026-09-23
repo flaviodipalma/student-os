@@ -1,6 +1,8 @@
 # LMS integrations (Canvas, Blackboard)
 
-**Status:** Canvas is implemented (OAuth 2.0 + read-only REST API).
+**Status:** Canvas is implemented, read-only, two ways: the student's private
+calendar feed (no school approval needed) or OAuth 2.0 + the REST API (needs a
+developer key from the school).
 Blackboard is not: its adapter makes no network calls and throws
 `LmsNotAvailableError`; Settings shows it as "coming soon".
 
@@ -50,11 +52,23 @@ else **created**.
 
 | Field | Owner |
 | --- | --- |
-| title, description, due date, due time (course: code, name, professor, description) | synced from the LMS |
-| type, estimate | set once when created (estimate: the LMS's if stated, else the importer's default) |
-| priority, status, planned date, study sessions | always the student's |
+| title, description, due date, due time, link, submission status (course: code, name, professor, description, link) | **LMS-controlled**: synced from the LMS (with the three-way rule below) |
+| type | set once when created |
+| estimate | set once, only if the LMS states one; otherwise **null** (never guessed; the Planner uses its fallback and asks the student to add one) |
+| priority, estimate, notes, planned date, study sessions | **student-controlled**: never changed by a sync (priority starts at the Student OS default, medium) |
+| status | the student's, with one conservative exception (below) |
 
-Submitting in the LMS never completes the task in Student OS.
+**Submission status → task status (conservative):**
+- An assignment already *submitted* or *graded* when first imported becomes a
+  completed task (nothing left to plan).
+- An existing task is marked completed only when a sync sees the LMS change from
+  not submitted to submitted/graded, and the student hasn't completed it.
+- The LMS never un-completes a task; if the student reopens it, it stays open.
+- "Unknown" (e.g. the calendar feed, which has no submission data) changes nothing.
+The status is shown on imported tasks ("Submitted in Canvas" / "Graded in Canvas").
+
+**Notes vs description:** an imported task's description comes from the LMS;
+the student's own notes go in `tasks.notes` ("Your notes"), which no sync touches.
 
 **Conflicts (three-way):** base = `external_synced`, local = the task now,
 remote = the LMS now. LMS-only changes are applied; student-only changes are
@@ -67,9 +81,32 @@ are counted in `assignmentsMissing` for the student to review.
 
 **No due date:** not imported (every task needs one); counted as skipped.
 
+**Courses the LMS stops listing** (term ended, dropped, deleted): reported in
+`missingCourses`, kept with their tasks. Only an OAuth sync can tell (it lists
+every current course); the calendar feed only contains courses with items.
+
+**Reliability:**
+- Everything the LMS returns is read first; then all saving happens in one
+  transaction, with each course and assignment in its own savepoint. One item
+  that can't be saved is rolled back alone and reported in `errors`; the rest
+  still syncs. A course that can't be *read* is skipped (`coursesSkipped`) and its
+  tasks are not reported as missing.
+- One sync at a time per student and LMS (a Postgres advisory lock); a second
+  "Sync now" (another tab) gets "A sync is already running". The button is also
+  disabled while syncing.
+- Duplicates are impossible: unique `(user_id, external_source, external_id)`
+  on courses and tasks, and matching by those ids first.
+
+**Summary** (`LmsSyncResult`, shown in Settings): courses added / linked / updated /
+skipped, assignments added / linked / updated / skipped / without a due date,
+tasks marked done from the LMS, conflicts (student's value kept), assignments and
+courses no longer in the LMS, safe error messages, and the sync time.
+
 ## Security review
 
-- Connections use OAuth 2.0 only. No LMS passwords are asked for or stored; no scraping or browser automation.
+- Connections use the student's private calendar feed link or OAuth 2.0. No LMS
+  passwords or personal access tokens are asked for or stored; no scraping or
+  browser automation. Feed links are treated like tokens (encrypted, never shown).
 - Tokens are encrypted (AES-256-GCM, key `LMS_TOKEN_ENCRYPTION_KEY`) and bound to
   `<user id>:<provider>`, so a copied ciphertext won't decrypt for another student.
   Without the key, tokens can't be stored at all (no plain-text fallback).
@@ -200,10 +237,13 @@ Without a developer key, `npm test` covers the whole flow against a fake Canvas
   often include a section ("CSC215-01"), so an existing "CSC215" course won't be
   linked automatically; a separate course is created instead (safer than a wrong merge).
 - Assignments without a due date aren't imported (every task needs one); the summary counts them.
-- Estimates aren't provided by Canvas: new tasks get the same default estimate a
-  syllabus import uses, which the student can change.
+- Canvas gives no time estimates: imported tasks have none until the student adds
+  one (the Planner still plans them with its fallback length and a reminder).
 - Removed assignments are reported and kept, not deleted; there's no "archive" state yet.
 - Sync runs when the student clicks it (no background sync yet).
+- Assignment overrides (different due dates per section) follow what Canvas returns
+  for the signed-in student; calendar-feed items with an override id are imported
+  as separate items.
 - Rate-limited or failed requests aren't retried automatically; the student tries again.
 - The OAuth state cookie and tokens depend on `LMS_TOKEN_ENCRYPTION_KEY`; rotating
   it needs a re-encryption step (the `v1:` prefix allows a `v2` key).

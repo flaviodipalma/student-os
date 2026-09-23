@@ -54,8 +54,9 @@ export function formatDue(task: Task, today: string): string {
   return `${label} at ${formatTime(fromDateKey(task.dueDate, task.dueTime))}`
 }
 
-// 45 -> "45 min", 90 -> "90 min", 240 -> "4h"
-export function formatEstimate(minutes: number): string {
+// 45 -> "45 min", 90 -> "90 min", 240 -> "4h", null -> "No estimate"
+export function formatEstimate(minutes: number | null): string {
+  if (minutes === null) return "No estimate"
   if (minutes < 120) return `${minutes} min`
   const h = Math.floor(minutes / 60)
   const m = minutes % 60

@@ -77,7 +77,9 @@ function TaskForm({
   const [dueDate, setDueDate] = useState(task?.dueDate ?? addDays(today, 1))
   const [dueTime, setDueTime] = useState(task?.dueTime ?? "")
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "medium")
-  const [estimate, setEstimate] = useState(String(task?.estimateMinutes ?? 60))
+  // Blank = not estimated (the Planner then uses a fallback and asks for one).
+  const [estimate, setEstimate] = useState(task ? (task.estimateMinutes === null ? "" : String(task.estimateMinutes)) : "60")
+  const [notes, setNotes] = useState(task?.notes ?? "")
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "not_started")
   const [error, setError] = useState<string | null>(null)
   const fields = useFieldErrors({
@@ -106,7 +108,8 @@ function TaskForm({
       dueDate,
       dueTime: dueTime || undefined,
       priority,
-      estimateMinutes: estimate.trim() === "" ? NaN : Number(estimate),
+      estimateMinutes: estimate.trim() === "" ? null : Number(estimate),
+      notes: task?.source ? notes : task?.notes,
       status,
       plannedDate: task?.plannedDate,
     })
@@ -157,6 +160,18 @@ function TaskForm({
           rows={2}
         />
       </Field>
+      {task?.source && (
+        // Imported tasks: the description comes from the LMS; these notes are the student's own.
+        <Field label="Your notes" htmlFor="task-notes" optional>
+          <Textarea
+            id="task-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Anything to remember. Never changed by syncing."
+            rows={2}
+          />
+        </Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Course" htmlFor="task-course" error={fields.errors.courseId}>
           <SimpleSelect id="task-course" value={courseId} onChange={setCourseId} options={courseOptions} />
@@ -173,7 +188,7 @@ function TaskForm({
         <Field label="Priority" htmlFor="task-priority">
           <SimpleSelect id="task-priority" value={priority} onChange={setPriority} options={priorityOptions} />
         </Field>
-        <Field label="Estimated duration (minutes)" htmlFor="task-estimate" error={fields.errors.estimateMinutes}>
+        <Field label="Estimated duration (minutes)" htmlFor="task-estimate" optional error={fields.errors.estimateMinutes}>
           <Input
             id="task-estimate"
             type="number"

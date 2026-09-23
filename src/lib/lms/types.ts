@@ -68,6 +68,8 @@ export type LmsSyncResult = {
   provider: LmsProviderId
   coursesCreated: number
   coursesUpdated: number
+  // Couldn't be imported or read this time (see errors).
+  coursesSkipped: number
   // Existing Student OS courses (added by hand or from a syllabus) that were linked to the LMS course.
   coursesLinked: number
   assignmentsCreated: number
@@ -80,6 +82,10 @@ export type LmsSyncResult = {
   // Imported tasks the LMS no longer lists. Kept as they are; the student decides.
   assignmentsMissing: number
   missing: { taskId: string; title: string }[]
+  // Imported courses the LMS no longer lists (kept, like everything else).
+  missingCourses: { courseId: string; name: string }[]
+  // Tasks marked done because the LMS shows them turned in (see sync-plan.ts).
+  assignmentsCompleted: number
   conflicts: LmsSyncConflict[]
   // Safe, student-facing messages.
   errors: string[]

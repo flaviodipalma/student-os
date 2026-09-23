@@ -1,7 +1,8 @@
 import "server-only"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import {
+  missingCourses,
   planCourses,
   planTasks,
   type ExistingCourse,
@@ -49,6 +50,8 @@ export type LmsReader = {
   getAssignments(courseExternalId: string): Promise<LmsAssignment[]>
   // Only tasks due on/after this date can be reported "missing" (see planTasks).
   missingFrom?: string
+  // True when getCourses returns every current course (so absent ones really are gone).
+  listsAllCourses?: boolean
 }
 
 type SyncOptions = { now?: Date; timeZone?: string }
@@ -67,6 +70,7 @@ export async function syncLms(
     return {
       provider: provider.id,
       name: provider.name,
+      listsAllCourses: true,
       getCourses: () => provider.getCourses(access),
       getAssignments: (courseId) => provider.getAssignments(access, courseId),
     }
@@ -89,13 +93,16 @@ export async function runSync(
     coursesCreated: 0,
     coursesUpdated: 0,
     coursesLinked: 0,
+    coursesSkipped: 0,
     assignmentsCreated: 0,
     assignmentsUpdated: 0,
     assignmentsLinked: 0,
     assignmentsSkipped: 0,
     assignmentsWithoutDueDate: 0,
+    assignmentsCompleted: 0,
     assignmentsMissing: 0,
     missing: [],
+    missingCourses: [],
     conflicts: [],
     errors: [],
     syncedAt: now.toISOString(),
@@ -119,35 +126,61 @@ export async function runSync(
       } catch (error) {
         // One course that can't be read doesn't stop the rest.
         if (!(error instanceof LmsError) || error.scope !== "course") throw error
+        result.coursesSkipped++
         result.errors.push(`${course.courseName}: ${error.message}`)
       }
     }
 
     await db.transaction(async (tx) => {
+      // One sync at a time per student and LMS (e.g. two tabs): the second waits for nothing, it stops.
+      if (!(await tryLock(tx, `lms-sync:${userId}:${provider.id}`))) {
+        throw new LmsError("A sync is already running. Please wait for it to finish.")
+      }
+
+      // Each item is saved in its own savepoint: one that fails (reported in
+      // `errors`) is rolled back alone and the rest of the sync carries on.
+      async function each(label: string, work: (sp: Database) => Promise<void>): Promise<boolean> {
+        try {
+          await tx.transaction(async (sp) => work(sp))
+          return true
+        } catch (error) {
+          result.errors.push(`${label}: ${toAppError(error).message}`)
+          return false
+        }
+      }
+
       // 4-5. Courses.
       const courseIdByExternal = new Map<string, string>()
-      for (const action of planCourses(await existingCourses(tx, userId), lmsCourses)) {
+      const existingCourseList = await existingCourses(tx, userId)
+      for (const action of planCourses(existingCourseList, lmsCourses)) {
         const source = sourceOf(provider.id, action.lms.externalId, action.lms.url)
-        if (action.kind === "create") {
-          try {
-            const created = await createCourse(tx, userId, action.fields)
-            await setCourseSource(tx, userId, created.id, source, action.fields, now)
-            courseIdByExternal.set(action.lms.externalId, created.id)
-            result.coursesCreated++
-          } catch (error) {
-            // e.g. two LMS courses with the same code: skip it, keep going.
-            result.errors.push(`${action.fields.code}: ${toAppError(error).message}`)
+        let courseId: string | undefined
+        const saved = await each(action.lms.courseName, async (sp) => {
+          if (action.kind === "create") {
+            courseId = (await createCourse(sp, userId, action.fields)).id
+            await setCourseSource(sp, userId, courseId, source, action.fields, now)
+            return
           }
+          if (action.kind === "update") await updateCourse(sp, userId, action.courseId, action.changes)
+          await setCourseSource(sp, userId, action.courseId, source, action.synced, now)
+          courseId = action.courseId
+        })
+        // Counted only once saved.
+        if (!saved || !courseId) {
+          result.coursesSkipped++
           continue
         }
-        if (action.kind === "update") {
-          await updateCourse(tx, userId, action.courseId, action.changes)
-          result.coursesUpdated++
-        } else if (action.kind === "link") {
-          result.coursesLinked++
-        }
-        await setCourseSource(tx, userId, action.courseId, source, action.synced, now)
-        courseIdByExternal.set(action.lms.externalId, action.courseId)
+        courseIdByExternal.set(action.lms.externalId, courseId)
+        if (action.kind === "create") result.coursesCreated++
+        else if (action.kind === "update") result.coursesUpdated++
+        else if (action.kind === "link") result.coursesLinked++
+      }
+      // Imported courses the LMS stopped listing (only a source that lists every course can tell).
+      if (reader.listsAllCourses) {
+        result.missingCourses = missingCourses(existingCourseList, lmsCourses, provider.id).map((course) => ({
+          courseId: course.id,
+          name: course.name,
+        }))
       }
 
       // 7-8. Assignments -> tasks.
@@ -164,22 +197,31 @@ export async function runSync(
           continue
         }
         const source = sourceOf(provider.id, action.lms.externalId, action.lms.url)
-        if (action.kind === "create") {
-          const created = await createTask(tx, userId, action.input)
-          await setTaskSource(tx, userId, created.id, source, action.synced, now)
-          result.assignmentsCreated++
+        const saved = await each(action.lms.title, async (sp) => {
+          if (action.kind === "create") {
+            const created = await createTask(sp, userId, action.input)
+            await setTaskSource(sp, userId, created.id, source, action.synced, now)
+            return
+          }
+          if (action.kind === "update") await updateTask(sp, userId, action.taskId, action.changes)
+          if (action.complete) await updateTask(sp, userId, action.taskId, { status: "completed" })
+          // The LMS's current values become the baseline for the next sync.
+          await setTaskSource(sp, userId, action.taskId, source, action.synced, now)
+        })
+        // Counted only once saved.
+        if (!saved) {
+          result.assignmentsSkipped++
           continue
         }
-        if (action.kind === "update") {
-          await updateTask(tx, userId, action.taskId, action.changes)
-          result.assignmentsUpdated++
-        } else if (action.kind === "link") {
-          result.assignmentsLinked++
-        } else {
-          result.assignmentsSkipped++
+        if (action.kind === "create") {
+          result.assignmentsCreated++
+          if (action.input.status === "completed") result.assignmentsCompleted++
+          continue
         }
-        // The LMS's current values become the baseline for the next sync.
-        await setTaskSource(tx, userId, action.taskId, source, action.synced, now)
+        if (action.kind === "update") result.assignmentsUpdated++
+        else if (action.kind === "link") result.assignmentsLinked++
+        else result.assignmentsSkipped++
+        if (action.complete) result.assignmentsCompleted++
       }
       result.conflicts = plan.conflicts
       result.assignmentsMissing = plan.missingTaskIds.length
@@ -256,4 +298,11 @@ async function setTaskSource(
       externalSyncedAt: now,
     })
     .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+}
+
+// A transaction-scoped Postgres advisory lock (released at commit/rollback).
+async function tryLock(db: Database, key: string): Promise<boolean> {
+  const result = (await db.execute(sql`select pg_try_advisory_xact_lock(hashtext(${key})) as locked`)) as unknown
+  const rows = (Array.isArray(result) ? result : (result as { rows: unknown[] }).rows) as { locked: boolean }[]
+  return rows[0]?.locked === true
 }

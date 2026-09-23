@@ -4,7 +4,7 @@ import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
 import { LmsError } from "../provider"
 import { parseCanvasBaseUrl } from "./config"
 import { looksLikeIcs, parseIcs, type IcsEvent } from "./ical"
-import { canvasDueToLocal, safeCanvasUrl } from "./mapping"
+import { canvasCourseUrl, canvasDueToLocal, safeCanvasUrl } from "./mapping"
 import type { Fetch } from "./oauth"
 
 // Reading a student's Canvas CALENDAR FEED (Canvas > Calendar > Calendar Feed):
@@ -144,7 +144,7 @@ function assignmentFrom(
       courseName: courseCode,
       description: null,
       instructor: null,
-      url: null,
+      url: canvasCourseUrl(context.baseUrl, courseId),
     },
     assignment: {
       provider: "canvas",

@@ -76,8 +76,14 @@ export function safeCanvasUrl(url: string | null | undefined, baseUrl: string): 
   }
 }
 
+// A course's page on the student's Canvas: Canvas's standard /courses/<id> address
+// on the already-validated Canvas host (the Courses API doesn't return a link).
+export function canvasCourseUrl(baseUrl: string, courseId: string): string | null {
+  return /^\d+$/.test(courseId) ? `${baseUrl}/courses/${courseId}` : null
+}
+
 // Courses the student can actually use: not deleted, not hidden by date.
-export function canvasCourseToLms(raw: unknown): LmsCourse | null {
+export function canvasCourseToLms(raw: unknown, baseUrl?: string): LmsCourse | null {
   const parsed = canvasCourse.safeParse(raw)
   if (!parsed.success) return null
   const course = parsed.data
@@ -92,8 +98,7 @@ export function canvasCourseToLms(raw: unknown): LmsCourse | null {
     courseName: name,
     description: course.public_description ? htmlToText(course.public_description) || null : null,
     instructor: course.teachers?.map((t) => t.display_name?.trim()).find(Boolean) ?? null,
-    // The Courses API doesn't return a course link, so none is made up.
-    url: null,
+    url: baseUrl ? canvasCourseUrl(baseUrl, course.id) : null,
   }
 }
 
