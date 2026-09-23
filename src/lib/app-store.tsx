@@ -92,6 +92,8 @@ type AppStore = {
   updateStudySession: (id: string, changes: Partial<NewSession>) => void
   deleteStudySession: (id: string) => void
   importSyllabus: (request: SyllabusImportRequest) => Promise<ActionResult<SyllabusImportSaved>>
+  // After an LMS sync: the saved courses and tasks, as the server has them now.
+  replaceCoursesAndTasks: (courses: Course[], tasks: Task[]) => void
   // Profile, preferences and weekly commitments. These return the result so
   // forms can show validation messages next to the fields.
   updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
@@ -398,6 +400,11 @@ export function AppStoreProvider({ initial, children }: { initial: AppData; chil
       const result = await call(completeOnboardingAction())
       if (result.ok) setStudent((prev) => ({ ...prev, onboardingCompleted: true }))
       return result
+    },
+
+    replaceCoursesAndTasks: (nextCourses, nextTasks) => {
+      setCourses(nextCourses)
+      setTasks(nextTasks)
     },
 
     // ---- Syllabus import (saved first, then shown: it's one confirmed step)

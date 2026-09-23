@@ -7,6 +7,7 @@ export type CourseColor = "sky" | "emerald" | "violet" | "orange" | "rose"
 // Learning management systems Student OS can import from.
 export const lmsProviderIds = ["canvas", "blackboard"] as const
 export type LmsProviderId = (typeof lmsProviderIds)[number]
+export const lmsProviderNames: Record<LmsProviderId, string> = { canvas: "Canvas", blackboard: "Blackboard" }
 
 // Set on courses and tasks imported from an LMS. The record is otherwise a
 // normal course or task: the Dashboard, Tasks and Planner treat it the same.

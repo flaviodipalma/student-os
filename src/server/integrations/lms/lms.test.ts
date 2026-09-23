@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { generatePlan } from "@/lib/planner"
-import type { LmsAssignment, LmsCourse, LmsCredentials } from "@/lib/lms/types"
+import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
 import type { LmsProviderId } from "@/lib/types"
 import { lmsConnections } from "../../db/schema"
 import { NotFoundError } from "../../errors"
@@ -17,7 +17,7 @@ import {
   saveLmsConnection,
 } from "./connections"
 import { createCredentialVault, credentialContext, CredentialVaultError } from "./credential-vault"
-import { LmsNotAvailableError, type LmsProvider, type LmsTokenSet } from "./provider"
+import { LmsNotAvailableError, type LmsAccess, type LmsProvider, type LmsTokenSet } from "./provider"
 import { getLmsProvider, listLmsProviders } from "./registry"
 import { syncLms } from "./sync"
 
@@ -66,14 +66,14 @@ class FixtureLmsProvider implements LmsProvider {
     throw new Error("not used in tests")
   }
   async revokeTokens() {}
-  async getCourses(credentials: LmsCredentials) {
-    this.seenTokens.push(credentials.accessToken)
+  async getCourses(access: LmsAccess) {
+    this.seenTokens.push(await access.getAccessToken())
     return this.courses
   }
-  async getCourseDetails(_: LmsCredentials, id: string) {
+  async getCourseDetails(_: LmsAccess, id: string) {
     return this.courses.find((c) => c.externalId === id)!
   }
-  async getAssignments(_: LmsCredentials, courseExternalId: string) {
+  async getAssignments(_: LmsAccess, courseExternalId: string) {
     return this.assignments.filter((a) => a.courseExternalId === courseExternalId)
   }
 }
@@ -140,18 +140,28 @@ describe("providers", () => {
     expect(getLmsProvider("blackboard").id).toBe("blackboard")
   })
 
-  it("aren't implemented yet: every call fails clearly and nothing touches the network", async () => {
+  it("Blackboard isn't implemented yet: every call fails clearly and nothing touches the network", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch")
-    const credentials = { accessToken: "x", refreshToken: null, expiresAt: null, baseUrl: null }
-    for (const provider of listLmsProviders()) {
-      expect(provider.available).toBe(false)
-      expect(() => provider.getAuthorizationUrl({ baseUrl: "", redirectUri: "", state: "" })).toThrow(LmsNotAvailableError)
-      await expect(provider.getCourses(credentials)).rejects.toThrow(`${provider.name} integration isn't available yet.`)
-      await expect(provider.getAssignments(credentials, "1")).rejects.toBeInstanceOf(LmsNotAvailableError)
-      await expect(provider.exchangeCode({ baseUrl: "", redirectUri: "", code: "" })).rejects.toBeInstanceOf(LmsNotAvailableError)
+    const provider = getLmsProvider("blackboard")
+    const access: LmsAccess = {
+      baseUrl: "https://lms.test.invalid",
+      timeZone: undefined,
+      getAccessToken: async () => "x",
+      refreshAccessToken: async () => "x",
     }
+    expect(provider.available).toBe(false)
+    expect(() => provider.getAuthorizationUrl({ baseUrl: "", state: "" })).toThrow(LmsNotAvailableError)
+    await expect(provider.getCourses(access)).rejects.toThrow("Blackboard integration isn't available yet.")
+    await expect(provider.getAssignments(access, "1")).rejects.toBeInstanceOf(LmsNotAvailableError)
+    await expect(provider.exchangeCode({ baseUrl: "", code: "" })).rejects.toBeInstanceOf(LmsNotAvailableError)
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+
+  it("Canvas is implemented, and only usable once the server is configured", () => {
+    const canvas = getLmsProvider("canvas")
+    expect(canvas.available).toBe(true)
+    expect(canvas.isConfigured()).toBe(Boolean(process.env.CANVAS_CLIENT_ID && process.env.CANVAS_CLIENT_SECRET && process.env.CANVAS_REDIRECT_URI))
   })
 })
 
@@ -165,6 +175,7 @@ describe("LMS connections", () => {
     const [summary] = await listLmsConnections(t.db, user)
     expect(summary).toEqual({
       provider: "canvas",
+      method: "oauth",
       status: "connected",
       connectedAt: expect.any(String),
       lastSyncedAt: null,
@@ -174,11 +185,11 @@ describe("LMS connections", () => {
     expect((await loadLmsCredentials(t.db, user, "canvas", vault)).accessToken).toBe("test-access-token")
   })
 
-  it("shows both providers as not available yet in Settings", async () => {
+  it("shows Canvas as available (if configured) and Blackboard as coming soon in Settings", async () => {
     const user = await t.addUser()
     expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
-      { provider: "canvas", name: "Canvas", available: false, connection: null },
-      { provider: "blackboard", name: "Blackboard", available: false, connection: null },
+      { provider: "canvas", name: "Canvas", available: true, configured: getLmsProvider("canvas").isConfigured(), connection: null },
+      { provider: "blackboard", name: "Blackboard", available: false, configured: false, connection: null },
     ])
   })
 
@@ -207,7 +218,7 @@ describe("LMS connections", () => {
 
   it("disconnecting deletes the tokens but keeps imported courses and tasks", async () => {
     const user = await connectedStudent()
-    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, NOW)
+    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
     await disconnectLms(t.db, user, "canvas")
     expect(await t.db.select().from(lmsConnections)).toEqual([])
     const data = await loadAppData(t.db, user)
@@ -220,7 +231,7 @@ describe("syncing (with the test fixture provider)", () => {
   it("imports LMS courses and assignments as normal courses and tasks, with their source", async () => {
     const user = await connectedStudent()
     const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment(), fixtureAssignment({ externalId: "no-date", dueDate: null })])
-    const result = await syncLms(t.db, user, provider, vault, NOW)
+    const result = await syncLms(t.db, user, provider, vault, { now: NOW })
 
     expect(result).toEqual({
       provider: "canvas",
@@ -231,7 +242,9 @@ describe("syncing (with the test fixture provider)", () => {
       assignmentsUpdated: 0,
       assignmentsLinked: 0,
       assignmentsSkipped: 1,
+      assignmentsWithoutDueDate: 1,
       assignmentsMissing: 0,
+      missing: [],
       conflicts: [],
       errors: [],
       syncedAt: NOW.toISOString(),
@@ -261,8 +274,8 @@ describe("syncing (with the test fixture provider)", () => {
   it("syncing again creates no duplicates", async () => {
     const user = await connectedStudent()
     const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, NOW)
-    const again = await syncLms(t.db, user, provider, vault, NOW)
+    await syncLms(t.db, user, provider, vault, { now: NOW })
+    const again = await syncLms(t.db, user, provider, vault, { now: NOW })
     expect(again).toMatchObject({ coursesCreated: 0, assignmentsCreated: 0, assignmentsSkipped: 1 })
     const data = await loadAppData(t.db, user)
     expect(data.courses).toHaveLength(1)
@@ -272,35 +285,36 @@ describe("syncing (with the test fixture provider)", () => {
   it("applies LMS changes, but keeps the student's own changes and reports conflicts", async () => {
     const user = await connectedStudent()
     const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, NOW)
+    await syncLms(t.db, user, provider, vault, { now: NOW })
     const [task] = (await loadAppData(t.db, user)).tasks
 
     // The LMS moves the due date; the student only changed priority: the date updates, priority stays.
     await updateTask(t.db, user, task.id, { priority: "critical" })
     provider.assignments = [fixtureAssignment({ dueDate: "2026-09-25" })]
-    const first = await syncLms(t.db, user, provider, vault, NOW)
+    const first = await syncLms(t.db, user, provider, vault, { now: NOW })
     expect(first.assignmentsUpdated).toBe(1)
     expect((await loadAppData(t.db, user)).tasks[0]).toMatchObject({ dueDate: "2026-09-25", priority: "critical" })
 
     // Now the student moves it to Saturday and the LMS moves it too: the student's date wins.
     await updateTask(t.db, user, task.id, { dueDate: "2026-09-26" })
     provider.assignments = [fixtureAssignment({ dueDate: "2026-09-24" })]
-    const second = await syncLms(t.db, user, provider, vault, NOW)
+    const second = await syncLms(t.db, user, provider, vault, { now: NOW })
     expect(second.conflicts).toEqual([
       { taskId: task.id, title: "Project 1", field: "dueDate", studentValue: "2026-09-26", lmsValue: "2026-09-24" },
     ])
     expect((await loadAppData(t.db, user)).tasks[0].dueDate).toBe("2026-09-26")
     // Reported once: the next sync with the same LMS value is quiet.
-    expect((await syncLms(t.db, user, provider, vault, NOW)).conflicts).toEqual([])
+    expect((await syncLms(t.db, user, provider, vault, { now: NOW })).conflicts).toEqual([])
   })
 
   it("never deletes a task the LMS stopped listing; reports it as missing", async () => {
     const user = await connectedStudent()
     const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, NOW)
+    await syncLms(t.db, user, provider, vault, { now: NOW })
     provider.assignments = []
-    const result = await syncLms(t.db, user, provider, vault, NOW)
+    const result = await syncLms(t.db, user, provider, vault, { now: NOW })
     expect(result.assignmentsMissing).toBe(1)
+    expect(result.missing).toEqual([{ taskId: expect.any(String), title: "Project 1" }])
     expect((await loadAppData(t.db, user)).tasks).toHaveLength(1)
   })
 
@@ -317,7 +331,7 @@ describe("syncing (with the test fixture provider)", () => {
       estimateMinutes: 240,
       status: "in_progress",
     })
-    const result = await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, NOW)
+    const result = await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
     expect(result).toMatchObject({ coursesLinked: 1, coursesCreated: 0, assignmentsLinked: 1, assignmentsCreated: 0 })
     const data = await loadAppData(t.db, user)
     expect(data.courses).toHaveLength(1)
@@ -335,8 +349,8 @@ describe("syncing (with the test fixture provider)", () => {
     const alice = await connectedStudent("Alice")
     const bob = await connectedStudent("Bob")
     const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, alice, provider, vault, NOW)
-    await syncLms(t.db, bob, provider, vault, NOW)
+    await syncLms(t.db, alice, provider, vault, { now: NOW })
+    await syncLms(t.db, bob, provider, vault, { now: NOW })
     const alices = await loadAppData(t.db, alice)
     const bobs = await loadAppData(t.db, bob)
     expect(alices.tasks).toHaveLength(1)
@@ -345,13 +359,16 @@ describe("syncing (with the test fixture provider)", () => {
     expect(bobs.courses[0].id).not.toBe(alices.courses[0].id)
   })
 
-  it("the real providers fail safely: nothing imported, a safe message recorded", async () => {
-    const user = await connectedStudent()
-    await expect(syncLms(t.db, user, getLmsProvider("canvas"), vault, NOW)).rejects.toThrow("Canvas integration isn't available yet.")
+  it("an unavailable provider fails safely: nothing imported, a safe message recorded", async () => {
+    const user = await t.addUser()
+    await saveLmsConnection(t.db, user, "blackboard", tokens(), vault)
+    await expect(syncLms(t.db, user, getLmsProvider("blackboard"), vault, { now: NOW })).rejects.toThrow(
+      "Blackboard integration isn't available yet."
+    )
     expect((await loadAppData(t.db, user)).courses).toEqual([])
     expect((await listLmsConnections(t.db, user))[0]).toMatchObject({
       status: "error",
-      lastSyncError: "Canvas integration isn't available yet.",
+      lastSyncError: "Blackboard integration isn't available yet.",
     })
   })
 
@@ -361,7 +378,7 @@ describe("syncing (with the test fixture provider)", () => {
     leaky.getCourses = async () => {
       throw new Error("401 for https://lms.test.invalid?access_token=test-access-token")
     }
-    const error = await syncLms(t.db, user, leaky, vault, NOW).catch((e) => e)
+    const error = await syncLms(t.db, user, leaky, vault, { now: NOW }).catch((e) => e)
     expect(error.message).toBe("Syncing with Test fixture LMS failed. Please try again.")
     expect((await listLmsConnections(t.db, user))[0].lastSyncError).not.toContain("access_token")
   })
@@ -370,7 +387,7 @@ describe("syncing (with the test fixture provider)", () => {
 describe("imported tasks in the rest of Student OS", () => {
   it("the Planner plans them like any other task", async () => {
     const user = await connectedStudent()
-    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, NOW)
+    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
     const data = await loadAppData(t.db, user)
     const plan = generatePlan({ date: "2026-09-21", tasks: data.tasks, events: data.events, now: NOW })
     expect(plan.suggestions.some((s) => s.taskId === data.tasks[0].id)).toBe(true)

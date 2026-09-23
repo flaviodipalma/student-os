@@ -75,8 +75,11 @@ export type LmsSyncResult = {
   assignmentsLinked: number
   // No due date, or unchanged since the last sync.
   assignmentsSkipped: number
+  // Of those: no due date in the LMS, so not imported (every task needs one).
+  assignmentsWithoutDueDate: number
   // Imported tasks the LMS no longer lists. Kept as they are; the student decides.
   assignmentsMissing: number
+  missing: { taskId: string; title: string }[]
   conflicts: LmsSyncConflict[]
   // Safe, student-facing messages.
   errors: string[]

@@ -9,7 +9,7 @@ import {
   type SyncedCourseFields,
   type SyncedTaskFields,
 } from "@/lib/lms/sync-plan"
-import type { LmsAssignment, LmsSyncResult } from "@/lib/lms/types"
+import type { LmsAssignment, LmsCourse, LmsSyncResult } from "@/lib/lms/types"
 import type { ExternalSource, LmsProviderId } from "@/lib/types"
 import { toCourse, toTask } from "../../db/mappers"
 import { courses, tasks } from "../../db/schema"
@@ -17,9 +17,10 @@ import type { Database } from "../../db/types"
 import { AppError, toAppError } from "../../errors"
 import { createCourse, updateCourse } from "../../services/courses"
 import { createTask, updateTask } from "../../services/tasks"
-import { loadLmsCredentials, recordLmsSync } from "./connections"
+import { recordLmsSync } from "./connections"
 import type { CredentialVault } from "./credential-vault"
-import type { LmsProvider } from "./provider"
+import { LmsError, type LmsProvider } from "./provider"
+import { createLmsAccess } from "./token-service"
 
 // Syncs one student's LMS into their normal Student OS courses and tasks:
 //
@@ -39,13 +40,50 @@ import type { LmsProvider } from "./provider"
 // Imported records are ordinary courses and tasks: the Planner, Dashboard and
 // Tasks page need nothing LMS-specific.
 
+// Where a sync reads from: normalized courses and assignments, from any source
+// (OAuth + API, or a calendar feed). The sync itself is the same for all.
+export type LmsReader = {
+  provider: LmsProviderId
+  name: string
+  getCourses(): Promise<LmsCourse[]>
+  getAssignments(courseExternalId: string): Promise<LmsAssignment[]>
+  // Only tasks due on/after this date can be reported "missing" (see planTasks).
+  missingFrom?: string
+}
+
+type SyncOptions = { now?: Date; timeZone?: string }
+
+// Sync through an OAuth connection (tokens via the token service).
 export async function syncLms(
   db: Database,
   userId: string,
   provider: LmsProvider,
   vault: CredentialVault,
-  now: Date = new Date()
+  options: SyncOptions = {}
 ): Promise<LmsSyncResult> {
+  const now = options.now ?? new Date()
+  return runSync(db, userId, { provider: provider.id, name: provider.name }, options, async () => {
+    const access = await createLmsAccess(db, userId, provider, vault, { timeZone: options.timeZone, now: () => now })
+    return {
+      provider: provider.id,
+      name: provider.name,
+      getCourses: () => provider.getCourses(access),
+      getAssignments: (courseId) => provider.getAssignments(access, courseId),
+    }
+  })
+}
+
+// The shared sync. `open` sets up the reader (inside the error handling, so a
+// failure there is recorded on the connection too).
+export async function runSync(
+  db: Database,
+  userId: string,
+  source: { provider: LmsProviderId; name: string },
+  options: SyncOptions,
+  open: () => Promise<LmsReader>
+): Promise<LmsSyncResult> {
+  const now = options.now ?? new Date()
+  const provider = { id: source.provider, name: source.name }
   const result: LmsSyncResult = {
     provider: provider.id,
     coursesCreated: 0,
@@ -55,7 +93,9 @@ export async function syncLms(
     assignmentsUpdated: 0,
     assignmentsLinked: 0,
     assignmentsSkipped: 0,
+    assignmentsWithoutDueDate: 0,
     assignmentsMissing: 0,
+    missing: [],
     conflicts: [],
     errors: [],
     syncedAt: now.toISOString(),
@@ -63,15 +103,24 @@ export async function syncLms(
 
   try {
     // 2-3, 6. Read from the LMS (outside the transaction: these are network calls).
-    const credentials = await loadLmsCredentials(db, userId, provider.id, vault)
-    const lmsCourses = (await provider.getCourses(credentials)).filter((c) => c.provider === provider.id)
+    const reader = await open()
+    const lmsCourses = (await reader.getCourses()).filter((c) => c.provider === provider.id)
     const assignments: LmsAssignment[] = []
+    // Courses whose assignments were read; only these can have "missing" tasks.
+    const readCourses = new Set<string>()
     for (const course of lmsCourses) {
-      assignments.push(
-        ...(await provider.getAssignments(credentials, course.externalId)).filter(
-          (a) => a.provider === provider.id && a.courseExternalId === course.externalId
+      try {
+        assignments.push(
+          ...(await reader.getAssignments(course.externalId)).filter(
+            (a) => a.provider === provider.id && a.courseExternalId === course.externalId
+          )
         )
-      )
+        readCourses.add(course.externalId)
+      } catch (error) {
+        // One course that can't be read doesn't stop the rest.
+        if (!(error instanceof LmsError) || error.scope !== "course") throw error
+        result.errors.push(`${course.courseName}: ${error.message}`)
+      }
     }
 
     await db.transaction(async (tx) => {
@@ -102,13 +151,16 @@ export async function syncLms(
       }
 
       // 7-8. Assignments -> tasks.
-      const plan = planTasks(await existingTasks(tx, userId), assignments, (id) => courseIdByExternal.get(id), {
+      const existing = await existingTasks(tx, userId)
+      const plan = planTasks(existing, assignments, (id) => courseIdByExternal.get(id), {
         provider: provider.id,
-        courseIds: [...courseIdByExternal.values()],
+        courseIds: [...courseIdByExternal.entries()].filter(([external]) => readCourses.has(external)).map(([, id]) => id),
+        missingFrom: reader.missingFrom,
       })
       for (const action of plan.actions) {
         if (action.kind === "skip") {
           result.assignmentsSkipped++
+          if (action.reason === "no-due-date") result.assignmentsWithoutDueDate++
           continue
         }
         const source = sourceOf(provider.id, action.lms.externalId, action.lms.url)
@@ -131,6 +183,9 @@ export async function syncLms(
       }
       result.conflicts = plan.conflicts
       result.assignmentsMissing = plan.missingTaskIds.length
+      result.missing = existing
+        .filter((task) => plan.missingTaskIds.includes(task.id))
+        .map((task) => ({ taskId: task.id, title: task.title }))
     })
 
     // 9.
@@ -139,7 +194,8 @@ export async function syncLms(
   } catch (error) {
     // Only a safe message is kept or returned; provider errors can contain tokens or URLs.
     const safe = error instanceof AppError ? error.message : `Syncing with ${provider.name} failed. Please try again.`
-    await recordLmsSync(db, userId, provider.id, { error: safe }).catch(() => {})
+    const reconnect = error instanceof LmsError && error.reconnect
+    await recordLmsSync(db, userId, provider.id, { error: safe, reconnect }).catch(() => {})
     throw error instanceof AppError ? error : new AppError("database", safe)
   }
 }

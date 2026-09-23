@@ -47,6 +47,8 @@ export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "
 // Learning management systems Student OS can import from (see src/server/integrations/lms).
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
+// How Student OS reads the LMS: OAuth + API, or the student's private calendar feed link.
+export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed"])
 export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
@@ -307,12 +309,16 @@ export const lmsConnections = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
     provider: lmsProvider("provider").notNull(),
+    method: lmsConnectionMethod("method").notNull().default("oauth"),
     // The student's id in the LMS, if the provider reports one.
     externalUserId: text("external_user_id"),
     // Institution-specific LMS address (Canvas and Blackboard are hosted per school).
     baseUrl: text("base_url"),
     accessTokenEncrypted: text("access_token_encrypted"),
     refreshTokenEncrypted: text("refresh_token_encrypted"),
+    // Calendar-feed connections: the student's private feed link, ENCRYPTED like a token
+    // (anyone with the link can read their calendar).
+    feedUrlEncrypted: text("feed_url_encrypted"),
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
     status: lmsConnectionStatus("status").notNull().default("connected"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),

@@ -29,6 +29,13 @@
       "when": 1790139655151,
       "tag": "0003_lms_integration_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790176400660,
+      "tag": "0004_lms_calendar_feed",
+      "breakpoints": true
     }
   ]
 }

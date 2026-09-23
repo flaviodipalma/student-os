@@ -8,7 +8,7 @@ import { useTasks } from "@/lib/task-store"
 import { formatDue, formatEstimate, isDone, isOverdue } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { InProgressBadge, PriorityBadge } from "./task-badges"
+import { InProgressBadge, PriorityBadge, SourceBadge } from "./task-badges"
 
 // One task, laid out to answer: what is it, when is it due, how important,
 // how long will it take, and is it done?
@@ -67,6 +67,7 @@ export function TaskRow({
             {formatEstimate(task.estimateMinutes)}
           </span>
           {task.status === "in_progress" && <InProgressBadge />}
+          {task.source && <SourceBadge source={task.source} />}
         </div>
       </div>
     </div>

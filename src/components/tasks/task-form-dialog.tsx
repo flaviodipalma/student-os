@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { SourceBadge } from "@/components/tasks/task-badges"
 import { useCourses } from "@/lib/course-store"
 import { addDays } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
@@ -43,8 +44,13 @@ export function TaskFormDialog({
         <DialogHeader>
           <DialogTitle>{task ? "Edit task" : "New task"}</DialogTitle>
           <DialogDescription>
-            {task ? "Update the details of this task." : "Add something you need to get done."}
+            {task?.source
+              ? "Imported from your LMS. Your changes here are kept when it syncs again."
+              : task
+                ? "Update the details of this task."
+                : "Add something you need to get done."}
           </DialogDescription>
+          {task?.source && <SourceBadge source={task.source} />}
         </DialogHeader>
         <TaskForm task={task} defaultCourseId={defaultCourseId} onDone={() => onOpenChange(false)} />
       </DialogContent>

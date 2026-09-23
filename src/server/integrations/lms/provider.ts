@@ -1,6 +1,6 @@
 import "server-only"
 
-import type { LmsAssignment, LmsCourse, LmsCredentials } from "@/lib/lms/types"
+import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
 import type { LmsProviderId } from "@/lib/types"
 import { AppError } from "../../errors"
 
@@ -24,6 +24,20 @@ export type LmsTokenSet = {
   externalUserId: string | null
 }
 
+// What an adapter gets for reading on behalf of one student. Tokens are handed
+// out here (decrypted on the server, refreshed when needed by the token service)
+// and never stored or passed on by the adapter.
+export type LmsAccess = {
+  // The student's LMS address, validated (e.g. https://school.instructure.com).
+  baseUrl: string
+  // The student's time zone, for turning LMS timestamps into local dates.
+  timeZone: string | undefined
+  // A valid access token (refreshed first if it's about to expire).
+  getAccessToken(): Promise<string>
+  // Force a refresh, e.g. after the LMS answered 401. Throws if reconnecting is needed.
+  refreshAccessToken(): Promise<string>
+}
+
 export interface LmsProvider {
   readonly id: LmsProviderId
   readonly name: string
@@ -35,17 +49,31 @@ export interface LmsProvider {
   // ---- Connecting (OAuth 2.0 authorization code flow) ----
   // Where to send the student to approve access. `state` is a random, single-use
   // value created and checked by the server (CSRF protection for the callback).
-  getAuthorizationUrl(request: { baseUrl: string; redirectUri: string; state: string }): string
+  // The redirect URI is server configuration, never taken from the request.
+  getAuthorizationUrl(request: { baseUrl: string; state: string }): string
   // The OAuth callback: trade the one-time code for tokens.
-  exchangeCode(request: { baseUrl: string; redirectUri: string; code: string }): Promise<LmsTokenSet>
-  refreshTokens(credentials: LmsCredentials): Promise<LmsTokenSet>
-  // Tell the LMS to forget the tokens (on disconnect), where the provider supports it.
-  revokeTokens(credentials: LmsCredentials): Promise<void>
+  exchangeCode(request: { baseUrl: string; code: string }): Promise<LmsTokenSet>
+  refreshTokens(request: { baseUrl: string; refreshToken: string }): Promise<LmsTokenSet>
+  // Tell the LMS to forget the token (on disconnect), where the provider supports it.
+  revokeTokens(request: { baseUrl: string; accessToken: string }): Promise<void>
 
-  // ---- Reading (normalized) ----
-  getCourses(credentials: LmsCredentials): Promise<LmsCourse[]>
-  getCourseDetails(credentials: LmsCredentials, courseExternalId: string): Promise<LmsCourse>
-  getAssignments(credentials: LmsCredentials, courseExternalId: string): Promise<LmsAssignment[]>
+  // ---- Reading (normalized, read-only) ----
+  getCourses(access: LmsAccess): Promise<LmsCourse[]>
+  getCourseDetails(access: LmsAccess, courseExternalId: string): Promise<LmsCourse>
+  getAssignments(access: LmsAccess, courseExternalId: string): Promise<LmsAssignment[]>
+}
+
+// Safe, student-facing LMS problems. `scope` says how much failed: one course
+// (the sync skips it and carries on) or the whole connection.
+export class LmsError extends AppError {
+  constructor(
+    message: string,
+    readonly scope: "course" | "connection" = "connection",
+    readonly reconnect = false
+  ) {
+    super("validation", message)
+    this.name = "LmsError"
+  }
 }
 
 // Thrown by adapters that aren't built yet. Safe to show to the student.

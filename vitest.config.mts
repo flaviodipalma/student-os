@@ -13,5 +13,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Many tests start their own in-process Postgres (PGlite); under a full
+    // parallel run a few seconds isn't always enough.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 })
