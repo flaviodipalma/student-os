@@ -1,11 +1,10 @@
-import { addDays, fromDateKey } from "@/lib/format"
-import type { CalendarEvent, EventInput } from "@/lib/types"
+import { addDays } from "@/lib/format"
+import type { CalendarEvent, EventInput, RecurringCommitmentInput } from "@/lib/types"
 
 // DEVELOPMENT SEED DATA. Only `npm run db:seed` uses this, for a dev test account.
 //
-// The student's regular week (classes, practice, work shifts) is written out
-// as real, dated events for a few weeks around today. There are no recurring
-// events yet; each event is a separate item, like a database row.
+// The student's regular week (classes, practice, work shifts) becomes weekly
+// commitments (seedWeeklyCommitments); the one-off events around today stay events.
 
 type WeeklyEvent = Omit<EventInput, "date">
 
@@ -47,20 +46,29 @@ const weeklySchedule: Record<number, WeeklyEvent[]> = {
   ],
 }
 
-function slug(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+// The regular week as weekly commitments: one per activity and time, with its days.
+export function seedWeeklyCommitments(): RecurringCommitmentInput[] {
+  const byKey = new Map<string, RecurringCommitmentInput>()
+  for (const [day, entries] of Object.entries(weeklySchedule)) {
+    for (const entry of entries) {
+      const key = `${entry.title}|${entry.startTime}|${entry.endTime}`
+      const existing = byKey.get(key)
+      if (existing) existing.daysOfWeek.push(Number(day))
+      else
+        byKey.set(key, {
+          title: entry.title,
+          daysOfWeek: [Number(day)],
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          type: entry.type,
+        })
+    }
+  }
+  return [...byKey.values()]
 }
 
 export function buildMockEvents(today: string): CalendarEvent[] {
   const events: CalendarEvent[] = []
-
-  // The regular week, from two weeks ago to four weeks ahead.
-  for (let offset = -14; offset <= 28; offset++) {
-    const date = addDays(today, offset)
-    for (const event of weeklySchedule[fromDateKey(date).getDay()]) {
-      events.push({ ...event, id: `${slug(event.title)}-${date}`, date })
-    }
-  }
 
   // One-off events around today, including study sessions already booked for
   // specific tasks. (Today's work is left for the Planner to suggest.)

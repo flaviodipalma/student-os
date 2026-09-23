@@ -66,14 +66,15 @@ export type CalendarEvent = {
   description?: string
   // Optional link: a class belongs to a course.
   courseId?: string
-  // Set only on calendar items that show a study session (see
-  // src/lib/calendar-items.ts). Those are stored as StudySessionRecords, not events.
+  // Set only on calendar items that show a study session or a weekly commitment
+  // (see src/lib/calendar-items.ts). Those aren't stored as events.
   sessionId?: string
+  commitmentId?: string
   taskId?: string
   completed?: boolean
 }
 
-export type EventInput = Omit<CalendarEvent, "id" | "sessionId" | "taskId" | "completed">
+export type EventInput = Omit<CalendarEvent, "id" | "sessionId" | "commitmentId" | "taskId" | "completed">
 
 // Time set aside to work on a task, stored when the student accepts, completes or
 // skips a Planner suggestion. skipped = removed from that day's plan.
@@ -88,6 +89,43 @@ export type StudySessionRecord = {
   status: StudySessionStatus
 }
 
+// The signed-in student's profile.
+export const academicYears = ["freshman", "sophomore", "junior", "senior", "graduate", "other"] as const
+export type AcademicYear = (typeof academicYears)[number]
+
 export type Student = {
   firstName: string
+  lastName: string
+  // e.g. "Fall 2026"
+  academicTerm: string
+  // Year in school; null when not set.
+  academicYear: AcademicYear | null
+  onboardingCompleted: boolean
 }
+
+export type ProfileInput = Omit<Student, "onboardingCompleted">
+
+// How the student likes to study. Defaults live in src/lib/preferences.ts.
+export type StudentPreferences = {
+  // Planning window, "HH:MM".
+  studyStart: string
+  studyEnd: string
+  maxStudyMinutesPerDay: number
+  // 30, 45, 60 or 90.
+  preferredBlockMinutes: number
+  // Rest between study blocks (0 = no break).
+  breakMinutes: number
+}
+
+// Something the student does every week at the same time (practice, work, a club).
+// Stored once as a rule, not as individual events. 0 = Sunday … 6 = Saturday.
+export type RecurringCommitment = {
+  id: string
+  title: string
+  daysOfWeek: number[]
+  startTime: string
+  endTime: string
+  type: EventType
+}
+
+export type RecurringCommitmentInput = Omit<RecurringCommitment, "id">

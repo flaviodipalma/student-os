@@ -3,7 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
-import { busyRanges, durationMinutes, eventsOn } from "@/lib/events"
+import { useAppStore } from "@/lib/app-store"
+import { busyRanges, durationMinutes, eventsOn, toMinutes } from "@/lib/events"
 import { addDays, formatRelativeDay, formatWeekday, fromDateKey } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { daysUntilDue, upcomingDeadlines } from "@/lib/tasks"
@@ -21,21 +22,18 @@ type WeekDay = {
   deadlines: string[]
 }
 
-// Free time is counted inside a realistic waking window, 8 AM to 10 PM.
-const DAY_START = 8 * 60
-const DAY_END = 22 * 60
-
-// A day's hours, worked out from its calendar events.
-function loadOf(events: CalendarEvent[]) {
+// A day's hours, worked out from its calendar events. Free time is counted inside
+// the student's study window (from their preferences).
+function loadOf(events: CalendarEvent[], window: { start: number; end: number }) {
   const sum = (list: CalendarEvent[]) => list.reduce((total, e) => total + durationMinutes(e), 0) / 60
   const busyInWindow = busyRanges(events).reduce(
-    (total, [start, end]) => total + Math.max(0, Math.min(end, DAY_END) - Math.max(start, DAY_START)),
+    (total, [start, end]) => total + Math.max(0, Math.min(end, window.end) - Math.max(start, window.start)),
     0
   )
   return {
     fixedHours: sum(events.filter((e) => e.type !== "study")),
     studyHours: sum(events.filter((e) => e.type === "study")),
-    freeHours: (DAY_END - DAY_START - busyInWindow) / 60,
+    freeHours: (window.end - window.start - busyInWindow) / 60,
   }
 }
 
@@ -55,6 +53,8 @@ export function WeekOverview({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
   const { events } = useEvents()
   const { getCourse } = useCourses()
+  const { preferences } = useAppStore()
+  const studyWindow = { start: toMinutes(preferences.studyStart), end: toMinutes(preferences.studyEnd) }
   const label = (task: Task) => `${getCourse(task.courseId)?.code ?? ""} ${task.title}`.trim()
 
   // Open graded work due in the next 7 days.
@@ -67,7 +67,7 @@ export function WeekOverview({ className }: { className?: string }) {
       shortLabel: offset === 0 ? "Today" : formatWeekday(fromDateKey(date), "short"),
       longLabel: offset === 0 ? "Today" : formatRelativeDay(fromDateKey(date), fromDateKey(today)),
       isToday: offset === 0,
-      ...loadOf(eventsOn(events, date)),
+      ...loadOf(eventsOn(events, date), studyWindow),
       deadlines: thisWeek.filter((task) => task.dueDate === date).map(label),
     }
   })

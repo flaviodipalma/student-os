@@ -103,3 +103,58 @@ export { id as idSchema, dateKey as dateKeySchema }
 export function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? "Some of the details aren't valid."
 }
+
+// ---- Profile, preferences and weekly commitments (onboarding and Settings)
+
+export const profileSchema = z.object({
+  firstName: z.string().trim().min(1, "Add your first name.").max(80, "That name is too long."),
+  lastName: z.string().trim().max(80, "That name is too long.").default(""),
+  academicTerm: z.string().trim().max(60, "Keep the term short, e.g. Fall 2026.").default(""),
+  academicYear: z.enum(["freshman", "sophomore", "junior", "senior", "graduate", "other"]).nullable().default(null),
+})
+
+export const preferencesSchema = z
+  .object({
+    studyStart: timeOfDay,
+    studyEnd: timeOfDay,
+    maxStudyMinutesPerDay: z
+      .int("Use whole minutes.")
+      .min(15, "Plan at least 15 minutes of study a day.")
+      .max(720, "That's more than 12 hours of study a day."),
+    preferredBlockMinutes: z.union([z.literal(30), z.literal(45), z.literal(60), z.literal(90)], {
+      error: "Pick a study block length of 30, 45, 60 or 90 minutes.",
+    }),
+    breakMinutes: z.int().min(0).max(60, "Breaks can be at most 60 minutes."),
+  })
+  .refine((p) => minutesOf(p.studyEnd) > minutesOf(p.studyStart), {
+    message: "Your study window must end after it starts.",
+    path: ["studyEnd"],
+  })
+  .refine((p) => minutesOf(p.studyEnd) - minutesOf(p.studyStart) >= 60, {
+    message: "Make your study window at least an hour long.",
+    path: ["studyEnd"],
+  })
+
+export const commitmentFields = z.object({
+  title: z.string().trim().min(1, "Give the commitment a name.").max(100, "Keep the name under 100 characters."),
+  daysOfWeek: z
+    .array(z.int().min(0).max(6), { error: "Pick at least one day." })
+    .min(1, "Pick at least one day.")
+    .max(7)
+    .refine((days) => new Set(days).size === days.length, "Each day can only be picked once."),
+  startTime: timeOfDay,
+  endTime: timeOfDay,
+  type: eventType,
+})
+export const createCommitmentSchema = commitmentFields.extend({ id }).refine(endAfterStart, endAfterStartIssue)
+export const updateCommitmentSchema = commitmentFields.partial().refine(endAfterStart, endAfterStartIssue)
+
+// Everything collected in onboarding steps 1-3, saved together.
+export const onboardingDetailsSchema = z.object({
+  profile: profileSchema,
+  preferences: preferencesSchema,
+  commitments: z.array(commitmentFields.refine(endAfterStart, endAfterStartIssue)).max(30),
+})
+
+// One weekly commitment as entered in a form (no id yet).
+export const commitmentInputSchema = commitmentFields.refine(endAfterStart, endAfterStartIssue)

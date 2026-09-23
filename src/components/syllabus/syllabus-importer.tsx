@@ -27,7 +27,9 @@ type State =
   | { step: "review"; fileName: string; draft: ReviewDraft }
   | { step: "done"; result: ImportResult }
 
-export function SyllabusImporter() {
+// With `onFinished` (onboarding), it runs embedded: no link back to Courses, and
+// the last screen offers to continue setup instead of opening the course.
+export function SyllabusImporter({ onFinished }: { onFinished?: () => void } = {}) {
   const { courses } = useCourses()
   const { tasks, today } = useTasks()
   const [state, setState] = useState<State>({ step: "upload" })
@@ -55,13 +57,15 @@ export function SyllabusImporter() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/courses"
-        className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <ArrowLeftIcon aria-hidden className="size-4" />
-        Courses
-      </Link>
+      {!onFinished && (
+        <Link
+          href="/courses"
+          className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <ArrowLeftIcon aria-hidden className="size-4" />
+          Courses
+        </Link>
+      )}
 
       {state.step === "upload" && <UploadPanel error={state.error} onFile={handleFile} />}
       {state.step === "processing" && (
@@ -83,7 +87,9 @@ export function SyllabusImporter() {
           onImported={(result) => setState({ step: "done", result })}
         />
       )}
-      {state.step === "done" && <DonePanel result={state.result} onImportAnother={startOver} />}
+      {state.step === "done" && (
+        <DonePanel result={state.result} onImportAnother={startOver} onFinished={onFinished} />
+      )}
     </div>
   )
 }

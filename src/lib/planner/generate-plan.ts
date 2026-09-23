@@ -1,7 +1,8 @@
 import { byStart, durationMinutes, fromMinutes, toMinutes } from "@/lib/events"
 import { daysBetween, fromDateKey, toDateKey } from "@/lib/format"
 import { isDone } from "@/lib/tasks"
-import type { CalendarEvent, Task } from "@/lib/types"
+import { commitmentsOn } from "@/lib/recurring"
+import type { CalendarEvent, RecurringCommitment, Task } from "@/lib/types"
 import { findFreeSlots, roundUp, totalMinutes, type Slot } from "./availability"
 import { DEFAULT_PLANNER_SETTINGS, type PlannerSettings } from "./settings"
 import type { DailyPlan, StudySession, UnscheduledTask } from "./types"
@@ -15,6 +16,8 @@ export type PlanInput = {
   now: Date
   // Tasks the student removed from this date's plan.
   skippedTaskIds?: string[]
+  // Weekly commitments (practice, work…). Their times that day count as busy.
+  recurringCommitments?: RecurringCommitment[]
   settings?: Partial<PlannerSettings>
 }
 
@@ -36,9 +39,18 @@ export function dailyTarget(remaining: number, daysLeft: number, settings: Plann
   return Math.min(remaining, Math.max(share, settings.minBlockMinutes))
 }
 
-// The block length we'd like for `left` minutes of work. Anything longer than the
-// maximum is split into equal blocks (3h -> 2 x 90 min).
+// The block length we'd like for `left` minutes of work.
+// With a preferred block length (from the student's preferences), work is done
+// in blocks of that length, with a shorter last block (90 min at 60 -> 60 + 30),
+// unless the remainder would be shorter than a minimum block.
+// Without one, anything longer than the maximum is split into equal blocks (3h -> 2 x 90 min).
 function idealBlock(left: number, settings: PlannerSettings): number {
+  const preferred = settings.preferredBlockMinutes
+  if (preferred) {
+    if (left <= preferred) return roundUp(left, 5)
+    if (left - preferred < settings.minBlockMinutes && left <= settings.maxBlockMinutes) return roundUp(left, 5)
+    return preferred
+  }
   if (left <= settings.maxBlockMinutes) return roundUp(left, 5)
   const blocks = Math.ceil(left / settings.maxBlockMinutes)
   return roundUp(left / blocks, 15)
@@ -57,7 +69,11 @@ export function generatePlan(input: PlanInput): DailyPlan {
   const today = toDateKey(now)
   const skipped = input.skippedTaskIds ?? []
 
-  const dayEvents = events.filter((e) => e.date === date)
+  // Everything that takes time that day: events, study sessions, weekly commitments.
+  const dayEvents = [
+    ...events.filter((e) => e.date === date),
+    ...commitmentsOn(input.recurringCommitments ?? [], date),
+  ]
   const existingSessions: StudySession[] = dayEvents
     .filter((e) => e.type === "study" && e.taskId)
     .sort(byStart)

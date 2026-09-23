@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { toMinutes } from "@/lib/events"
-import type { CalendarEvent, Task } from "@/lib/types"
+import { DEFAULT_STUDENT_PREFERENCES, plannerSettingsFor } from "@/lib/preferences"
+import type { CalendarEvent, RecurringCommitment, Task } from "@/lib/types"
 import { buildDayTimeline, calculateTaskUrgency, generatePlan, type StudySession } from "./index"
 
 // A fixed Tuesday, 8:00 AM, so results never depend on the real clock.
@@ -249,6 +250,110 @@ describe("generatePlan", () => {
     const kept = task()
     const plan = generatePlan({ date: DATE, tasks: [skipped, kept], events: [], now: NOW, skippedTaskIds: [skipped.id] })
     expect(plan.suggestions.map((s) => s.taskId)).toEqual([kept.id])
+  })
+})
+
+describe("generatePlan with student preferences", () => {
+  const prefs = (overrides: Partial<typeof DEFAULT_STUDENT_PREFERENCES> = {}) =>
+    plannerSettingsFor({ ...DEFAULT_STUDENT_PREFERENCES, ...overrides })
+
+  it("only plans inside the student's study window", () => {
+    const plan = generatePlan({
+      date: DATE,
+      tasks: [task({ estimateMinutes: 60, priority: "high" })],
+      events: [],
+      now: NOW,
+      settings: prefs({ studyStart: "18:00", studyEnd: "21:00" }),
+    })
+    expect(plan.suggestions).toHaveLength(1)
+    expect(toMinutes(plan.suggestions[0].startTime)).toBeGreaterThanOrEqual(toMinutes("18:00"))
+    expect(toMinutes(plan.suggestions[0].endTime)).toBeLessThanOrEqual(toMinutes("21:00"))
+  })
+
+  it("respects the student's daily maximum", () => {
+    const tasks = Array.from({ length: 4 }, () => task({ estimateMinutes: 90, priority: "high" }))
+    const plan = generatePlan({ date: DATE, tasks, events: [], now: NOW, settings: prefs({ maxStudyMinutesPerDay: 90 }) })
+    expect(plan.studyLimit).toBe(90)
+    expect(plan.suggestions.reduce((sum, s) => sum + minutes(s), 0)).toBeLessThanOrEqual(90)
+  })
+
+  it("works in the student's preferred block length", () => {
+    const plan = (estimateMinutes: number, block: number) =>
+      generatePlan({
+        date: DATE,
+        tasks: [task({ estimateMinutes })],
+        events: [],
+        now: NOW,
+        settings: prefs({ preferredBlockMinutes: block }),
+      }).suggestions.map(minutes)
+    expect(plan(120, 60)).toEqual([60, 60])
+    expect(plan(90, 60)).toEqual([60, 30])
+    expect(plan(70, 60)).toEqual([70]) // no 10-minute leftover block
+    expect(plan(90, 45)).toEqual([45, 45])
+    expect(plan(180, 90)).toEqual([90, 90])
+  })
+
+  it("uses the student's break length between blocks", () => {
+    const gap = (breakMinutes: number) => {
+      const [first, second] = generatePlan({
+        date: DATE,
+        tasks: [task({ estimateMinutes: 120 })],
+        events: [],
+        now: NOW,
+        settings: prefs({ breakMinutes, preferredBlockMinutes: 60 }),
+      }).suggestions
+      return toMinutes(second.startTime) - toMinutes(first.endTime)
+    }
+    expect(gap(0)).toBe(0)
+    expect(gap(30)).toBe(30)
+  })
+})
+
+describe("generatePlan with recurring commitments", () => {
+  // 2026-09-22 is a Tuesday.
+  const practice: RecurringCommitment = {
+    id: "c1",
+    title: "Soccer Practice",
+    daysOfWeek: [2, 4],
+    startTime: "10:30",
+    endTime: "13:00",
+    type: "sports",
+  }
+
+  it("treats a weekly commitment as unavailable on its days", () => {
+    // Only 8:00-10:30 and 13:00-22:00 are free once practice is blocked.
+    const tasks = [task({ estimateMinutes: 120, priority: "high" }), task({ estimateMinutes: 120 })]
+    const plan = generatePlan({ date: DATE, tasks, events: [], now: NOW, recurringCommitments: [practice] })
+    expect(plan.suggestions.length).toBeGreaterThan(0)
+    for (const session of plan.suggestions) {
+      const start = toMinutes(session.startTime)
+      const end = toMinutes(session.endTime)
+      expect(end <= toMinutes("10:30") || start >= toMinutes("13:00")).toBe(true)
+    }
+  })
+
+  it("ignores commitments on other days of the week", () => {
+    const wednesdayOnly = { ...practice, daysOfWeek: [3] }
+    const tasks = [task()]
+    const withIt = generatePlan({ date: DATE, tasks, events: [], now: NOW, recurringCommitments: [wednesdayOnly] })
+    const without = generatePlan({ date: DATE, tasks, events: [], now: NOW })
+    expect(withIt.suggestions).toEqual(without.suggestions)
+    expect(withIt.freeMinutes).toBe(without.freeMinutes)
+  })
+
+  it("combines with events and the study window", () => {
+    // Window 9:00-14:00, practice 10:30-13:00, class 13:00-14:00 -> only 9:00-10:30 is free.
+    const events = [event("13:00", "14:00", { title: "CSC215 Class" })]
+    const plan = generatePlan({
+      date: DATE,
+      tasks: [task({ estimateMinutes: 60, dueDate: DATE })],
+      events,
+      now: NOW,
+      recurringCommitments: [practice],
+      settings: { ...plannerSettingsFor({ ...DEFAULT_STUDENT_PREFERENCES, studyStart: "09:00", studyEnd: "14:00" }), maxShareOfFreeTime: 1 },
+    })
+    expect(plan.freeMinutes).toBe(90)
+    expect(plan.suggestions).toEqual([expect.objectContaining({ startTime: "09:00", endTime: "10:00" })])
   })
 })
 

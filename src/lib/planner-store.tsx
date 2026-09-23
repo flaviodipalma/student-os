@@ -4,10 +4,12 @@ import { useMemo } from "react"
 import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
 import { generatePlan, type DailyPlan, type StudySession } from "@/lib/planner"
+import { plannerSettingsFor } from "@/lib/preferences"
 
 // Connects the planner (pure logic in src/lib/planner) to the student's saved data.
 //
-//   database -> tasks + events + study sessions -> generatePlan -> suggestions
+//   database -> tasks + events + study sessions + weekly commitments
+//            + the student's study preferences -> generatePlan -> suggestions
 //
 // usePlan(date) is used by both the Planner page and the Dashboard, so they
 // always agree. Suggestions themselves aren't stored; they're recalculated from
@@ -15,16 +17,24 @@ import { generatePlan, type DailyPlan, type StudySession } from "@/lib/planner"
 //   accept -> scheduled, mark done -> completed, remove -> skipped.
 
 export function usePlan(date: string): DailyPlan {
-  const { tasks, calendarItems, studySessions } = useAppStore()
+  const { tasks, calendarItems, studySessions, preferences, recurringCommitments } = useAppStore()
   const now = useNow()
 
   return useMemo(() => {
     const skippedTaskIds = studySessions
       .filter((session) => session.status === "skipped" && session.date === date)
       .map((session) => session.taskId)
-    // calendarItems = events plus the student's scheduled/completed study sessions.
-    return generatePlan({ date, tasks, events: calendarItems, now, skippedTaskIds })
-  }, [date, tasks, calendarItems, studySessions, now])
+    return generatePlan({
+      date,
+      tasks,
+      // Events and scheduled/completed study sessions; weekly commitments are passed separately.
+      events: calendarItems.filter((item) => !item.commitmentId),
+      recurringCommitments,
+      now,
+      skippedTaskIds,
+      settings: plannerSettingsFor(preferences),
+    })
+  }, [date, tasks, calendarItems, studySessions, recurringCommitments, preferences, now])
 }
 
 export function usePlanActions() {

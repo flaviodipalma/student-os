@@ -16,16 +16,31 @@ import {
   updateStudySessionAction,
   updateTaskAction,
 } from "@/app/actions/data"
+import {
+  completeOnboardingAction,
+  createCommitmentAction,
+  deleteCommitmentAction,
+  saveOnboardingAction,
+  updateCommitmentAction,
+  updatePreferencesAction,
+  updateProfileAction,
+} from "@/app/actions/settings"
 import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
 import { pickCourseColor } from "@/lib/course-colors"
 import { useFeedback } from "@/lib/feedback"
+import { addDays } from "@/lib/format"
+import { commitmentsBetween } from "@/lib/recurring"
 import type {
   CalendarEvent,
   Course,
   CourseInput,
   EventInput,
+  ProfileInput,
+  RecurringCommitment,
+  RecurringCommitmentInput,
+  StudentPreferences,
   StudySessionRecord,
   Student,
   Task,
@@ -33,6 +48,7 @@ import type {
   TaskStatus,
 } from "@/lib/types"
 import type { AppData } from "@/server/services/app-data"
+import type { OnboardingDetails, OnboardingSaved } from "@/server/services/onboarding"
 import type { SyllabusImportRequest, SyllabusImportSaved } from "@/server/services/syllabus"
 
 // The app's data in the browser: the signed-in user's courses, tasks, events and
@@ -52,7 +68,9 @@ type AppStore = {
   tasks: Task[]
   events: CalendarEvent[]
   studySessions: StudySessionRecord[]
-  // Events plus study sessions shown as study blocks.
+  preferences: StudentPreferences
+  recurringCommitments: RecurringCommitment[]
+  // Events, study sessions and weekly commitments, as calendar items.
   calendarItems: CalendarEvent[]
   getCourse: (id: string) => Course | undefined
   addCourse: (input: CourseInput) => Promise<Course | null>
@@ -69,6 +87,15 @@ type AppStore = {
   updateStudySession: (id: string, changes: Partial<NewSession>) => void
   deleteStudySession: (id: string) => void
   importSyllabus: (request: SyllabusImportRequest) => Promise<ActionResult<SyllabusImportSaved>>
+  // Profile, preferences and weekly commitments. These return the result so
+  // forms can show validation messages next to the fields.
+  updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
+  updatePreferences: (input: StudentPreferences) => Promise<ActionResult<StudentPreferences>>
+  addCommitment: (input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
+  updateCommitment: (id: string, changes: Partial<RecurringCommitmentInput>) => Promise<ActionResult<RecurringCommitment>>
+  deleteCommitment: (id: string) => void
+  saveOnboarding: (details: OnboardingDetails) => Promise<ActionResult<OnboardingSaved>>
+  completeOnboarding: () => Promise<ActionResult<null>>
 }
 
 const AppStoreContext = createContext<AppStore | null>(null)
@@ -104,6 +131,9 @@ export function AppStoreProvider({
   const [tasks, setTasks] = useState(initial.tasks)
   const [events, setEvents] = useState(initial.events)
   const [studySessions, setStudySessions] = useState(initial.studySessions)
+  const [student, setStudent] = useState(initial.student)
+  const [preferences, setPreferences] = useState(initial.preferences)
+  const [recurringCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
 
   // Awaits a server action; runs onOk with the saved record, or undoes the change.
   async function save<T>(request: Promise<ActionResult<T>>, onOk: (data: T) => void, undo: () => void) {
@@ -114,14 +144,28 @@ export function AppStoreProvider({
     else showError(result.error)
   }
 
+  // Weekly commitments are shown from 5 weeks back to ~6 months ahead.
   const calendarItems = useMemo(
-    () => [...events, ...sessionsAsCalendarItems(studySessions, tasks, courses)],
-    [events, studySessions, tasks, courses]
+    () => [
+      ...events,
+      ...sessionsAsCalendarItems(studySessions, tasks, courses),
+      ...commitmentsBetween(recurringCommitments, addDays(today, -35), addDays(today, 180)),
+    ],
+    [events, studySessions, tasks, courses, recurringCommitments, today]
   )
+
+  // For saves where the form needs the outcome: returns it, and handles expired sessions.
+  async function call<T>(request: Promise<ActionResult<T>>): Promise<ActionResult<T>> {
+    const result = await request.catch(() => NETWORK_ERROR)
+    if (!result.ok && result.code === "unauthorized") router.push("/login")
+    return result
+  }
 
   const store: AppStore = {
     today,
-    student: initial.student,
+    student,
+    preferences,
+    recurringCommitments,
     courses,
     tasks,
     events,
@@ -260,6 +304,48 @@ export function AppStoreProvider({
       if (!before) return
       setStudySessions((prev) => withoutId(prev, id))
       save(deleteStudySessionAction(id), () => {}, () => setStudySessions((prev) => [...prev, before]))
+    },
+
+    // ---- Profile, preferences, weekly commitments
+    updateProfile: async (input) => {
+      const result = await call(updateProfileAction(input))
+      if (result.ok) setStudent(result.data)
+      return result
+    },
+    updatePreferences: async (input) => {
+      const result = await call(updatePreferencesAction(input))
+      if (result.ok) setPreferences(result.data)
+      return result
+    },
+    addCommitment: async (input) => {
+      const result = await call(createCommitmentAction({ ...input, id: crypto.randomUUID() }))
+      if (result.ok) setRecurringCommitments((prev) => [...prev, result.data])
+      return result
+    },
+    updateCommitment: async (id, changes) => {
+      const result = await call(updateCommitmentAction(id, changes))
+      if (result.ok) setRecurringCommitments((prev) => replaceById(prev, result.data))
+      return result
+    },
+    deleteCommitment: (id) => {
+      const before = recurringCommitments.find((commitment) => commitment.id === id)
+      if (!before) return
+      setRecurringCommitments((prev) => withoutId(prev, id))
+      save(deleteCommitmentAction(id), () => {}, () => setRecurringCommitments((prev) => [...prev, before]))
+    },
+    saveOnboarding: async (details) => {
+      const result = await call(saveOnboardingAction(details))
+      if (result.ok) {
+        setStudent(result.data.student)
+        setPreferences(result.data.preferences)
+        setRecurringCommitments(result.data.recurringCommitments)
+      }
+      return result
+    },
+    completeOnboarding: async () => {
+      const result = await call(completeOnboardingAction())
+      if (result.ok) setStudent((prev) => ({ ...prev, onboardingCompleted: true }))
+      return result
     },
 
     // ---- Syllabus import (saved first, then shown: it's one confirmed step)

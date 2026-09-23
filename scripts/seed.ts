@@ -3,8 +3,9 @@
 //   npm run db:seed
 //
 // Uses DEV_SEED_EMAIL / DEV_SEED_PASSWORD from .env.local. Signs that account in
-// (or signs it up), deletes that account's existing data, and adds the sample
-// courses, tasks, events and study sessions from src/server/seed. Real accounts
+// (or signs it up), deletes that account's existing data, finishes its onboarding
+// (profile, default preferences, weekly commitments) and adds the sample courses,
+// tasks, events and study sessions from src/server/seed. Real accounts
 // are never touched: every query is scoped to the dev account's user id.
 
 import { createClient } from "@supabase/supabase-js"
@@ -14,12 +15,14 @@ import postgres from "postgres"
 import { toDateKey } from "@/lib/format"
 import * as schema from "@/server/db/schema"
 import type { Database } from "@/server/db/types"
-import { buildMockEvents } from "@/server/seed/events"
+import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
+import { buildMockEvents, seedWeeklyCommitments } from "@/server/seed/events"
 import { seedCourses } from "@/server/seed/courses"
 import { buildMockTasks } from "@/server/seed/tasks"
 import { createCourse } from "@/server/services/courses"
 import { createEvent } from "@/server/services/events"
-import { ensureProfile } from "@/server/services/profiles"
+import { saveOnboardingDetails } from "@/server/services/onboarding"
+import { completeOnboarding, ensureProfile } from "@/server/services/profiles"
 import { createStudySession } from "@/server/services/study-sessions"
 import { createTask } from "@/server/services/tasks"
 
@@ -75,7 +78,15 @@ async function main() {
     await db.delete(schema.syllabusImports).where(eq(schema.syllabusImports.userId, userId))
     await db.delete(schema.courses).where(eq(schema.courses.userId, userId)) // also deletes tasks + sessions
 
-    // 3. Sample data. Seed files use readable ids ("csc215"); the database gets real ones.
+    // 3. A finished onboarding: profile, default preferences, the regular week.
+    await saveOnboardingDetails(db, userId, {
+      profile: { firstName: "Flavio", lastName: "", academicTerm: "Fall 2026", academicYear: "sophomore" },
+      preferences: DEFAULT_STUDENT_PREFERENCES,
+      commitments: seedWeeklyCommitments(),
+    })
+    await completeOnboarding(db, userId)
+
+    // 4. Sample data. Seed files use readable ids ("csc215"); the database gets real ones.
     const courseIds = new Map<string, string>()
     for (const course of seedCourses) {
       const saved = await createCourse(db, userId, course)
@@ -115,7 +126,7 @@ async function main() {
       }
     }
     console.log(
-      `Seeded ${email}: ${courseIds.size} courses, ${taskIds.size} tasks, ${events} events, ${sessions} study sessions.`
+      `Seeded ${email}: ${courseIds.size} courses, ${taskIds.size} tasks, ${seedWeeklyCommitments().length} weekly commitments, ${events} events, ${sessions} study sessions.`
     )
   } finally {
     await sql.end()

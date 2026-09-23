@@ -70,7 +70,8 @@ export async function signUpAction(_previous: AuthFormState, formData: FormData)
   }
 
   if (needsConfirmation) return { notice: "Check your email to confirm your account, then log in." }
-  redirect("/dashboard")
+  // New accounts start with onboarding.
+  redirect("/onboarding")
 }
 
 export async function logInAction(_previous: AuthFormState, formData: FormData): Promise<AuthFormState> {

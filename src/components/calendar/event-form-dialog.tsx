@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Trash2Icon } from "lucide-react"
 import {
   AlertDialog,
@@ -13,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Field, SimpleSelect } from "@/components/form-fields"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useCourses } from "@/lib/course-store"
+import { formatTime, fromDateKey } from "@/lib/format"
 import { useEvents, useStudySessions } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes, fromMinutes, toMinutes } from "@/lib/events"
 import type { CalendarEvent, EventInput, EventType } from "@/lib/types"
@@ -51,16 +53,24 @@ export function EventFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{event?.sessionId ? "Study session" : event ? "Edit event" : "New event"}</DialogTitle>
+          <DialogTitle>
+            {event?.commitmentId ? event.title : event?.sessionId ? "Study session" : event ? "Edit event" : "New event"}
+          </DialogTitle>
           <DialogDescription>
-            {event?.sessionId
-              ? "Move this study session or remove it. It belongs to a task, so its title comes from the task."
-              : event
-                ? "Update or remove this event."
-                : "Block out time on your calendar."}
+            {event?.commitmentId
+              ? `Every week, ${formatTime(fromDateKey(event.date, event.startTime))} – ${formatTime(fromDateKey(event.date, event.endTime))}.`
+              : event?.sessionId
+                ? "Move this study session or remove it. It belongs to a task, so its title comes from the task."
+                : event
+                  ? "Update or remove this event."
+                  : "Block out time on your calendar."}
           </DialogDescription>
         </DialogHeader>
-        <EventForm event={event} draft={draft} onDone={() => onOpenChange(false)} />
+        {event?.commitmentId ? (
+          <CommitmentNotice onDone={() => onOpenChange(false)} />
+        ) : (
+          <EventForm event={event} draft={draft} onDone={() => onOpenChange(false)} />
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -217,5 +227,25 @@ function EventForm({
         </AlertDialog>
       )}
     </form>
+  )
+}
+
+// Weekly commitments are rules, not single events, so they're changed in Settings.
+function CommitmentNotice({ onDone }: { onDone: () => void }) {
+  return (
+    <div className="grid gap-4">
+      <p className="text-sm text-muted-foreground">
+        This is one of your weekly commitments. It repeats every week, and the Planner keeps this time free. To change
+        or remove it, go to Settings.
+      </p>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onDone}>
+          Close
+        </Button>
+        <Link href="/settings" className={buttonVariants()} onClick={onDone}>
+          Open Settings
+        </Link>
+      </DialogFooter>
+    </div>
   )
 }

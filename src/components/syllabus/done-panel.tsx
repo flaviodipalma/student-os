@@ -6,7 +6,16 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { useCourses } from "@/lib/course-store"
 import type { ImportResult } from "@/lib/syllabus/import"
 
-export function DonePanel({ result, onImportAnother }: { result: ImportResult; onImportAnother: () => void }) {
+export function DonePanel({
+  result,
+  onImportAnother,
+  onFinished,
+}: {
+  result: ImportResult
+  onImportAnother: () => void
+  // Set during onboarding: continue setup instead of opening the course.
+  onFinished?: () => void
+}) {
   const course = useCourses().getCourse(result.courseId)
   const name = course ? `${course.code} — ${course.name}` : "your course"
 
@@ -20,15 +29,28 @@ export function DonePanel({ result, onImportAnother }: { result: ImportResult; o
         {` with ${result.taskCount} ${result.taskCount === 1 ? "task" : "tasks"}. They're now in your Tasks, Dashboard and Planner.`}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Link href={`/courses/${result.courseId}`} className={buttonVariants({ size: "lg" })}>
-          View course
-        </Link>
-        <Link href="/planner" className={buttonVariants({ size: "lg", variant: "outline" })}>
-          Open Planner
-        </Link>
-        <Button size="lg" variant="ghost" onClick={onImportAnother}>
-          Import another syllabus
-        </Button>
+        {onFinished ? (
+          <>
+            <Button size="lg" onClick={onFinished}>
+              Continue setup
+            </Button>
+            <Button size="lg" variant="outline" onClick={onImportAnother}>
+              Import another syllabus
+            </Button>
+          </>
+        ) : (
+          <>
+            <Link href={`/courses/${result.courseId}`} className={buttonVariants({ size: "lg" })}>
+              View course
+            </Link>
+            <Link href="/planner" className={buttonVariants({ size: "lg", variant: "outline" })}>
+              Open Planner
+            </Link>
+            <Button size="lg" variant="ghost" onClick={onImportAnother}>
+              Import another syllabus
+            </Button>
+          </>
+        )}
       </div>
     </section>
   )

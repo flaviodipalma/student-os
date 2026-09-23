@@ -4,9 +4,11 @@ import {
   date,
   foreignKey,
   index,
+  boolean,
   integer,
   pgEnum,
   pgTable,
+  smallint,
   text,
   time,
   timestamp,
@@ -41,6 +43,7 @@ export const taskType = pgEnum("task_type", [
 ])
 export const eventType = pgEnum("event_type", ["class", "sports", "work", "personal", "study"])
 export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "completed", "skipped"])
+export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -59,9 +62,70 @@ export const profiles = pgTable(
       .primaryKey()
       .references(() => authUsers.id, { onDelete: "cascade" }),
     firstName: text("first_name").notNull().default(""),
+    lastName: text("last_name").notNull().default(""),
+    // e.g. "Fall 2026"
+    academicTerm: text("academic_term").notNull().default(""),
+    academicYear: academicYear("academic_year"),
+    // New students go through onboarding first; this flips when they finish it.
+    onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
     ...timestamps,
   },
-  (t) => [check("profiles_first_name_length", sql`char_length(${t.firstName}) <= 80`)]
+  (t) => [
+    check("profiles_first_name_length", sql`char_length(${t.firstName}) <= 80`),
+    check("profiles_last_name_length", sql`char_length(${t.lastName}) <= 80`),
+    check("profiles_academic_term_length", sql`char_length(${t.academicTerm}) <= 60`),
+  ]
+).enableRLS()
+
+// How the student likes to study (one row per student). Students without a row
+// use the defaults in src/lib/preferences.ts.
+export const studentPreferences = pgTable(
+  "student_preferences",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    studyStart: time("study_start").notNull(),
+    studyEnd: time("study_end").notNull(),
+    maxStudyMinutesPerDay: integer("max_study_minutes_per_day").notNull(),
+    preferredBlockMinutes: integer("preferred_block_minutes").notNull(),
+    breakMinutes: integer("break_minutes").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    check("student_preferences_window", sql`${t.studyEnd} > ${t.studyStart}`),
+    check("student_preferences_max_study", sql`${t.maxStudyMinutesPerDay} between 15 and 720`),
+    check("student_preferences_block", sql`${t.preferredBlockMinutes} in (30, 45, 60, 90)`),
+    check("student_preferences_break", sql`${t.breakMinutes} between 0 and 60`),
+  ]
+).enableRLS()
+
+// Something the student does every week at the same time. Stored once as a rule;
+// the Planner and Calendar work out the individual occurrences when needed.
+export const recurringCommitments = pgTable(
+  "recurring_commitments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    // 0 = Sunday ... 6 = Saturday
+    daysOfWeek: smallint("days_of_week").array().notNull(),
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    type: eventType("type").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("recurring_commitments_user_id_idx").on(t.userId),
+    check("recurring_commitments_end_after_start", sql`${t.endTime} > ${t.startTime}`),
+    check("recurring_commitments_title_length", sql`char_length(btrim(${t.title})) between 1 and 100`),
+    check(
+      "recurring_commitments_days",
+      sql`cardinality(${t.daysOfWeek}) between 1 and 7 and ${t.daysOfWeek} <@ array[0,1,2,3,4,5,6]::smallint[]`
+    ),
+  ]
 ).enableRLS()
 
 export const courses = pgTable(
