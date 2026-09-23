@@ -60,7 +60,7 @@ export function SettingsView() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Weekly commitments</CardTitle>
+          <CardTitle className="text-lg font-semibold">Recurring commitments</CardTitle>
           <CardDescription>
             Things you do every week. They show on your calendar, and the Planner never schedules study over them.
           </CardDescription>
@@ -72,6 +72,7 @@ export function SettingsView() {
             onUpdate={async (id, input) => toMessage(await store.updateCommitment(id, input))}
             onDelete={store.deleteCommitment}
             withDates
+            confirmDelete
           />
         </CardContent>
       </Card>

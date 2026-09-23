@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { CircleAlertIcon, CopyIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { SimpleSelect } from "@/components/form-fields"
 import { Button } from "@/components/ui/button"
@@ -46,6 +46,9 @@ export function ReviewPanel({
   const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Guards against a double click, and remembers what was sent for retries.
+  const savingRef = useRef(false)
+  const sentRef = useRef<{ draft: ReviewDraft; request: ImportRequest } | null>(null)
 
   const problems = checkDraft(draft)
   const problemKeys = new Set(problems.map((p) => p.itemKey).filter(Boolean))
@@ -59,14 +62,22 @@ export function ReviewPanel({
   const setAll = (value: boolean) => setDraft((d) => ({ ...d, items: d.items.map((item) => ({ ...item, selected: value })) }))
 
   // The student confirmed: save the course and tasks (one database transaction).
+  // A retry of the same, unchanged review resends the same request (same task
+  // ids), so a save that went through before a dropped connection isn't doubled.
   async function handleImport() {
     setTried(true)
-    if (problems.length > 0) return
-    const request = toImportRequest(draft, true, source)
+    if (problems.length > 0 || savingRef.current) return
+    if (sentRef.current?.draft !== draft) {
+      const request = toImportRequest(draft, true, source)
+      sentRef.current = request ? { draft, request } : null
+    }
+    const request = sentRef.current?.request
     if (!request) return
+    savingRef.current = true
     setSaving(true)
     setSaveError(null)
     const result = await importSyllabus(request)
+    savingRef.current = false
     setSaving(false)
     if (!result.ok) return setSaveError(result.error)
     onImported({

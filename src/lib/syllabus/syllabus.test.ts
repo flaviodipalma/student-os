@@ -167,6 +167,9 @@ describe("duplicate detection", () => {
     expect(findDuplicateTask({ title: "Assignment 2", dueDate: "2026-10-02" }, "csc215", tasks)?.id).toBe("t-a2")
     expect(findDuplicateTask({ title: "Assignment 2", dueDate: "2026-10-03" }, "csc215", tasks)).toBeUndefined()
     expect(findDuplicateTask({ title: "Assignment 2", dueDate: "2026-10-02" }, "ser225", tasks)).toBeUndefined()
+    // Renamed when first imported: same course, date and type still counts.
+    expect(findDuplicateTask({ title: "HW two", dueDate: "2026-10-02", type: "assignment" }, "csc215", tasks)?.id).toBe("t-a2")
+    expect(findDuplicateTask({ title: "HW two", dueDate: "2026-10-02", type: "quiz" }, "csc215", tasks)).toBeUndefined()
   })
 
   it("matches the course by code and leaves likely duplicates unselected", () => {

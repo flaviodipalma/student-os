@@ -14,6 +14,7 @@ import { useTasks } from "@/lib/task-store"
 import { byCourse, byDue, byPriority, isDone } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { NewTaskButton } from "./new-task-button"
 import { TaskList } from "./task-list"
 
 type Filter = "all" | "today" | "upcoming" | "completed"
@@ -68,7 +69,7 @@ export function TasksView() {
                 aria-pressed={selected}
                 onClick={() => setFilter(f.value)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 max-sm:py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   selected
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -102,7 +103,20 @@ export function TasksView() {
 
       <Card>
         <CardContent className="px-2">
-          <TaskList tasks={visible} emptyMessage={active.empty} />
+          {tasks.length === 0 ? (
+            // A brand-new student: say so, and offer the way in.
+            <div className="px-2 py-8 text-center">
+              <p className="font-medium">No tasks yet.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add your first task, or import a syllabus to add all its deadlines at once.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <NewTaskButton label="Create task" />
+              </div>
+            </div>
+          ) : (
+            <TaskList tasks={visible} emptyMessage={active.empty} />
+          )}
         </CardContent>
       </Card>
     </div>

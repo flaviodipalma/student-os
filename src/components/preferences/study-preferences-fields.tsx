@@ -64,7 +64,7 @@ export function StudyPreferencesFields({
               aria-checked={value.preferredBlockMinutes === minutes}
               onClick={() => set({ preferredBlockMinutes: minutes })}
               className={cn(
-                "rounded-md px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "rounded-md px-3 py-1 max-sm:py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 value.preferredBlockMinutes === minutes
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"

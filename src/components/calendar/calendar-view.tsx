@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useNow } from "@/lib/clock"
+import { useMediaQuery } from "@/lib/use-media-query"
 import { useEvents } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
@@ -36,7 +37,10 @@ export function CalendarView() {
   const { scheduleBetween } = useEvents()
   const now = useNow()
   const today = toDateKey(now)
-  const [view, setView] = useState<View>("week")
+  // Phones start on the Day view (a week doesn't fit); the student's own choice wins.
+  const small = useMediaQuery("(max-width: 639px)")
+  const [chosenView, setView] = useState<View | null>(null)
+  const view: View = chosenView ?? (small ? "day" : "week")
   const [anchor, setAnchor] = useState(today)
 
   // Dialog state: which event is being edited, or where a new one starts.
@@ -129,7 +133,7 @@ export function CalendarView() {
               aria-pressed={view === option}
               onClick={() => setView(option)}
               className={cn(
-                "rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "rounded-md px-3 py-1 max-sm:py-2 text-sm font-medium capitalize transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 view === option ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -138,6 +142,19 @@ export function CalendarView() {
           ))}
         </div>
       </div>
+
+      {events.length === 0 && (
+        // Nothing in view: say so, and offer to add something (the grid stays clickable too).
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            No events scheduled {view === "week" ? "this week" : "this day"}. Click a time below or add one.
+          </p>
+          <Button variant="outline" onClick={openNewFromButton}>
+            <PlusIcon data-icon="inline-start" />
+            Add event
+          </Button>
+        </div>
+      )}
 
       <TimeGrid
         days={days}

@@ -1,7 +1,11 @@
-import type { Course, Task } from "@/lib/types"
+import type { Course, Task, TaskType } from "@/lib/types"
 
 // Simple duplicate detection, so importing the same syllabus twice doesn't create
-// everything twice. A likely duplicate = same course + similar title + same due date.
+// everything twice. A likely duplicate, in the same course and on the same due date:
+//   1. a similar title, or
+//   2. the same type (e.g. the student renamed "Project 1" to "CSC215 Project"
+//      when importing it the first time).
+// Likely duplicates are only unselected on the review screen; the student decides.
 
 // "CSC 215", "csc-215" and "CSC215" are the same course code.
 export function normalizeCourseCode(code: string): string {
@@ -35,12 +39,14 @@ export function findMatchingCourse(code: string | null, courses: Course[]): Cour
 }
 
 export function findDuplicateTask(
-  item: { title: string; dueDate: string },
+  item: { title: string; dueDate: string; type?: TaskType },
   courseId: string,
   tasks: Task[]
 ): Task | undefined {
   if (!item.dueDate || !item.title.trim()) return undefined
-  return tasks.find(
-    (task) => task.courseId === courseId && task.dueDate === item.dueDate && titlesSimilar(task.title, item.title)
+  const sameDay = tasks.filter((task) => task.courseId === courseId && task.dueDate === item.dueDate)
+  return (
+    sameDay.find((task) => titlesSimilar(task.title, item.title)) ??
+    (item.type ? sameDay.find((task) => task.type === item.type) : undefined)
   )
 }

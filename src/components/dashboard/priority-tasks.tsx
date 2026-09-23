@@ -12,17 +12,17 @@ export function PriorityTasks({ className }: { className?: string }) {
   const todays = todaysTasks(tasks, today)
   const remaining = todays.filter((task) => !isDone(task))
   const minutesLeft = remaining.reduce((sum, task) => sum + task.estimateMinutes, 0)
+  // Nothing due or planned today: the plan and deadlines already say so.
+  if (todays.length === 0) return null
 
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">Today&apos;s priorities</CardTitle>
+        <CardTitle className="text-lg font-semibold">Due today</CardTitle>
         <CardDescription>
-          {todays.length === 0
-            ? "Nothing planned or due today."
-            : remaining.length > 0
-              ? `${remaining.length} to go · about ${formatDuration(minutesLeft)} of focused work`
-              : "Everything planned for today is done."}
+          {remaining.length > 0
+            ? `${remaining.length} to go · about ${formatDuration(minutesLeft)} of work`
+            : "Everything due today is done."}
         </CardDescription>
         <CardAction>
           <Link

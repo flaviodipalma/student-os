@@ -6,17 +6,22 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CircleCheckBigIcon,
+  CoffeeIcon,
+  ExternalLinkIcon,
   InfoIcon,
+  PlayIcon,
   RotateCcwIcon,
   SparklesIcon,
   XIcon,
 } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
+import { PriorityBadge } from "@/components/tasks/task-badges"
 import { TaskFormDialog } from "@/components/tasks/task-form-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { useNow } from "@/lib/clock"
 import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { toMinutes } from "@/lib/events"
@@ -30,15 +35,21 @@ import {
 } from "@/lib/planner"
 import { usePlan, usePlanActions } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
-import { formatDue } from "@/lib/tasks"
-import type { Task } from "@/lib/types"
+import { formatDue, priorityLabel } from "@/lib/tasks"
+import type { CalendarEvent, Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { DayTimeline } from "./day-timeline"
 
 // The Planner page: "What should I do today?" It only renders the DailyPlan the
 // planner produced (src/lib/planner); no planning happens in here.
+//
+//   What should I do now?  (today only)
+//   Summary                (sessions, study time vs limit, free time)
+//   Your day               (one timeline; each study session has its reasons and actions)
+//   Needs attention        (warnings, work that didn't fit, removed sessions)
 
 const sessionMinutes = (s: StudySession) => toMinutes(s.endTime) - toMinutes(s.startTime)
+const isRecommended = (s: StudySession): s is RecommendedStudySession => s.status === "suggested"
 
 export function PlannerView() {
   const { tasks, today } = useTasks()
@@ -58,9 +69,7 @@ export function PlannerView() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            Your plan for {dayWord}
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Your plan for {dayWord}</h1>
           <p className="mt-1.5 text-muted-foreground">
             Recommended study around your classes and commitments. You decide what to keep.
           </p>
@@ -77,7 +86,7 @@ export function PlannerView() {
                 aria-pressed={date === option.value}
                 onClick={() => setDate(option.value)}
                 className={cn(
-                  "rounded-md px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "rounded-md px-3 py-1.5 max-sm:py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   date === option.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -96,6 +105,8 @@ export function PlannerView() {
         </div>
       </header>
 
+      {date === today && <NowCard plan={plan} dayEvents={dayEvents} taskById={taskById} onShowTask={showTask} />}
+
       <PlanSummary
         plan={plan}
         dayWord={dayWord}
@@ -104,18 +115,28 @@ export function PlannerView() {
           .reduce((sum, e) => sum + toMinutes(e.endTime) - toMinutes(e.startTime), 0)}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Your day</CardTitle>
-            <CardDescription>Fixed events and recommended study, in order.</CardDescription>
+            <CardDescription>Fixed events and study sessions, in order. Accept the ones you&apos;ll do.</CardDescription>
             <Legend />
           </CardHeader>
           <CardContent>
             {dayEvents.length === 0 && plan.suggestions.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">Nothing on the calendar for {dayWord}.</p>
+              <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                {headline(plan, dayWord).title}
+              </p>
             ) : (
-              <DayTimeline date={date} items={buildDayTimeline(plan, dayEvents)} grouped />
+              <DayTimeline
+                date={date}
+                items={buildDayTimeline(plan, dayEvents)}
+                grouped
+                sessionDetails={(session) => {
+                  const task = taskById.get(session.taskId)
+                  return task ? <SessionDetails session={session} task={task} onShowTask={() => showTask(task.id)} /> : null
+                }}
+              />
             )}
           </CardContent>
         </Card>
@@ -128,7 +149,7 @@ export function PlannerView() {
             onShowTask={showTask}
             onPlanNextDay={() => setDate(addDays(date, 1))}
           />
-          <Recommended plan={plan} taskById={taskById} dayWord={dayWord} onShowTask={showTask} />
+          <RemovedFromPlan plan={plan} taskById={taskById} />
         </div>
       </div>
 
@@ -144,10 +165,226 @@ export function PlannerView() {
   )
 }
 
+// ---- "What should I do now?" (today only) -----------------------------------
+//
+// From the day's plan and the current time, one clear next step:
+//   1. a study session happening now,
+//   2. a fixed event happening now (and when the next session starts),
+//   3. the next study session later today,
+//   4. otherwise: free.
+
+function NowCard({
+  plan,
+  dayEvents,
+  taskById,
+  onShowTask,
+}: {
+  plan: DailyPlan
+  dayEvents: CalendarEvent[]
+  taskById: Map<string, Task>
+  onShowTask: (taskId: string) => void
+}) {
+  const now = useNow()
+  const actions = usePlanActions()
+  const { getCourse } = useCourses()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const time = (hhmm: string) => formatTime(fromDateKey(plan.date, hhmm))
+
+  const sessions = [...plan.existingSessions, ...plan.suggestions]
+    .filter((s) => s.status !== "completed")
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+  const current = sessions.find((s) => toMinutes(s.startTime) <= nowMinutes && nowMinutes < toMinutes(s.endTime))
+  const next = sessions.find((s) => toMinutes(s.startTime) > nowMinutes)
+  const busyNow = dayEvents.find(
+    (e) => !e.sessionId && toMinutes(e.startTime) <= nowMinutes && nowMinutes < toMinutes(e.endTime)
+  )
+  const session = current ?? (busyNow ? undefined : next)
+  const task = session ? taskById.get(session.taskId) : undefined
+
+  let heading: string
+  if (current) heading = "Right now"
+  else if (busyNow) heading = `You're at ${busyNow.title} until ${time(busyNow.endTime)}.`
+  else if (next) heading = `Your next study session starts at ${time(next.startTime)}.`
+  else heading = "You're free right now."
+
+  const course = task ? getCourse(task.courseId) : undefined
+  // "CSC215 · High priority · Due Friday"
+  const details = task
+    ? [
+        course?.code,
+        task.priority === "high" || task.priority === "critical" ? `${priorityLabel[task.priority]} priority` : null,
+        `Due ${formatDue(task, plan.date)}`,
+      ].filter(Boolean)
+    : []
+
+  return (
+    <section
+      aria-labelledby="now-heading"
+      className="rounded-xl bg-primary p-5 text-primary-foreground shadow-sm sm:p-6"
+    >
+      <h2 id="now-heading" className="text-sm font-medium text-primary-foreground/80">
+        What should I do now?
+      </h2>
+      {session && task ? (
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm text-primary-foreground/80">{heading}</p>
+            <p className="mt-1 text-xl font-semibold leading-snug">
+              {time(session.startTime)} – {time(session.endTime)} · Work on {task.title}
+            </p>
+            <p className="mt-1 text-sm text-primary-foreground/85">{details.join(" · ")}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {session.status === "suggested" ? (
+              <Button variant="secondary" size="lg" onClick={() => actions.accept(session)}>
+                <PlayIcon data-icon="inline-start" />
+                {current ? "Start session" : "Add to calendar"}
+              </Button>
+            ) : (
+              <Button variant="secondary" size="lg" onClick={() => actions.complete(session)}>
+                <CheckIcon data-icon="inline-start" />
+                Mark done
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="lg"
+              className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              onClick={() => onShowTask(task.id)}
+            >
+              Open task
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-start gap-3">
+          <CoffeeIcon aria-hidden className="mt-1 size-5 shrink-0 text-primary-foreground/80" />
+          <div>
+            <p className="text-xl font-semibold leading-snug">{heading}</p>
+            <p className="mt-1 text-sm text-primary-foreground/85">
+              {busyNow && next
+                ? `Next up: ${taskById.get(next.taskId)?.title ?? "study"} at ${time(next.startTime)}.`
+                : plan.status === "no-tasks" || plan.status === "all-done"
+                  ? "Nothing needs planning today."
+                  : "Nothing else is planned for today. See tomorrow's plan to get ahead."}
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ---- One study session's reasons and actions (inside the timeline) ----------
+
+function SessionDetails({
+  session,
+  task,
+  onShowTask,
+}: {
+  session: StudySession
+  task: Task
+  onShowTask: () => void
+}) {
+  const actions = usePlanActions()
+  const [whyOpen, setWhyOpen] = useState(false)
+  const state = session.status
+  const reasons = isRecommended(session) ? session.reasons : []
+  const whyId = `why-${session.id}`
+  const important = task.priority === "high" || task.priority === "critical"
+
+  return (
+    <div className="mt-2 space-y-2">
+      {(important || reasons.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {important && <PriorityBadge priority={task.priority} />}
+          {reasons.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={whyOpen}
+              aria-controls={whyId}
+              onClick={() => setWhyOpen((open) => !open)}
+              className="inline-flex min-h-8 items-center gap-1 rounded-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Why this? <span className="font-normal text-muted-foreground">{reasons[0]}</span>
+              <ChevronDownIcon aria-hidden className={cn("size-3.5 transition-transform", whyOpen && "rotate-180")} />
+            </button>
+          )}
+        </div>
+      )}
+      {whyOpen && (
+        <ul id={whyId} className="space-y-0.5 text-xs text-muted-foreground">
+          {reasons.map((reason) => (
+            <li key={reason} className="flex items-start gap-1.5">
+              <CheckIcon aria-hidden className="mt-0.5 size-3 shrink-0 text-primary" />
+              {reason}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {state === "suggested" && (
+          <Button size="sm" onClick={() => actions.accept(session)}>
+            <CheckIcon data-icon="inline-start" />
+            Accept
+          </Button>
+        )}
+        {state !== "completed" ? (
+          <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
+            <CircleCheckBigIcon data-icon="inline-start" />
+            Done
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => actions.undoComplete(session)}>
+            <RotateCcwIcon data-icon="inline-start" />
+            Undo
+          </Button>
+        )}
+        {state !== "completed" && (
+          <Button size="sm" variant="ghost" onClick={() => actions.remove(session)} aria-label={`Skip ${task.title} for this day`}>
+            <XIcon data-icon="inline-start" />
+            Skip
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={onShowTask} aria-label={`Open task: ${task.title}`}>
+          <ExternalLinkIcon data-icon="inline-start" />
+          Open task
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Tasks the student skipped for this day; they come back on other days, or now with Restore.
+function RemovedFromPlan({ plan, taskById }: { plan: DailyPlan; taskById: Map<string, Task> }) {
+  const actions = usePlanActions()
+  if (plan.skippedTaskIds.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Skipped for this day</CardTitle>
+        <CardDescription>These won&apos;t be recommended again today. They come back on other days.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-1">
+          {plan.skippedTaskIds.map((taskId) => (
+            <li key={taskId} className="flex items-center justify-between gap-2 text-sm">
+              <span className="truncate">{taskById.get(taskId)?.title ?? "Task"}</span>
+              <Button size="sm" variant="ghost" onClick={() => actions.restore(taskId, plan.date)}>
+                Restore
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
 function Legend() {
   const keys = [
     { label: "Fixed event", swatch: "bg-teal-100 border-l-[3px] border-teal-500" },
-    { label: "Suggested", swatch: "border border-dashed border-primary/60 bg-primary/5" },
+    { label: "Recommended", swatch: "border border-dashed border-primary/60 bg-primary/5" },
     { label: "Scheduled study", swatch: "bg-indigo-100 border-l-[3px] border-indigo-600" },
     { label: "Done", swatch: "border border-foreground/15 bg-muted" },
   ]
@@ -244,193 +481,6 @@ function PlanSummary({ plan, dayWord, commitmentMinutes }: { plan: DailyPlan; da
         </dl>
       )}
     </section>
-  )
-}
-
-function Recommended({
-  plan,
-  taskById,
-  dayWord,
-  onShowTask,
-}: {
-  plan: DailyPlan
-  taskById: Map<string, Task>
-  dayWord: string
-  onShowTask: (taskId: string) => void
-}) {
-  const actions = usePlanActions()
-  const sessions: (StudySession | RecommendedStudySession)[] = [...plan.existingSessions, ...plan.suggestions].sort(
-    (a, b) => a.startTime.localeCompare(b.startTime)
-  )
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Study sessions</CardTitle>
-        <CardDescription>For {dayWord}. Accept a recommendation to put it on your calendar.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {sessions.length === 0 && (
-          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-            {headline(plan, dayWord).title}
-          </p>
-        )}
-        {sessions.map((session) => {
-          const task = taskById.get(session.taskId)
-          if (!task) return null
-          return (
-            <SessionCard
-              key={session.id}
-              session={session}
-              task={task}
-              onShowTask={() => onShowTask(task.id)}
-              onAccept={() => actions.accept(session)}
-              onComplete={() => actions.complete(session)}
-              onUndo={() => actions.undoComplete(session)}
-              onRemove={() => actions.remove(session)}
-            />
-          )
-        })}
-
-        {plan.skippedTaskIds.length > 0 && (
-          <div className="border-t pt-3">
-            <p className="text-xs font-medium text-muted-foreground">Removed from this plan</p>
-            <ul className="mt-1.5 space-y-1">
-              {plan.skippedTaskIds.map((taskId) => (
-                <li key={taskId} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{taskById.get(taskId)?.title ?? "Task"}</span>
-                  <Button size="xs" variant="ghost" onClick={() => actions.restore(taskId, plan.date)}>
-                    Restore
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function SessionCard({
-  session,
-  task,
-  onShowTask,
-  onAccept,
-  onComplete,
-  onUndo,
-  onRemove,
-}: {
-  session: StudySession | RecommendedStudySession
-  task: Task
-  onShowTask: () => void
-  onAccept: () => void
-  onComplete: () => void
-  onUndo: () => void
-  onRemove: () => void
-}) {
-  const { getCourse } = useCourses()
-  const [whyOpen, setWhyOpen] = useState(false)
-  const course = getCourse(task.courseId)
-  const state = session.status
-  const reasons = "reasons" in session ? session.reasons : []
-  const time = (hhmm: string) => formatTime(fromDateKey(session.date, hhmm))
-  const whyId = `why-${session.id}`
-
-  return (
-    <article
-      className={cn(
-        "rounded-lg border p-3",
-        state === "suggested" && "border-dashed border-primary/45 bg-primary/[0.03]",
-        state === "scheduled" && "border-indigo-200 bg-indigo-50/60",
-        state === "completed" && "bg-muted/40 text-muted-foreground"
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground tabular-nums">
-            {time(session.startTime)} – {time(session.endTime)} · {formatDuration(sessionMinutes(session))}
-          </p>
-          <h3 className={cn("mt-0.5 font-medium leading-snug", state === "completed" && "line-through decoration-foreground/30")}>
-            <button
-              type="button"
-              onClick={onShowTask}
-              className="rounded-sm text-left outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              {task.title}
-            </button>
-          </h3>
-        </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            state === "suggested" && "bg-primary/10 text-primary",
-            state === "scheduled" && "bg-indigo-100 text-indigo-900",
-            state === "completed" && "bg-background"
-          )}
-        >
-          {state === "suggested" ? "Recommended" : state === "scheduled" ? "On calendar" : "Done"}
-        </span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        {course && <CourseTag code={course.code} color={course.color} />}
-        {reasons.slice(0, 2).map((reason) => (
-          <span key={reason} className="rounded bg-background px-1.5 py-0.5 ring-1 ring-foreground/10">
-            {reason}
-          </span>
-        ))}
-      </div>
-
-      {reasons.length > 0 && (
-        <>
-          <button
-            type="button"
-            aria-expanded={whyOpen}
-            aria-controls={whyId}
-            onClick={() => setWhyOpen((open) => !open)}
-            className="mt-2 inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            Why this?
-            <ChevronDownIcon aria-hidden className={cn("size-3.5 transition-transform", whyOpen && "rotate-180")} />
-          </button>
-          {whyOpen && (
-            <ul id={whyId} className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-              {reasons.map((reason) => (
-                <li key={reason} className="flex items-start gap-1.5">
-                  <CheckIcon aria-hidden className="mt-0.5 size-3 shrink-0 text-primary" />
-                  {reason}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {state === "suggested" && (
-          <Button size="sm" onClick={onAccept}>
-            <CheckIcon data-icon="inline-start" />
-            Accept
-          </Button>
-        )}
-        {state !== "completed" ? (
-          <Button size="sm" variant="outline" onClick={onComplete}>
-            Mark done
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" onClick={onUndo}>
-            <RotateCcwIcon data-icon="inline-start" />
-            Undo
-          </Button>
-        )}
-        {state !== "completed" && (
-          <Button size="sm" variant="ghost" onClick={onRemove} aria-label={`Remove ${task.title} from this plan`}>
-            <XIcon data-icon="inline-start" />
-            Remove
-          </Button>
-        )}
-      </div>
-    </article>
   )
 }
 

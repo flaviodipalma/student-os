@@ -1,21 +1,29 @@
 "use client"
 
 import { createContext, use, useEffect, useState } from "react"
+import { dateFromWallClock, type WallClock } from "@/lib/time-zone"
 
-// The current time, shared by everything that shows "now" (the Dashboard's
-// Now/Up next labels, the Calendar's current-time line).
+// The current time, shared by everything that shows "now" or "today" (the
+// Dashboard, the Calendar's current-time line, the Planner).
 //
-// It starts from the time the server rendered the page, so the first render in
-// the browser matches the server's HTML exactly, then ticks every 30 seconds.
+// It starts from the student's wall-clock time when the server rendered the
+// page (in the student's time zone, so server and browser render the same
+// thing), then follows the browser's clock, ticking every 30 seconds.
 
 const ClockContext = createContext<Date | null>(null)
 
-export function ClockProvider({ serverNow, children }: { serverNow: number; children: React.ReactNode }) {
-  const [now, setNow] = useState(() => new Date(serverNow))
+export function ClockProvider({ wallClock, children }: { wallClock: WallClock; children: React.ReactNode }) {
+  const [now, setNow] = useState(() => dateFromWallClock(wallClock))
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000)
-    return () => clearInterval(id)
+    // Switch to the browser's own clock right after the first render, then keep ticking.
+    const tick = () => setNow(new Date())
+    const first = setTimeout(tick, 0)
+    const id = setInterval(tick, 30_000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+    }
   }, [])
 
   return <ClockContext value={now}>{children}</ClockContext>

@@ -4,10 +4,12 @@ import { AppProviders } from "@/components/app-shell/app-providers"
 import { Brand } from "@/components/app-shell/brand"
 import { DatabaseError } from "@/components/app-shell/database-error"
 import { MobileNav } from "@/components/app-shell/mobile-nav"
+import { MobileTabBar } from "@/components/app-shell/nav-links"
 import { Sidebar } from "@/components/app-shell/sidebar"
 import { loadSignedInApp } from "@/server/app-loader"
 
-// Shell for every signed-in page: sidebar on desktop, top bar + slide-out menu on mobile.
+// Shell for every signed-in page: sidebar on desktop; on smaller screens a top bar
+// (menu with account and log-out) and a tab bar with the same sections.
 // It checks who is signed in, then loads that student's data from the database once;
 // every page reads it from the app store. New students go through onboarding first.
 export default async function AppLayout({ children }: LayoutProps<"/">) {
@@ -20,7 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const account = { firstName: app.data.student.firstName, email: app.user.email ?? "" }
 
   return (
-    <AppProviders data={app.data} today={app.today} serverNow={app.now.getTime()}>
+    <AppProviders data={app.data} wallClock={app.wallClock}>
       <div className="flex min-h-svh">
         <Sidebar account={account} />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -28,9 +30,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <MobileNav account={account} />
             <Brand />
           </header>
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+          {/* Extra space at the bottom on small screens for the tab bar. */}
+          <main className="flex-1 px-4 pt-6 pb-24 sm:px-6 lg:px-10 lg:py-10">
             <div className="mx-auto w-full max-w-5xl">{children}</div>
           </main>
+          <MobileTabBar />
         </div>
       </div>
     </AppProviders>

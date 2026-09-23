@@ -76,7 +76,7 @@ export async function updateRecurringCommitment(
 ): Promise<RecurringCommitment> {
   const where = and(eq(recurringCommitments.id, commitmentId), eq(recurringCommitments.userId, userId))
   const [existing] = await db.select().from(recurringCommitments).where(where)
-  if (!existing) throw new NotFoundError("weekly commitment")
+  if (!existing) throw new NotFoundError("recurring commitment")
   const values = {
     ...changes,
     description: changes.description === undefined ? undefined : changes.description || null,
@@ -92,7 +92,7 @@ export async function updateRecurringCommitment(
   if (startDate && endDate && endDate < startDate) throw new ValidationError("The end date can't be before the start date.")
 
   const [row] = await db.update(recurringCommitments).set(values).where(where).returning()
-  if (!row) throw new NotFoundError("weekly commitment")
+  if (!row) throw new NotFoundError("recurring commitment")
   return toCommitment(row)
 }
 
@@ -101,7 +101,7 @@ export async function deleteRecurringCommitment(db: Database, userId: string, co
     .delete(recurringCommitments)
     .where(and(eq(recurringCommitments.id, commitmentId), eq(recurringCommitments.userId, userId)))
     .returning({ id: recurringCommitments.id })
-  if (deleted.length === 0) throw new NotFoundError("weekly commitment")
+  if (deleted.length === 0) throw new NotFoundError("recurring commitment")
 }
 
 // Replaces all of a student's weekly commitments (used when onboarding saves its list).

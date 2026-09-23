@@ -7,16 +7,27 @@ import { useNow } from "@/lib/clock"
 import { useCourses } from "@/lib/course-store"
 import { eventTypeLabel, toMinutes } from "@/lib/events"
 import { formatDuration, formatTime, fromDateKey, toDateKey } from "@/lib/format"
-import { partOfDay, type PartOfDay, type TimelineItem } from "@/lib/planner"
+import { partOfDay, type PartOfDay, type StudySession, type TimelineItem } from "@/lib/planner"
 import { useTasks } from "@/lib/task-store"
 import { cn } from "@/lib/utils"
 
 const partLabel: Record<PartOfDay, string> = { morning: "Morning", afternoon: "Afternoon", evening: "Evening" }
 
-// One day as a vertical list: fixed events, study sessions (suggested, scheduled
-// or done), free time and breaks. `grouped` splits it into Morning, Afternoon
-// and Evening (by start time).
-export function DayTimeline({ date, items, grouped = false }: { date: string; items: TimelineItem[]; grouped?: boolean }) {
+// One day as a vertical list: fixed events, study sessions (recommended,
+// scheduled or done), free time and breaks. `grouped` splits it into Morning,
+// Afternoon and Evening (by start time). `sessionDetails` adds extra content
+// (e.g. the Planner's reasons and actions) under each study session.
+export function DayTimeline({
+  date,
+  items,
+  grouped = false,
+  sessionDetails,
+}: {
+  date: string
+  items: TimelineItem[]
+  grouped?: boolean
+  sessionDetails?: (session: StudySession) => React.ReactNode
+}) {
   const now = useNow()
   const { tasks } = useTasks()
   const { getCourse } = useCourses()
@@ -40,8 +51,8 @@ export function DayTimeline({ date, items, grouped = false }: { date: string; it
 
     if (item.kind === "break") {
       return (
-        <li key={item.key} className="grid grid-cols-[4.25rem_minmax(0,1fr)] gap-3 text-xs text-muted-foreground">
-          <span />
+        <li key={item.key} className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-[4.25rem_minmax(0,1fr)]">
+          <span className="hidden sm:block" />
           <span className="pl-3">{formatDuration(minutes)} break</span>
         </li>
       )
@@ -94,7 +105,7 @@ export function DayTimeline({ date, items, grouped = false }: { date: string; it
             state === "completed" && "bg-background text-muted-foreground"
           )}
         >
-          {state === "suggested" ? "Suggested" : state === "scheduled" ? "Scheduled" : "Done"}
+          {state === "suggested" ? "Recommended" : state === "scheduled" ? "Scheduled" : "Done"}
         </span>
       )
       blockClass =
@@ -109,9 +120,15 @@ export function DayTimeline({ date, items, grouped = false }: { date: string; it
       <li
         key={item.key}
         aria-current={status === "now" ? "time" : undefined}
-        className={cn("grid grid-cols-[4.25rem_minmax(0,1fr)] gap-3", status === "past" && "opacity-55")}
+        // Phones: the time sits above the block, so long titles get the full width.
+        className={cn(
+          "grid gap-1 sm:grid-cols-[4.25rem_minmax(0,1fr)] sm:gap-3",
+          status === "past" && "opacity-55"
+        )}
       >
-        <p className="pt-2 text-right text-sm font-medium tabular-nums">{time(item.start)}</p>
+        <p className="text-xs font-medium text-muted-foreground tabular-nums sm:pt-2 sm:text-right sm:text-sm sm:text-foreground">
+          {time(item.start)}
+        </p>
         <div className={cn("rounded-lg border px-3 py-2", blockClass, status === "now" && "ring-2 ring-primary/30")}>
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium leading-snug">{title}</p>
@@ -137,6 +154,7 @@ export function DayTimeline({ date, items, grouped = false }: { date: string; it
               </span>
             ))}
           </p>
+          {item.kind === "session" && sessionDetails?.(item.session)}
         </div>
       </li>
     )

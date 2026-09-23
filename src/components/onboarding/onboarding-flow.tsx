@@ -24,7 +24,10 @@ import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 const steps = [
   { title: "About you", description: "So Student OS knows what to call you." },
   { title: "Study preferences", description: "When and how you like to study. The defaults work for most students." },
-  { title: "Weekly schedule", description: "Things you do every week. The Planner keeps these times free." },
+  {
+    title: "Weekly schedule",
+    description: "Recurring commitments like practice, work or clubs. The Planner keeps these times free.",
+  },
   { title: "Courses", description: "Add your classes now, or skip and do it later." },
 ]
 
@@ -118,6 +121,12 @@ export function OnboardingFlow() {
           {step === 0 ? `Welcome${profile.firstName.trim() ? `, ${profile.firstName.trim()}` : ""}!` : current.title}
         </h1>
         <p className="mt-1 text-muted-foreground">{current.description}</p>
+        {step === 0 && (
+          <p className="mt-4 rounded-lg bg-primary/[0.06] px-4 py-3 text-sm">
+            Student OS helps you figure out what to work on today. Four quick steps, and you can skip anything you
+            don&apos;t need yet.
+          </p>
+        )}
 
         <div className="mt-6">
           {step === 0 && <ProfileFields value={profile} onChange={setProfile} />}

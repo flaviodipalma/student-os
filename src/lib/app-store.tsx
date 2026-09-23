@@ -29,7 +29,9 @@ import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
 import { pickCourseColor } from "@/lib/course-colors"
+import { useNow } from "@/lib/clock"
 import { useFeedback } from "@/lib/feedback"
+import { toDateKey } from "@/lib/format"
 import { scheduleBetween } from "@/lib/recurring"
 import type {
   CalendarEvent,
@@ -114,22 +116,24 @@ function withClears<T extends object>(changes: T, clearable: string[]): T {
   return out as T
 }
 
+// Confirmation when a study session is stored with this status.
+const sessionMessage: Record<StudySessionRecord["status"], string | undefined> = {
+  scheduled: "Study session added to your calendar.",
+  completed: "Study session completed. Nice work!",
+  skipped: undefined, // shown in "Removed from this plan"; no toast needed
+}
+
 const NETWORK_ERROR: ActionResult<never> = {
   ok: false,
   error: "We couldn't save that. Check your connection and try again.",
   code: "database",
 }
 
-export function AppStoreProvider({
-  initial,
-  today,
-  children,
-}: {
-  initial: AppData
-  today: string
-  children: React.ReactNode
-}) {
-  const { showError } = useFeedback()
+export function AppStoreProvider({ initial, children }: { initial: AppData; children: React.ReactNode }) {
+  // The student's local date, from the shared clock: it moves on at midnight
+  // even if the page stays open.
+  const today = toDateKey(useNow())
+  const { showError, showSuccess } = useFeedback()
   const router = useRouter()
   const [courses, setCourses] = useState(initial.courses)
   const [tasks, setTasks] = useState(initial.tasks)
@@ -139,10 +143,19 @@ export function AppStoreProvider({
   const [preferences, setPreferences] = useState(initial.preferences)
   const [recurringCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
 
-  // Awaits a server action; runs onOk with the saved record, or undoes the change.
-  async function save<T>(request: Promise<ActionResult<T>>, onOk: (data: T) => void, undo: () => void) {
+  // Awaits a server action; runs onOk with the saved record (and confirms with
+  // `success`, if given), or undoes the change and explains why.
+  async function save<T>(
+    request: Promise<ActionResult<T>>,
+    onOk: (data: T) => void,
+    undo: () => void,
+    success?: string
+  ) {
     const result = await request.catch(() => NETWORK_ERROR)
-    if (result.ok) return onOk(result.data)
+    if (result.ok) {
+      if (success) showSuccess(success)
+      return onOk(result.data)
+    }
     undo()
     if (result.code === "unauthorized") router.push("/login")
     else showError(result.error)
@@ -185,7 +198,8 @@ export function AppStoreProvider({
           saved = course
           setCourses((prev) => replaceById(prev, course))
         },
-        () => setCourses((prev) => withoutId(prev, id))
+        () => setCourses((prev) => withoutId(prev, id)),
+        "Course created."
       )
       return saved
     },
@@ -196,7 +210,8 @@ export function AppStoreProvider({
       save(
         updateCourseAction(id, changes),
         (course) => setCourses((prev) => replaceById(prev, course)),
-        () => setCourses((prev) => replaceById(prev, before))
+        () => setCourses((prev) => replaceById(prev, before)),
+        "Course updated."
       )
     },
     // Deleting a course deletes its tasks and their study sessions too.
@@ -216,7 +231,8 @@ export function AppStoreProvider({
           setTasks(snapshot.tasks)
           setStudySessions(snapshot.studySessions)
           setEvents(snapshot.events)
-        }
+        },
+        "Course deleted."
       )
       return ok
     },
@@ -228,17 +244,21 @@ export function AppStoreProvider({
       save(
         createTaskAction({ ...input, id }),
         (task) => setTasks((prev) => replaceById(prev, task)),
-        () => setTasks((prev) => withoutId(prev, id))
+        () => setTasks((prev) => withoutId(prev, id)),
+        "Task created."
       )
     },
     updateTask: (id, changes) => {
       const before = tasks.find((task) => task.id === id)
       if (!before) return
       setTasks((prev) => replaceById(prev, { ...before, ...changes }))
+      // Only an edit gets a message; ticking a task off shows on the checkbox itself.
+      const statusOnly = Object.keys(changes).length === 1 && "status" in changes
       save(
         updateTaskAction(id, withClears(changes, ["dueTime", "plannedDate"])),
         (task) => setTasks((prev) => replaceById(prev, task)),
-        () => setTasks((prev) => replaceById(prev, before))
+        () => setTasks((prev) => replaceById(prev, before)),
+        statusOnly ? (changes.status === "completed" ? "Task completed." : undefined) : "Task updated."
       )
     },
     // Deleting a task deletes its study sessions too.
@@ -246,10 +266,15 @@ export function AppStoreProvider({
       const before = { tasks, studySessions }
       setTasks((prev) => withoutId(prev, id))
       setStudySessions((prev) => prev.filter((session) => session.taskId !== id))
-      save(deleteTaskAction(id), () => {}, () => {
-        setTasks(before.tasks)
-        setStudySessions(before.studySessions)
-      })
+      save(
+        deleteTaskAction(id),
+        () => {},
+        () => {
+          setTasks(before.tasks)
+          setStudySessions(before.studySessions)
+        },
+        "Task deleted."
+      )
     },
     setStatus: (id, status) => store.updateTask(id, { status }),
 
@@ -260,7 +285,8 @@ export function AppStoreProvider({
       save(
         createEventAction({ ...input, id }),
         (event) => setEvents((prev) => replaceById(prev, event)),
-        () => setEvents((prev) => withoutId(prev, id))
+        () => setEvents((prev) => withoutId(prev, id)),
+        "Event saved."
       )
     },
     updateEvent: (id, changes) => {
@@ -270,14 +296,15 @@ export function AppStoreProvider({
       save(
         updateEventAction(id, withClears(changes, ["description", "courseId"])),
         (event) => setEvents((prev) => replaceById(prev, event)),
-        () => setEvents((prev) => replaceById(prev, before))
+        () => setEvents((prev) => replaceById(prev, before)),
+        "Event saved."
       )
     },
     deleteEvent: (id) => {
       const before = events.find((event) => event.id === id)
       if (!before) return
       setEvents((prev) => withoutId(prev, id))
-      save(deleteEventAction(id), () => {}, () => setEvents((prev) => [...prev, before]))
+      save(deleteEventAction(id), () => {}, () => setEvents((prev) => [...prev, before]), "Event deleted.")
     },
 
     // ---- Study sessions
@@ -287,7 +314,8 @@ export function AppStoreProvider({
       save(
         createStudySessionAction({ ...input, id }),
         (session) => setStudySessions((prev) => replaceById(prev, session)),
-        () => setStudySessions((prev) => withoutId(prev, id))
+        () => setStudySessions((prev) => withoutId(prev, id)),
+        sessionMessage[input.status]
       )
     },
     updateStudySession: (id, changes) => {
@@ -297,7 +325,9 @@ export function AppStoreProvider({
       save(
         updateStudySessionAction(id, changes),
         (session) => setStudySessions((prev) => replaceById(prev, session)),
-        () => setStudySessions((prev) => replaceById(prev, before))
+        () => setStudySessions((prev) => replaceById(prev, before)),
+        // Undoing "done" (back to scheduled) needs no message.
+        changes.status === "scheduled" ? undefined : changes.status ? sessionMessage[changes.status] : "Study session moved."
       )
     },
     deleteStudySession: (id) => {
@@ -315,12 +345,18 @@ export function AppStoreProvider({
     },
     updatePreferences: async (input) => {
       const result = await call(updatePreferencesAction(input))
-      if (result.ok) setPreferences(result.data)
+      if (result.ok) {
+        setPreferences(result.data)
+        showSuccess("Preferences updated. Your plan uses them now.")
+      }
       return result
     },
     addCommitment: async (input) => {
       const result = await call(createCommitmentAction({ ...input, id: crypto.randomUUID() }))
-      if (result.ok) setRecurringCommitments((prev) => [...prev, result.data])
+      if (result.ok) {
+        setRecurringCommitments((prev) => [...prev, result.data])
+        showSuccess("Recurring commitment added.")
+      }
       return result
     },
     updateCommitment: async (id, input) => {
@@ -332,14 +368,22 @@ export function AppStoreProvider({
         endDate: input.endDate ?? null,
       }
       const result = await call(updateCommitmentAction(id, changes))
-      if (result.ok) setRecurringCommitments((prev) => replaceById(prev, result.data))
+      if (result.ok) {
+        setRecurringCommitments((prev) => replaceById(prev, result.data))
+        showSuccess("Recurring commitment updated.")
+      }
       return result
     },
     deleteCommitment: (id) => {
       const before = recurringCommitments.find((commitment) => commitment.id === id)
       if (!before) return
       setRecurringCommitments((prev) => withoutId(prev, id))
-      save(deleteCommitmentAction(id), () => {}, () => setRecurringCommitments((prev) => [...prev, before]))
+      save(
+        deleteCommitmentAction(id),
+        () => {},
+        () => setRecurringCommitments((prev) => [...prev, before]),
+        "Recurring commitment deleted."
+      )
     },
     saveOnboarding: async (details) => {
       const result = await call(saveOnboardingAction(details))
@@ -360,9 +404,11 @@ export function AppStoreProvider({
     importSyllabus: async (request) => {
       const result = await importSyllabusAction(request).catch(() => NETWORK_ERROR)
       if (result.ok) {
-        const { course, createdCourse, tasks: created } = result.data
-        if (createdCourse) setCourses((prev) => [...prev, course])
-        setTasks((prev) => [...prev, ...created])
+        // Merged by id: a retried import that was already saved never shows twice.
+        const { course, tasks: created } = result.data
+        setCourses((prev) => (prev.some((c) => c.id === course.id) ? replaceById(prev, course) : [...prev, course]))
+        const createdIds = new Set(created.map((task) => task.id))
+        setTasks((prev) => [...prev.filter((task) => !createdIds.has(task.id)), ...created])
       } else if (result.code === "unauthorized") {
         router.push("/login")
       }

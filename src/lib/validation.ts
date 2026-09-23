@@ -51,11 +51,16 @@ export const taskFields = z.object({
   dueDate: dateKey,
   dueTime: timeOfDay.optional(),
   priority,
-  estimateMinutes: z.int("Duration must be whole minutes.").min(1).max(10000),
+  estimateMinutes: z
+    .int("Estimated duration must be a whole number of minutes.")
+    .min(1, "Estimated duration must be at least 1 minute.")
+    .max(10000, "That's more than 10,000 minutes. Split it into smaller tasks."),
   status: taskStatus,
   plannedDate: dateKey.optional(),
 })
 export const createTaskSchema = taskFields.extend({ id })
+// One task as entered in the form (no id yet).
+export const taskInputSchema = taskFields
 // null clears an optional field.
 export const updateTaskSchema = taskFields
   .extend({ dueTime: timeOfDay.nullable().optional(), plannedDate: dateKey.nullable().optional() })
@@ -63,7 +68,7 @@ export const updateTaskSchema = taskFields
 
 // ---- Events
 
-const eventFields = z.object({
+export const eventFields = z.object({
   title: z.string().trim().min(1, "Give the event a title.").max(200),
   date: dateKey,
   startTime: timeOfDay,
@@ -77,6 +82,8 @@ const endAfterStart = (value: { startTime?: string; endTime?: string }) =>
 const endAfterStartIssue = { message: "End time must be after the start time.", path: ["endTime"] }
 
 export const createEventSchema = eventFields.extend({ id }).refine(endAfterStart, endAfterStartIssue)
+// One event as entered in the form (no id yet).
+export const eventInputSchema = eventFields.refine(endAfterStart, endAfterStartIssue)
 export const updateEventSchema = eventFields
   .extend({ description: z.string().trim().max(2000).nullable().optional(), courseId: id.nullable().optional() })
   .partial()

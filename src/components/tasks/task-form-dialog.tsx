@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Field, SimpleSelect, type Option } from "@/components/form-fields"
+import { Field, SimpleSelect, useFieldErrors, type Option } from "@/components/form-fields"
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import { addDays } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { priorities, priorityLabel, statusLabel, typeLabel } from "@/lib/tasks"
 import type { Priority, Task, TaskInput, TaskStatus, TaskType } from "@/lib/types"
+import { taskInputSchema } from "@/lib/validation"
 
 const typeOptions = Object.entries(typeLabel).map(([value, label]) => ({ value, label })) as Option<TaskType>[]
 const priorityOptions = priorities.map((value) => ({ value, label: priorityLabel[value] }))
@@ -73,26 +74,39 @@ function TaskForm({
   const [estimate, setEstimate] = useState(String(task?.estimateMinutes ?? 60))
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "not_started")
   const [error, setError] = useState<string | null>(null)
+  const fields = useFieldErrors({
+    title: "task-title",
+    courseId: "task-course",
+    dueDate: "task-due-date",
+    dueTime: "task-due-time",
+    estimateMinutes: "task-estimate",
+  })
+  // Update a value and clear its message.
+  const edit =
+    <T,>(setter: (value: T) => void, key?: Parameters<typeof fields.clear>[0]) =>
+    (value: T) => {
+      setter(value)
+      if (key) fields.clear(key)
+    }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    const minutes = Number(estimate)
-    if (!title.trim()) return setError("Give the task a title.")
-    if (!dueDate) return setError("Pick a due date.")
-    if (!Number.isInteger(minutes) || minutes <= 0) return setError("Estimated duration must be a whole number of minutes.")
-
-    const input: TaskInput = {
-      title: title.trim(),
-      description: description.trim(),
+    // The same rules the server checks (src/lib/validation.ts).
+    const parsed = taskInputSchema.safeParse({
+      title,
+      description,
       courseId,
       type,
       dueDate,
       dueTime: dueTime || undefined,
       priority,
-      estimateMinutes: minutes,
+      estimateMinutes: estimate.trim() === "" ? NaN : Number(estimate),
       status,
       plannedDate: task?.plannedDate,
-    }
+    })
+    if (!parsed.success) return setError(fields.show(parsed.error))
+    fields.reset()
+    const input: TaskInput = parsed.data
     if (task) updateTask(task.id, input)
     else addTask(input)
     onDone()
@@ -119,11 +133,11 @@ function TaskForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid gap-4">
-      <Field label="Title" htmlFor="task-title">
+      <Field label="Title" htmlFor="task-title" error={fields.errors.title}>
         <Input
           id="task-title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => edit(setTitle, "title")(e.target.value)}
           placeholder="e.g. Assignment #3: Binary Trees"
           autoFocus
         />
@@ -138,22 +152,22 @@ function TaskForm({
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Course" htmlFor="task-course">
+        <Field label="Course" htmlFor="task-course" error={fields.errors.courseId}>
           <SimpleSelect id="task-course" value={courseId} onChange={setCourseId} options={courseOptions} />
         </Field>
         <Field label="Type" htmlFor="task-type">
           <SimpleSelect id="task-type" value={type} onChange={setType} options={typeOptions} />
         </Field>
-        <Field label="Due date" htmlFor="task-due-date">
-          <Input id="task-due-date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        <Field label="Due date" htmlFor="task-due-date" error={fields.errors.dueDate}>
+          <Input id="task-due-date" type="date" value={dueDate} onChange={(e) => edit(setDueDate, "dueDate")(e.target.value)} />
         </Field>
-        <Field label="Due time" htmlFor="task-due-time" optional>
-          <Input id="task-due-time" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+        <Field label="Due time" htmlFor="task-due-time" optional error={fields.errors.dueTime}>
+          <Input id="task-due-time" type="time" value={dueTime} onChange={(e) => edit(setDueTime, "dueTime")(e.target.value)} />
         </Field>
         <Field label="Priority" htmlFor="task-priority">
           <SimpleSelect id="task-priority" value={priority} onChange={setPriority} options={priorityOptions} />
         </Field>
-        <Field label="Estimated duration (minutes)" htmlFor="task-estimate">
+        <Field label="Estimated duration (minutes)" htmlFor="task-estimate" error={fields.errors.estimateMinutes}>
           <Input
             id="task-estimate"
             type="number"
@@ -161,7 +175,7 @@ function TaskForm({
             min={5}
             step={5}
             value={estimate}
-            onChange={(e) => setEstimate(e.target.value)}
+            onChange={(e) => edit(setEstimate, "estimateMinutes")(e.target.value)}
           />
         </Field>
         <Field label="Status" htmlFor="task-status">

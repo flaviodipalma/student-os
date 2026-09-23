@@ -4,6 +4,16 @@ import { useState } from "react"
 import { PencilIcon, PlusIcon, RepeatIcon, Trash2Icon } from "lucide-react"
 import { eventStyle } from "@/components/calendar/event-style"
 import { Field, SimpleSelect } from "@/components/form-fields"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
@@ -35,6 +45,7 @@ export function CommitmentsEditor({
   onUpdate,
   onDelete,
   withDates = false,
+  confirmDelete = false,
 }: {
   commitments: EditableCommitment[]
   onAdd: (input: RecurringCommitmentInput) => SaveResult
@@ -42,15 +53,18 @@ export function CommitmentsEditor({
   onDelete: (id: string) => void
   // Show the optional "Starts on" / "Ends on" fields.
   withDates?: boolean
+  // Ask before deleting (saved commitments: it removes every week at once).
+  confirmDelete?: boolean
 }) {
   // null = no form open; "new" = adding; otherwise the id being edited.
   const [editing, setEditing] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<EditableCommitment | null>(null)
 
   return (
     <div className="grid gap-3">
       {commitments.length === 0 && editing !== "new" && (
         <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          No weekly commitments yet. Add things like practice, work shifts or club meetings, and the Planner will keep
+          No recurring commitments yet. Add things like practice, work shifts or club meetings, and the Planner will keep
           those times free.
         </p>
       )}
@@ -101,7 +115,7 @@ export function CommitmentsEditor({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Delete ${commitment.title}`}
-                onClick={() => onDelete(commitment.id)}
+                onClick={() => (confirmDelete ? setDeleting(commitment) : onDelete(commitment.id))}
               >
                 <Trash2Icon />
               </Button>
@@ -125,9 +139,33 @@ export function CommitmentsEditor({
       ) : (
         <Button variant="outline" className="w-fit" onClick={() => setEditing("new")}>
           <PlusIcon data-icon="inline-start" />
-          Add weekly commitment
+          Add recurring commitment
         </Button>
       )}
+
+      <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this recurring commitment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every week of &ldquo;{deleting?.title}&rdquo; will be removed from your calendar, and the Planner will
+              stop keeping this time free. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleting) onDelete(deleting.id)
+                setDeleting(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

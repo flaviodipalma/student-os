@@ -87,11 +87,11 @@ export function TodaySchedule({ className }: { className?: string }) {
                 <li
                   key={item.key}
                   className={cn(
-                    "grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-2 text-sm",
+                    "grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-2 text-sm",
                     suggested ? "border border-dashed border-primary/45 bg-primary/[0.04]" : cn("border-l-[3px]", style)
                   )}
                 >
-                  <span className="text-xs font-medium tabular-nums opacity-80">
+                  <span className="text-xs font-medium whitespace-nowrap tabular-nums opacity-80">
                     {time(item.start)}–{time(item.end)}
                   </span>
                   <span className="flex min-w-0 items-center gap-1.5 font-medium">

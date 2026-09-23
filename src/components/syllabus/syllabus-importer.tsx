@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, CheckIcon } from "lucide-react"
 import { useCourses } from "@/lib/course-store"
 import { requestExtraction } from "@/lib/syllabus/client"
 import { SyllabusImportError } from "@/lib/syllabus/errors"
@@ -10,6 +10,7 @@ import type { ImportResult } from "@/lib/syllabus/import"
 import type { ImportStage } from "@/lib/syllabus/importer"
 import { buildReviewDraft, type ReviewDraft } from "@/lib/syllabus/review"
 import { useTasks } from "@/lib/task-store"
+import { cn } from "@/lib/utils"
 import { DonePanel } from "./done-panel"
 import { FoundPanel } from "./found-panel"
 import { ProgressPanel } from "./progress-panel"
@@ -67,6 +68,8 @@ export function SyllabusImporter({ onFinished }: { onFinished?: () => void } = {
         </Link>
       )}
 
+      <ImportSteps step={state.step} />
+
       {state.step === "upload" && <UploadPanel error={state.error} onFile={handleFile} />}
       {state.step === "processing" && (
         <ProgressPanel fileName={state.fileName} stage={state.stage} onCancel={() => abortRef.current?.abort()} />
@@ -91,5 +94,45 @@ export function SyllabusImporter({ onFinished }: { onFinished?: () => void } = {
         <DonePanel result={state.result} onImportAnother={startOver} onFinished={onFinished} />
       )}
     </div>
+  )
+}
+
+// Where the student is: upload -> review -> done. Nothing is saved before "Done".
+const importSteps = [
+  { label: "Upload", steps: ["upload", "processing"] },
+  { label: "Review and confirm", steps: ["found", "review"] },
+  { label: "Done", steps: ["done"] },
+] as const
+
+function ImportSteps({ step }: { step: State["step"] }) {
+  const current = importSteps.findIndex((s) => (s.steps as readonly string[]).includes(step))
+  return (
+    <ol aria-label="Import steps" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      {importSteps.map((s, index) => (
+        <li
+          key={s.label}
+          aria-current={index === current ? "step" : undefined}
+          className={cn(
+            "flex items-center gap-2",
+            index === current ? "font-medium text-foreground" : "text-muted-foreground"
+          )}
+        >
+          <span
+            className={cn(
+              "flex size-5 items-center justify-center rounded-full text-[11px] font-semibold",
+              index < current
+                ? "bg-primary text-primary-foreground"
+                : index === current
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground"
+            )}
+          >
+            {index < current ? <CheckIcon aria-hidden className="size-3" /> : index + 1}
+          </span>
+          {s.label}
+          {index < importSteps.length - 1 && <span aria-hidden className="mx-1 h-px w-6 bg-foreground/15" />}
+        </li>
+      ))}
+    </ol>
   )
 }
