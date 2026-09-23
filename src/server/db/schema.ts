@@ -49,6 +49,15 @@ export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
 // How Student OS reads the LMS: OAuth + API, or the student's private calendar feed link.
 export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed"])
+export const notificationType = pgEnum("notification_type", [
+  "task_due_soon",
+  "task_overdue",
+  "important_deadline",
+  "study_session_upcoming",
+  "study_session_missed",
+  "event_upcoming",
+  "daily_plan_ready",
+])
 export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
@@ -111,10 +120,20 @@ export const studentPreferences = pgTable(
     maxStudyMinutesPerDay: integer("max_study_minutes_per_day").notNull(),
     preferredBlockMinutes: integer("preferred_block_minutes").notNull(),
     breakMinutes: integer("break_minutes").notNull(),
+    // Notification preferences (see src/lib/notifications). Defaults: on, 30 min ahead.
+    notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
+    remindTasks: boolean("remind_tasks").notNull().default(true),
+    remindStudySessions: boolean("remind_study_sessions").notNull().default(true),
+    remindEvents: boolean("remind_events").notNull().default(true),
+    remindOverdue: boolean("remind_overdue").notNull().default(true),
+    remindDailyPlan: boolean("remind_daily_plan").notNull().default(true),
+    reminderMinutes: integer("reminder_minutes").notNull().default(30),
+    browserNotifications: boolean("browser_notifications").notNull().default(false),
     ...timestamps,
   },
   (t) => [
     check("student_preferences_window", sql`${t.studyEnd} > ${t.studyStart}`),
+    check("student_preferences_reminder_minutes", sql`${t.reminderMinutes} in (5, 15, 30, 60, 1440)`),
     check("student_preferences_max_study", sql`${t.maxStudyMinutesPerDay} between 15 and 720`),
     check("student_preferences_block", sql`${t.preferredBlockMinutes} in (30, 45, 60, 90)`),
     check("student_preferences_break", sql`${t.breakMinutes} between 0 and 60`),
@@ -365,5 +384,47 @@ export const externalCalendarEvents = pgTable(
     index("external_calendar_events_user_starts_idx").on(t.userId, t.startsAt),
     check("external_calendar_events_end_after_start", sql`${t.endsAt} > ${t.startsAt}`),
     check("external_calendar_events_title_length", sql`char_length(btrim(${t.title})) between 1 and 200`),
+  ]
+).enableRLS()
+
+// Reminders delivered to a student (see src/lib/notifications). A row is created
+// only when a reminder is due, once: (user, dedupe_key) is unique, so page loads,
+// syncs and re-plans can't create it twice, and a dismissed one never comes back.
+// Deleting the related task or study session deletes its reminders.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    type: notificationType("type").notNull(),
+    // Stable identity of the reminder, e.g. "task_due_soon:<task>:<due instant>:<minutes>".
+    dedupeKey: text("dedupe_key").notNull(),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    // In-app path (e.g. /tasks?task=<id>); never an external URL.
+    link: text("link").notNull(),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    relatedTaskId: uuid("related_task_id"),
+    relatedStudySessionId: uuid("related_study_session_id").references(() => studySessions.id, { onDelete: "cascade" }),
+    // A calendar item reference: "event:<id>", "commitment:<id>" or "external:<id>".
+    relatedEventId: text("related_event_id"),
+    ...timestamps,
+  },
+  (t) => [
+    unique("notifications_user_dedupe_key").on(t.userId, t.dedupeKey),
+    index("notifications_user_scheduled_idx").on(t.userId, t.scheduledFor),
+    // The related task must be the same student's.
+    foreignKey({
+      name: "notifications_task_owner_fk",
+      columns: [t.relatedTaskId, t.userId],
+      foreignColumns: [tasks.id, tasks.userId],
+    }).onDelete("cascade"),
+    check("notifications_title_length", sql`char_length(${t.title}) between 1 and 200`),
+    check("notifications_message_length", sql`char_length(${t.message}) between 1 and 500`),
+    check("notifications_link_internal", sql`${t.link} like '/%' and ${t.link} not like '//%'`),
   ]
 ).enableRLS()

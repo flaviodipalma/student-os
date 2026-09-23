@@ -8,11 +8,15 @@ const section = getNavItem("/tasks")
 
 export const metadata: Metadata = { title: section.title }
 
-export default function TasksPage() {
+// ?task=<id> opens that task (links from reminders). Only the student's own tasks
+// are in the store, so another student's id simply opens nothing.
+export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
+  const task = (await searchParams).task
+  const focusTaskId = typeof task === "string" ? task : undefined
   return (
     <>
       <PageHeader title={section.title} description={section.description} action={<NewTaskButton />} />
-      <TasksView />
+      <TasksView key={focusTaskId} focusTaskId={focusTaskId} />
     </>
   )
 }

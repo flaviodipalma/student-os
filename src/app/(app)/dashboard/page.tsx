@@ -3,6 +3,7 @@ import { connection } from "next/server"
 import { DailyProgress } from "@/components/dashboard/daily-progress"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { GettingStarted } from "@/components/dashboard/getting-started"
+import { NeedsAttention } from "@/components/dashboard/needs-attention"
 import { PriorityTasks } from "@/components/dashboard/priority-tasks"
 import { TodaySchedule } from "@/components/dashboard/today-schedule"
 import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines"
@@ -27,6 +28,8 @@ export default async function DashboardPage() {
       </div>
 
       <GettingStarted />
+
+      <NeedsAttention />
 
       {/*
         "What do I need to do today?" first:

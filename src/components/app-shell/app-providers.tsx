@@ -3,6 +3,7 @@
 import { AppStoreProvider } from "@/lib/app-store"
 import { ClockProvider } from "@/lib/clock"
 import { FeedbackProvider } from "@/lib/feedback"
+import { NotificationProvider } from "@/lib/notification-store"
 import { PlannerProvider } from "@/lib/planner-store"
 import type { WallClock } from "@/lib/time-zone"
 import type { AppData } from "@/server/services/app-data"
@@ -24,7 +25,11 @@ export function AppProviders({
     <ClockProvider wallClock={wallClock}>
       <FeedbackProvider>
         <AppStoreProvider initial={data} timeZone={timeZone}>
-          <PlannerProvider>{children}</PlannerProvider>
+          <PlannerProvider>
+            <NotificationProvider initial={data.notifications} initialPreferences={data.notificationPreferences}>
+              {children}
+            </NotificationProvider>
+          </PlannerProvider>
         </AppStoreProvider>
       </FeedbackProvider>
     </ClockProvider>

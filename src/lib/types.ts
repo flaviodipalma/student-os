@@ -192,3 +192,53 @@ export type RecurringCommitment = {
 }
 
 export type RecurringCommitmentInput = Omit<RecurringCommitment, "id">
+
+// ---- Notifications & reminders (see src/lib/notifications/README.md) ----------------
+
+// Stored in the database as these values (TASK_DUE_SOON = "task_due_soon", ...).
+// New kinds are added here and to the notification_type enum.
+export const notificationTypes = [
+  "task_due_soon",
+  "task_overdue",
+  "important_deadline",
+  "study_session_upcoming",
+  "study_session_missed",
+  "event_upcoming",
+  "daily_plan_ready",
+] as const
+export type NotificationType = (typeof notificationTypes)[number]
+
+// How long before a due time / start time reminders come (minutes).
+export const reminderMinuteOptions = [5, 15, 30, 60, 1440] as const
+
+// Part of the student's preferences (same table and service as study preferences).
+export type NotificationPreferences = {
+  // Master switch: off = no reminders of any kind.
+  enabled: boolean
+  taskReminders: boolean
+  studySessionReminders: boolean
+  eventReminders: boolean
+  overdueReminders: boolean
+  dailyPlanReminder: boolean
+  // One of reminderMinuteOptions.
+  reminderMinutes: number
+  // Also show new reminders as desktop notifications (needs the browser's permission).
+  browserNotifications: boolean
+}
+
+// A reminder as the app shows it. Times are ISO 8601 instants.
+export type AppNotification = {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  // In-app path to open (a task, the Planner day, the Calendar day).
+  link: string
+  scheduledFor: string
+  createdAt: string
+  readAt: string | null
+  relatedTaskId: string | null
+  relatedStudySessionId: string | null
+  // A calendar item: "event:<id>", "commitment:<id>" or "external:<id>".
+  relatedEventId: string | null
+}

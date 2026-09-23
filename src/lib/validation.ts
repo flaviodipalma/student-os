@@ -123,6 +123,19 @@ export const profileSchema = z.object({
   academicYear: z.enum(["freshman", "sophomore", "junior", "senior", "graduate", "other"]).nullable().default(null),
 })
 
+export const notificationPreferencesSchema = z.object({
+  enabled: z.boolean(),
+  taskReminders: z.boolean(),
+  studySessionReminders: z.boolean(),
+  eventReminders: z.boolean(),
+  overdueReminders: z.boolean(),
+  dailyPlanReminder: z.boolean(),
+  reminderMinutes: z.union([z.literal(5), z.literal(15), z.literal(30), z.literal(60), z.literal(1440)], {
+    error: "Pick a reminder time from the list.",
+  }),
+  browserNotifications: z.boolean(),
+})
+
 export const preferencesSchema = z
   .object({
     studyStart: timeOfDay,

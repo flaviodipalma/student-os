@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ActionResult } from "@/lib/action-result"
 import { useAppStore } from "@/lib/app-store"
-import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import type { ProfileInput, StudentPreferences } from "@/lib/types"
-import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
+import { useNotifications } from "@/lib/notification-store"
+import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
+import type { NotificationPreferences, ProfileInput, StudentPreferences } from "@/lib/types"
+import { firstIssue, notificationPreferencesSchema, preferencesSchema, profileSchema } from "@/lib/validation"
+import { NotificationSettingsFields } from "./notification-settings-fields"
 
 // Profile, study preferences and weekly commitments. Same fields, validation and
 // server actions as onboarding; this page just saves each section on its own.
@@ -24,6 +26,8 @@ export function SettingsView() {
     academicYear: store.student.academicYear,
   })
   const [preferences, setPreferences] = useState<StudentPreferences>(store.preferences)
+  const notificationStore = useNotifications()
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(notificationStore.preferences)
 
   const toMessage = (result: ActionResult<unknown>) => (result.ok ? null : result.error)
 
@@ -58,6 +62,24 @@ export function SettingsView() {
         <StudyPreferencesFields value={preferences} onChange={setPreferences} />
       </Section>
 
+      <Section
+        id="notifications"
+        title="Notifications"
+        description="Reminders about deadlines, study sessions and events, in the bell and on your Dashboard."
+        onSave={async () => {
+          const parsed = notificationPreferencesSchema.safeParse(notificationPrefs)
+          if (!parsed.success) return firstIssue(parsed.error)
+          return toMessage(await notificationStore.updatePreferences(parsed.data))
+        }}
+        extraAction={
+          <Button type="button" variant="ghost" onClick={() => setNotificationPrefs(DEFAULT_NOTIFICATION_PREFERENCES)}>
+            Reset to defaults
+          </Button>
+        }
+      >
+        <NotificationSettingsFields value={notificationPrefs} onChange={setNotificationPrefs} />
+      </Section>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold">Recurring commitments</CardTitle>
@@ -82,12 +104,14 @@ export function SettingsView() {
 
 // A settings card with its own Save button and a saved/error message.
 function Section({
+  id,
   title,
   description,
   onSave,
   extraAction,
   children,
 }: {
+  id?: string
   title: string
   description: string
   // Returns an error message, or null when saved.
@@ -109,7 +133,7 @@ function Section({
   }
 
   return (
-    <Card>
+    <Card id={id}>
       <form onSubmit={handleSubmit} onChange={() => status.saved && setStatus((s) => ({ ...s, saved: false }))} noValidate>
         <CardHeader>
           <CardTitle className="text-lg font-semibold">{title}</CardTitle>

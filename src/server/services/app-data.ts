@@ -1,7 +1,9 @@
 import type {
+  AppNotification,
   CalendarEvent,
   Course,
   ExternalEventRecord,
+  NotificationPreferences,
   RecurringCommitment,
   StudentPreferences,
   StudySessionRecord,
@@ -12,7 +14,8 @@ import type { Database } from "../db/types"
 import { listCourses } from "./courses"
 import { listEvents } from "./events"
 import { listExternalEvents } from "./external-events"
-import { getPreferences } from "./preferences"
+import { listNotifications } from "./notifications"
+import { getNotificationPreferences, getPreferences } from "./preferences"
 import { getProfile } from "./profiles"
 import { listRecurringCommitments } from "./recurring-commitments"
 import { listStudySessions } from "./study-sessions"
@@ -28,12 +31,26 @@ export type AppData = {
   recurringCommitments: RecurringCommitment[]
   // Read-only copies of the student's Canvas / Blackboard calendar events (hidden ones included).
   externalEvents: ExternalEventRecord[]
+  // Delivered reminders (not dismissed), newest first, and the student's reminder settings.
+  notifications: AppNotification[]
+  notificationPreferences: NotificationPreferences
 }
 
 // Everything the app shows for one user, loaded once per page load. The
 // Dashboard, Calendar, Tasks, Courses and Planner all read from this.
 export async function loadAppData(db: Database, userId: string): Promise<AppData> {
-  const [student, courses, tasks, events, studySessions, preferences, recurringCommitments, externalEvents] = await Promise.all([
+  const [
+    student,
+    courses,
+    tasks,
+    events,
+    studySessions,
+    preferences,
+    recurringCommitments,
+    externalEvents,
+    notifications,
+    notificationPreferences,
+  ] = await Promise.all([
     getProfile(db, userId),
     listCourses(db, userId),
     listTasks(db, userId),
@@ -42,6 +59,19 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     getPreferences(db, userId),
     listRecurringCommitments(db, userId),
     listExternalEvents(db, userId),
+    listNotifications(db, userId),
+    getNotificationPreferences(db, userId),
   ])
-  return { student, courses, tasks, events, studySessions, preferences, recurringCommitments, externalEvents }
+  return {
+    student,
+    courses,
+    tasks,
+    events,
+    studySessions,
+    preferences,
+    recurringCommitments,
+    externalEvents,
+    notifications,
+    notificationPreferences,
+  }
 }

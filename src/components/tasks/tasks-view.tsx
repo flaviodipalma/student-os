@@ -15,6 +15,7 @@ import { byCourse, byDue, byPriority, isDone } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { NewTaskButton } from "./new-task-button"
+import { TaskFormDialog } from "./task-form-dialog"
 import { TaskList } from "./task-list"
 
 type Filter = "all" | "today" | "upcoming" | "completed"
@@ -38,8 +39,11 @@ const sorts = [
   { value: "course", label: "Course" },
 ] as const
 
-export function TasksView() {
+// `focusTaskId` (from /tasks?task=<id>, e.g. a reminder's "Open task") opens that task.
+export function TasksView({ focusTaskId }: { focusTaskId?: string }) {
   const { tasks, today } = useTasks()
+  const focused = focusTaskId ? tasks.find((task) => task.id === focusTaskId) : undefined
+  const [focusOpen, setFocusOpen] = useState(Boolean(focused))
   const { courses } = useCourses()
   const compare: Record<Sort, (a: Task, b: Task) => number> = {
     due: byDue,
@@ -119,6 +123,7 @@ export function TasksView() {
           )}
         </CardContent>
       </Card>
+      {focused && <TaskFormDialog open={focusOpen} onOpenChange={setFocusOpen} task={focused} />}
     </div>
   )
 }

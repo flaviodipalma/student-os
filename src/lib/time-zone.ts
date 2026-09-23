@@ -50,3 +50,25 @@ export function wallClockIn(timeZone: string | undefined, instant: Date = new Da
 export function dateFromWallClock([year, month, day, hours, minutes, seconds]: WallClock): Date {
   return new Date(year, month, day, hours, minutes, seconds)
 }
+
+// The instant a wall-clock time happens in `timeZone` (DST-aware, from the zone's
+// own rules; no fixed offsets). A time skipped by a DST change lands just after it.
+// Without a valid zone, the runtime's own zone is used.
+export function instantFromWallClock([year, month, day, hours, minutes, seconds]: WallClock, timeZone: string | undefined): Date {
+  if (!isValidTimeZone(timeZone)) return new Date(year, month, day, hours, minutes, seconds)
+  const asUtc = Date.UTC(year, month, day, hours, minutes, seconds)
+  // The zone's offset at that moment, then corrected once for DST edges.
+  let guess = asUtc
+  for (let i = 0; i < 2; i++) {
+    const [wy, wmo, wd, wh, wmi, ws] = wallClockIn(timeZone, new Date(guess))
+    guess -= Date.UTC(wy, wmo, wd, wh, wmi, ws) - asUtc
+  }
+  return new Date(guess)
+}
+
+// "2026-09-29" + "14:30" in the student's zone -> the instant.
+export function instantAt(dateKey: string, time: string, timeZone: string | undefined): Date {
+  const [year, month, day] = dateKey.split("-").map(Number)
+  const [hours, minutes] = time.split(":").map(Number)
+  return instantFromWallClock([year, month - 1, day, hours, minutes, 0], timeZone)
+}

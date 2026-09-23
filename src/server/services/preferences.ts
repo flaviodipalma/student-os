@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm"
-import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import type { StudentPreferences } from "@/lib/types"
+import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
+import type { NotificationPreferences, StudentPreferences } from "@/lib/types"
 import { studentPreferences } from "../db/schema"
 import type { Database } from "../db/types"
 
@@ -30,4 +30,45 @@ export async function savePreferences(
     .values({ userId, ...preferences })
     .onConflictDoUpdate({ target: studentPreferences.userId, set: { ...preferences, updatedAt: new Date() } })
   return getPreferences(db, userId)
+}
+
+// ---- Notification preferences (same row as the study preferences) ----------------
+
+export async function getNotificationPreferences(db: Database, userId: string): Promise<NotificationPreferences> {
+  const [row] = await db.select().from(studentPreferences).where(eq(studentPreferences.userId, userId))
+  if (!row) return DEFAULT_NOTIFICATION_PREFERENCES
+  return {
+    enabled: row.notificationsEnabled,
+    taskReminders: row.remindTasks,
+    studySessionReminders: row.remindStudySessions,
+    eventReminders: row.remindEvents,
+    overdueReminders: row.remindOverdue,
+    dailyPlanReminder: row.remindDailyPlan,
+    reminderMinutes: row.reminderMinutes,
+    browserNotifications: row.browserNotifications,
+  }
+}
+
+// Saves only the notification settings (study preferences stay as they are, or
+// the defaults if the student hasn't saved any yet).
+export async function saveNotificationPreferences(
+  db: Database,
+  userId: string,
+  preferences: NotificationPreferences
+): Promise<NotificationPreferences> {
+  const values = {
+    notificationsEnabled: preferences.enabled,
+    remindTasks: preferences.taskReminders,
+    remindStudySessions: preferences.studySessionReminders,
+    remindEvents: preferences.eventReminders,
+    remindOverdue: preferences.overdueReminders,
+    remindDailyPlan: preferences.dailyPlanReminder,
+    reminderMinutes: preferences.reminderMinutes,
+    browserNotifications: preferences.browserNotifications,
+  }
+  await db
+    .insert(studentPreferences)
+    .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, ...values })
+    .onConflictDoUpdate({ target: studentPreferences.userId, set: { ...values, updatedAt: new Date() } })
+  return getNotificationPreferences(db, userId)
 }

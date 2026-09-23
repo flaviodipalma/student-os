@@ -51,10 +51,11 @@ import { DayTimeline } from "./day-timeline"
 const sessionMinutes = (s: StudySession) => toMinutes(s.endTime) - toMinutes(s.startTime)
 const isRecommended = (s: StudySession): s is RecommendedStudySession => s.status === "suggested"
 
-export function PlannerView() {
+// `initialDate` (from /planner?date=YYYY-MM-DD, e.g. a study session reminder) opens that day.
+export function PlannerView({ initialDate }: { initialDate?: string }) {
   const { tasks, today } = useTasks()
   const { scheduleOn } = useEvents()
-  const [date, setDate] = useState(today)
+  const [date, setDate] = useState(initialDate ?? today)
   const [openTask, setOpenTask] = useState<Task | null>(null)
   const plan = usePlan(date)
   const tomorrow = addDays(today, 1)

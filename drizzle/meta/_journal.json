@@ -50,6 +50,13 @@
       "when": 1790194559205,
       "tag": "0006_external_calendar_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790197126861,
+      "tag": "0007_notifications",
+      "breakpoints": true
     }
   ]
 }

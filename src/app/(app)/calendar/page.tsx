@@ -6,6 +6,11 @@ const section = getNavItem("/calendar")
 
 export const metadata: Metadata = { title: section.title }
 
-export default function CalendarPage() {
-  return <CalendarView />
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+export default async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
+  const { date, external } = await searchParams
+  const initialDate = typeof date === "string" && DATE.test(date) ? date : undefined
+  const initialExternalId = typeof external === "string" ? external : undefined
+  return <CalendarView key={`${initialDate}-${initialExternalId}`} initialDate={initialDate} initialExternalId={initialExternalId} />
 }

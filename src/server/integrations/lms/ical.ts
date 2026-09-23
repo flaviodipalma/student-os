@@ -1,6 +1,6 @@
 import "server-only"
 
-import { isValidTimeZone, wallClockIn } from "@/lib/time-zone"
+import { instantFromWallClock, isValidTimeZone, type WallClock } from "@/lib/time-zone"
 
 // A small iCalendar (RFC 5545) reader: just what's needed to read an LMS
 // calendar feed (Canvas, Blackboard). Handles folded lines, escaped text, and
@@ -60,23 +60,6 @@ export function unescapeText(value: string): string {
   return value.replace(/\\([\\;,nN])/g, (_, char: string) => (char === "n" || char === "N" ? "\n" : char))
 }
 
-// Wall-clock time in a time zone -> the instant it happened.
-function zonedToInstant(parts: number[], timeZone: string): Date | null {
-  const [y, mo, d, h, mi, s] = parts
-  const asUtc = Date.UTC(y, mo, d, h, mi, s)
-  try {
-    // The zone's offset at that moment, then corrected once for DST edges.
-    let guess = asUtc
-    for (let i = 0; i < 2; i++) {
-      const [wy, wmo, wd, wh, wmi, ws] = wallClockIn(timeZone, new Date(guess))
-      guess -= Date.UTC(wy, wmo, wd, wh, wmi, ws) - asUtc
-    }
-    return new Date(guess)
-  } catch {
-    return null
-  }
-}
-
 function parseStart(property: Property): IcsStart | null {
   const value = property.value.trim()
   const date = value.match(/^(\d{4})(\d{2})(\d{2})$/)
@@ -93,8 +76,8 @@ function parseStart(property: Property): IcsStart | null {
   }
   // An unknown zone can't be placed correctly: unreadable, rather than guessed.
   if (!isValidTimeZone(tzid)) return null
-  const instant = zonedToInstant(parts, tzid)
-  return instant ? { kind: "instant", instant } : null
+  const instant = instantFromWallClock(parts as WallClock, tzid)
+  return Number.isNaN(instant.getTime()) ? null : { kind: "instant", instant }
 }
 
 // "PT1H30M", "P1D", "P1W" (RFC 5545 3.3.6) -> milliseconds. Negative or unreadable: null.

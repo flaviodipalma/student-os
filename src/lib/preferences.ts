@@ -1,4 +1,4 @@
-import type { StudentPreferences } from "@/lib/types"
+import type { NotificationPreferences, StudentPreferences } from "@/lib/types"
 
 // The one place study-preference defaults are defined. New students start with
 // these; onboarding and Settings let them change every value. The Planner reads
@@ -10,6 +10,19 @@ export const DEFAULT_STUDENT_PREFERENCES: StudentPreferences = {
   maxStudyMinutesPerDay: 240,
   preferredBlockMinutes: 60,
   breakMinutes: 15,
+}
+
+// Reminders are on by default, 30 minutes ahead; desktop notifications are opt-in
+// (the browser asks for permission only when the student turns them on).
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  enabled: true,
+  taskReminders: true,
+  studySessionReminders: true,
+  eventReminders: true,
+  overdueReminders: true,
+  dailyPlanReminder: true,
+  reminderMinutes: 30,
+  browserNotifications: false,
 }
 
 // The choices offered in onboarding and Settings.

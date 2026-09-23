@@ -39,7 +39,9 @@ function rangeTitle(view: View, days: string[]): string {
   return `${start} – ${end}, ${last.getFullYear()}`
 }
 
-export function CalendarView() {
+// `initialDate` / `initialExternalId` (from /calendar?date=...&external=..., e.g. an
+// event reminder) open that day and, for a Canvas/Blackboard event, its details.
+export function CalendarView({ initialDate, initialExternalId }: { initialDate?: string; initialExternalId?: string } = {}) {
   const { scheduleBetween } = useEvents()
   const { externalEvents } = useAppStore()
   const now = useNow()
@@ -48,15 +50,15 @@ export function CalendarView() {
   const small = useMediaQuery("(max-width: 639px)")
   const [chosenView, setView] = useState<View | null>(null)
   const view: View = chosenView ?? (small ? "day" : "week")
-  const [anchor, setAnchor] = useState(today)
+  const [anchor, setAnchor] = useState(initialDate ?? today)
 
   // Dialog state: which event is being edited, or where a new one starts.
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarEvent | undefined>()
   const [draft, setDraft] = useState<EventDraft | undefined>()
   // External (Canvas / Blackboard) events open read-only details instead of the form.
-  const [externalOpen, setExternalOpen] = useState(false)
-  const [externalId, setExternalId] = useState<string | undefined>()
+  const [externalOpen, setExternalOpen] = useState(Boolean(initialExternalId))
+  const [externalId, setExternalId] = useState<string | undefined>(initialExternalId)
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const [filter, setFilter] = useState<SourceFilter>("all")
   // Filters appear only once there's something to filter (an external calendar is connected).
