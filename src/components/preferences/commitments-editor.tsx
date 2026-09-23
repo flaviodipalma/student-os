@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { formatTime, fromDateKey } from "@/lib/format"
-import { formatDays, weekdayLabels } from "@/lib/recurring"
+import { formatDateRange, formatDays, weekdayLabels } from "@/lib/recurring"
 import type { EventType, RecurringCommitmentInput } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { commitmentInputSchema, firstIssue } from "@/lib/validation"
 
 // Weekly commitments: a list with edit/delete, plus an add form. Used by
-// onboarding (saved together at the end of the step) and Settings (saved one by one).
+// onboarding (saved together at the end of the step) and Settings (saved one by
+// one, with optional start/end dates). The Calendar edits the same records.
 
 export type EditableCommitment = RecurringCommitmentInput & { id: string }
 
@@ -33,11 +34,14 @@ export function CommitmentsEditor({
   onAdd,
   onUpdate,
   onDelete,
+  withDates = false,
 }: {
   commitments: EditableCommitment[]
   onAdd: (input: RecurringCommitmentInput) => SaveResult
   onUpdate: (id: string, input: RecurringCommitmentInput) => SaveResult
   onDelete: (id: string) => void
+  // Show the optional "Starts on" / "Ends on" fields.
+  withDates?: boolean
 }) {
   // null = no form open; "new" = adding; otherwise the id being edited.
   const [editing, setEditing] = useState<string | null>(null)
@@ -56,6 +60,7 @@ export function CommitmentsEditor({
             <li key={commitment.id}>
               <CommitmentForm
                 initial={commitment}
+                withDates={withDates}
                 submitLabel="Save"
                 onCancel={() => setEditing(null)}
                 onSubmit={async (input) => {
@@ -74,8 +79,14 @@ export function CommitmentsEditor({
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{commitment.title}</p>
                 <p className="text-xs opacity-80">
-                  {formatDays(commitment.daysOfWeek)} · {time(commitment.startTime)} – {time(commitment.endTime)} ·{" "}
-                  {eventTypeLabel[commitment.type]}
+                  {[
+                    formatDays(commitment.daysOfWeek),
+                    `${time(commitment.startTime)} – ${time(commitment.endTime)}`,
+                    eventTypeLabel[commitment.type],
+                    formatDateRange(commitment),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </div>
               <Button
@@ -102,6 +113,7 @@ export function CommitmentsEditor({
       {editing === "new" ? (
         <CommitmentForm
           initial={blank}
+          withDates={withDates}
           submitLabel="Add commitment"
           onCancel={() => setEditing(null)}
           onSubmit={async (input) => {
@@ -122,11 +134,13 @@ export function CommitmentsEditor({
 
 function CommitmentForm({
   initial,
+  withDates,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   initial: RecurringCommitmentInput
+  withDates: boolean
   submitLabel: string
   onSubmit: (input: RecurringCommitmentInput) => Promise<string | null>
   onCancel: () => void
@@ -135,8 +149,6 @@ function CommitmentForm({
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const set = (changes: Partial<RecurringCommitmentInput>) => setValue((prev) => ({ ...prev, ...changes }))
-  const toggleDay = (day: number) =>
-    set({ daysOfWeek: value.daysOfWeek.includes(day) ? value.daysOfWeek.filter((d) => d !== day) : [...value.daysOfWeek, day] })
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -169,30 +181,7 @@ function CommitmentForm({
           />
         </Field>
       </div>
-      <div className="grid gap-1.5">
-        <span id="commitment-days-label" className="text-sm font-medium">
-          Days
-        </span>
-        <div role="group" aria-labelledby="commitment-days-label" className="flex flex-wrap gap-1.5">
-          {dayOrder.map((day) => {
-            const on = value.daysOfWeek.includes(day)
-            return (
-              <button
-                key={day}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleDay(day)}
-                className={cn(
-                  "h-8 w-11 rounded-md text-sm font-medium ring-1 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  on ? "bg-primary text-primary-foreground ring-primary" : "bg-background ring-foreground/15 hover:bg-muted"
-                )}
-              >
-                {weekdayLabels[day]}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <DayPicker id="commitment-days" value={value.daysOfWeek} onChange={(daysOfWeek) => set({ daysOfWeek })} />
       <div className="grid grid-cols-2 gap-4 sm:max-w-sm">
         <Field label="Starts" htmlFor="commitment-start">
           <Input id="commitment-start" type="time" value={value.startTime} onChange={(e) => set({ startTime: e.target.value })} />
@@ -201,6 +190,26 @@ function CommitmentForm({
           <Input id="commitment-end" type="time" value={value.endTime} onChange={(e) => set({ endTime: e.target.value })} />
         </Field>
       </div>
+      {withDates && (
+        <div className="grid grid-cols-2 gap-4 sm:max-w-sm">
+          <Field label="Starts on" htmlFor="commitment-start-date" optional>
+            <Input
+              id="commitment-start-date"
+              type="date"
+              value={value.startDate ?? ""}
+              onChange={(e) => set({ startDate: e.target.value || undefined })}
+            />
+          </Field>
+          <Field label="Ends on" htmlFor="commitment-end-date" optional>
+            <Input
+              id="commitment-end-date"
+              type="date"
+              value={value.endDate ?? ""}
+              onChange={(e) => set({ endDate: e.target.value || undefined })}
+            />
+          </Field>
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-sm font-medium text-destructive">
           {error}
@@ -215,5 +224,44 @@ function CommitmentForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+// Weekday toggle buttons, Monday first. Also used by the Calendar's event form.
+export function DayPicker({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: number[]
+  onChange: (daysOfWeek: number[]) => void
+}) {
+  const toggle = (day: number) => onChange(value.includes(day) ? value.filter((d) => d !== day) : [...value, day])
+  return (
+    <div className="grid gap-1.5">
+      <span id={`${id}-label`} className="text-sm font-medium">
+        Days
+      </span>
+      <div role="group" aria-labelledby={`${id}-label`} className="flex flex-wrap gap-1.5">
+        {dayOrder.map((day) => {
+          const on = value.includes(day)
+          return (
+            <button
+              key={day}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(day)}
+              className={cn(
+                "h-8 w-11 rounded-md text-sm font-medium ring-1 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                on ? "bg-primary text-primary-foreground ring-primary" : "bg-background ring-foreground/15 hover:bg-muted"
+              )}
+            >
+              {weekdayLabels[day]}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

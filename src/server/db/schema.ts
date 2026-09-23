@@ -101,7 +101,8 @@ export const studentPreferences = pgTable(
 ).enableRLS()
 
 // Something the student does every week at the same time. Stored once as a rule;
-// the Planner and Calendar work out the individual occurrences when needed.
+// the Planner, Calendar and Dashboard work out the individual occurrences when
+// needed (src/lib/recurring.ts), so no per-week rows are ever stored.
 export const recurringCommitments = pgTable(
   "recurring_commitments",
   {
@@ -115,10 +116,16 @@ export const recurringCommitments = pgTable(
     startTime: time("start_time").notNull(),
     endTime: time("end_time").notNull(),
     type: eventType("type").notNull(),
+    description: text("description"),
+    // Optional first and last day it happens (inclusive). Null = no limit.
+    startDate: date("start_date"),
+    endDate: date("end_date"),
     ...timestamps,
   },
   (t) => [
     index("recurring_commitments_user_id_idx").on(t.userId),
+    check("recurring_commitments_dates", sql`${t.endDate} is null or ${t.startDate} is null or ${t.endDate} >= ${t.startDate}`),
+    check("recurring_commitments_description_length", sql`char_length(${t.description}) <= 500`),
     check("recurring_commitments_end_after_start", sql`${t.endTime} > ${t.startTime}`),
     check("recurring_commitments_title_length", sql`char_length(btrim(${t.title})) between 1 and 100`),
     check(

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
 import { useAppStore } from "@/lib/app-store"
-import { busyRanges, durationMinutes, eventsOn, toMinutes } from "@/lib/events"
+import { busyRanges, durationMinutes, toMinutes } from "@/lib/events"
 import { addDays, formatRelativeDay, formatWeekday, fromDateKey } from "@/lib/format"
 import { useTasks } from "@/lib/task-store"
 import { daysUntilDue, upcomingDeadlines } from "@/lib/tasks"
@@ -51,7 +51,7 @@ function summarize(day: WeekDay): string {
 
 export function WeekOverview({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
-  const { events } = useEvents()
+  const { scheduleOn } = useEvents()
   const { getCourse } = useCourses()
   const { preferences } = useAppStore()
   const studyWindow = { start: toMinutes(preferences.studyStart), end: toMinutes(preferences.studyEnd) }
@@ -67,7 +67,7 @@ export function WeekOverview({ className }: { className?: string }) {
       shortLabel: offset === 0 ? "Today" : formatWeekday(fromDateKey(date), "short"),
       longLabel: offset === 0 ? "Today" : formatRelativeDay(fromDateKey(date), fromDateKey(today)),
       isToday: offset === 0,
-      ...loadOf(eventsOn(events, date), studyWindow),
+      ...loadOf(scheduleOn(date), studyWindow),
       deadlines: thisWeek.filter((task) => task.dueDate === date).map(label),
     }
   })

@@ -1,6 +1,6 @@
 "use client"
 
-import { CircleCheckIcon, SparklesIcon } from "lucide-react"
+import { CircleCheckIcon, RepeatIcon, SparklesIcon } from "lucide-react"
 import { eventStyle } from "@/components/calendar/event-style"
 import { CourseTag } from "@/components/course-tag"
 import { useNow } from "@/lib/clock"
@@ -55,8 +55,20 @@ export function DayTimeline({ date, items }: { date: string; items: TimelineItem
           title = "Free time"
           blockClass = "border-dashed border-foreground/15 text-muted-foreground"
         } else if (item.kind === "event") {
-          title = item.event.title
-          meta = [...meta, eventTypeLabel[item.event.type], item.event.description]
+          title = item.event.commitmentId ? (
+            <span className="inline-flex items-start gap-1.5">
+              <RepeatIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 opacity-70" />
+              {item.event.title}
+            </span>
+          ) : (
+            item.event.title
+          )
+          meta = [
+            ...meta,
+            eventTypeLabel[item.event.type],
+            item.event.commitmentId && "Repeats weekly",
+            item.event.description,
+          ]
           blockClass = cn("border-transparent border-l-[3px]", eventStyle[item.event.type].block)
         } else {
           const task = tasks.find((t) => t.id === item.session.taskId)

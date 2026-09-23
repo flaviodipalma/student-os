@@ -71,6 +71,7 @@ export function SettingsView() {
             onAdd={async (input) => toMessage(await store.addCommitment(input))}
             onUpdate={async (id, input) => toMessage(await store.updateCommitment(id, input))}
             onDelete={store.deleteCommitment}
+            withDates
           />
         </CardContent>
       </Card>

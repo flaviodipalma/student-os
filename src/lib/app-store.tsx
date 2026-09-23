@@ -30,8 +30,7 @@ import type { ActionResult } from "@/lib/action-result"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
 import { pickCourseColor } from "@/lib/course-colors"
 import { useFeedback } from "@/lib/feedback"
-import { addDays } from "@/lib/format"
-import { commitmentsBetween } from "@/lib/recurring"
+import { scheduleBetween } from "@/lib/recurring"
 import type {
   CalendarEvent,
   Course,
@@ -70,8 +69,12 @@ type AppStore = {
   studySessions: StudySessionRecord[]
   preferences: StudentPreferences
   recurringCommitments: RecurringCommitment[]
-  // Events, study sessions and weekly commitments, as calendar items.
+  // Events and study sessions as calendar items (one-time things, each stored once).
   calendarItems: CalendarEvent[]
+  // Everything on the student's schedule from `from` to `to` (inclusive):
+  // calendarItems plus that range's weekly commitment occurrences.
+  scheduleBetween: (from: string, to: string) => CalendarEvent[]
+  getCommitment: (id: string) => RecurringCommitment | undefined
   getCourse: (id: string) => Course | undefined
   addCourse: (input: CourseInput) => Promise<Course | null>
   updateCourse: (id: string, changes: Partial<CourseInput>) => void
@@ -92,7 +95,8 @@ type AppStore = {
   updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
   updatePreferences: (input: StudentPreferences) => Promise<ActionResult<StudentPreferences>>
   addCommitment: (input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
-  updateCommitment: (id: string, changes: Partial<RecurringCommitmentInput>) => Promise<ActionResult<RecurringCommitment>>
+  // Replaces the whole rule, so the edit applies to every week.
+  updateCommitment: (id: string, input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
   deleteCommitment: (id: string) => void
   saveOnboarding: (details: OnboardingDetails) => Promise<ActionResult<OnboardingSaved>>
   completeOnboarding: () => Promise<ActionResult<null>>
@@ -144,14 +148,9 @@ export function AppStoreProvider({
     else showError(result.error)
   }
 
-  // Weekly commitments are shown from 5 weeks back to ~6 months ahead.
   const calendarItems = useMemo(
-    () => [
-      ...events,
-      ...sessionsAsCalendarItems(studySessions, tasks, courses),
-      ...commitmentsBetween(recurringCommitments, addDays(today, -35), addDays(today, 180)),
-    ],
-    [events, studySessions, tasks, courses, recurringCommitments, today]
+    () => [...events, ...sessionsAsCalendarItems(studySessions, tasks, courses)],
+    [events, studySessions, tasks, courses]
   )
 
   // For saves where the form needs the outcome: returns it, and handles expired sessions.
@@ -171,6 +170,8 @@ export function AppStoreProvider({
     events,
     studySessions,
     calendarItems,
+    scheduleBetween: (from, to) => scheduleBetween(calendarItems, recurringCommitments, from, to),
+    getCommitment: (id) => recurringCommitments.find((commitment) => commitment.id === id),
     getCourse: (id) => courses.find((course) => course.id === id),
 
     // ---- Courses
@@ -322,7 +323,14 @@ export function AppStoreProvider({
       if (result.ok) setRecurringCommitments((prev) => [...prev, result.data])
       return result
     },
-    updateCommitment: async (id, changes) => {
+    updateCommitment: async (id, input) => {
+      // Optional fields left empty are cleared (null), not kept.
+      const changes = {
+        ...input,
+        description: input.description ?? null,
+        startDate: input.startDate ?? null,
+        endDate: input.endDate ?? null,
+      }
       const result = await call(updateCommitmentAction(id, changes))
       if (result.ok) setRecurringCommitments((prev) => replaceById(prev, result.data))
       return result

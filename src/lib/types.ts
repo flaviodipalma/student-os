@@ -117,8 +117,9 @@ export type StudentPreferences = {
   breakMinutes: number
 }
 
-// Something the student does every week at the same time (practice, work, a club).
-// Stored once as a rule, not as individual events. 0 = Sunday … 6 = Saturday.
+// Something the student does every week at the same time (practice, work, a
+// class). Stored once as a rule, not as individual events; the occurrences are
+// worked out when needed (src/lib/recurring.ts). 0 = Sunday … 6 = Saturday.
 export type RecurringCommitment = {
   id: string
   title: string
@@ -126,6 +127,10 @@ export type RecurringCommitment = {
   startTime: string
   endTime: string
   type: EventType
+  description?: string
+  // Optional first and last day (inclusive); unset = no limit.
+  startDate?: string
+  endDate?: string
 }
 
 export type RecurringCommitmentInput = Omit<RecurringCommitment, "id">

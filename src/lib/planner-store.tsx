@@ -27,8 +27,10 @@ export function usePlan(date: string): DailyPlan {
     return generatePlan({
       date,
       tasks,
-      // Events and scheduled/completed study sessions; weekly commitments are passed separately.
-      events: calendarItems.filter((item) => !item.commitmentId),
+      // Events and scheduled/completed study sessions (all dates, so time already
+      // planned for a task counts), plus the weekly commitments: the planner
+      // treats both as busy time, using the same occurrence rules as the Calendar.
+      events: calendarItems,
       recurringCommitments,
       now,
       skippedTaskIds,

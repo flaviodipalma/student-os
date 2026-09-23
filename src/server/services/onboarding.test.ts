@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { RecurringCommitmentInput } from "@/lib/types"
-import { createCommitmentSchema, onboardingDetailsSchema, preferencesSchema, profileSchema } from "@/lib/validation"
+import {
+  createCommitmentSchema,
+  onboardingDetailsSchema,
+  preferencesSchema,
+  profileSchema,
+  updateCommitmentSchema,
+} from "@/lib/validation"
 import { recurringCommitments } from "../db/schema"
 import { NotFoundError, toAppError } from "../errors"
 import { createTestDb } from "../test-utils/test-db"
@@ -156,6 +162,81 @@ describe("weekly commitments", () => {
     await expect(
       createRecurringCommitment(t.db, user, { ...practice, startTime: "13:00", endTime: "10:30" })
     ).rejects.toBeTruthy()
+  })
+})
+
+describe("repeating events (weekly commitments with dates)", () => {
+  const term = { ...practice, description: "Field 3", startDate: "2026-09-01", endDate: "2026-12-12" }
+
+  it("saves and returns the description and date range", async () => {
+    const user = await t.addUser()
+    const created = await createRecurringCommitment(t.db, user, term)
+    expect(created).toEqual({ ...term, id: created.id })
+    expect(await listRecurringCommitments(t.db, user)).toEqual([created])
+  })
+
+  it("editing the series updates the one stored rule, and null clears optional fields", async () => {
+    const user = await t.addUser()
+    const created = await createRecurringCommitment(t.db, user, term)
+    const edited = await updateRecurringCommitment(t.db, user, created.id, {
+      title: "Soccer (fall)",
+      endDate: null,
+      description: null,
+    })
+    expect(edited).toEqual({ ...practice, id: created.id, title: "Soccer (fall)", startDate: "2026-09-01" })
+    expect(await listRecurringCommitments(t.db, user)).toHaveLength(1)
+  })
+
+  it("deleting the series removes every week at once", async () => {
+    const user = await t.addUser()
+    const created = await createRecurringCommitment(t.db, user, term)
+    await deleteRecurringCommitment(t.db, user, created.id)
+    expect(await listRecurringCommitments(t.db, user)).toEqual([])
+    await expect(deleteRecurringCommitment(t.db, user, created.id)).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it("rejects an end date before the start date", async () => {
+    const user = await t.addUser()
+    const check = (value: unknown) => {
+      const result = createCommitmentSchema.safeParse({ ...value as object, id: crypto.randomUUID() })
+      return result.success ? "ok" : result.error.issues[0].message
+    }
+    expect(check(term)).toBe("ok")
+    expect(check({ ...term, endDate: "2026-08-01" })).toBe("The end date can't be before the start date.")
+    expect(check({ ...term, endDate: term.startDate })).toBe("ok") // a single day is fine
+    expect(check({ ...term, startDate: "2026-02-30" })).toBe("Use a valid date.")
+    expect(updateCommitmentSchema.safeParse({ startDate: "2026-12-01", endDate: "2026-11-01" }).success).toBe(false)
+
+    // An edit that moves only one side is checked against the saved other side.
+    const created = await createRecurringCommitment(t.db, user, term)
+    await expect(
+      updateRecurringCommitment(t.db, user, created.id, { endDate: "2026-08-01" })
+    ).rejects.toMatchObject({ code: "validation" })
+    await expect(
+      updateRecurringCommitment(t.db, user, created.id, { startTime: "14:00" })
+    ).rejects.toMatchObject({ code: "validation" })
+
+    // And the database refuses it too.
+    await expect(
+      t.db.insert(recurringCommitments).values({ ...term, userId: user, endDate: "2026-08-01" })
+    ).rejects.toBeTruthy()
+  })
+
+  it("commitments from onboarding show up in the app data like any other", async () => {
+    const user = await t.addUser()
+    await saveOnboardingDetails(t.db, user, { profile, preferences: DEFAULT_STUDENT_PREFERENCES, commitments: [practice] })
+    await createRecurringCommitment(t.db, user, { ...term, title: "Library shift", type: "work" })
+    const data = await loadAppData(t.db, user)
+    expect(data.recurringCommitments.map((c) => c.title).sort()).toEqual(["Library shift", "Soccer Practice"])
+  })
+
+  it("another student can't edit or delete them", async () => {
+    const alice = await t.addUser("Alice")
+    const bob = await t.addUser("Bob")
+    const alices = await createRecurringCommitment(t.db, alice, term)
+    await expect(updateRecurringCommitment(t.db, bob, alices.id, { endDate: null })).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteRecurringCommitment(t.db, bob, alices.id)).rejects.toBeInstanceOf(NotFoundError)
+    expect(await listRecurringCommitments(t.db, alice)).toEqual([alices])
   })
 })
 

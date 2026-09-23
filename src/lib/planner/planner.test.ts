@@ -357,6 +357,56 @@ describe("generatePlan with recurring commitments", () => {
   })
 })
 
+describe("generatePlan avoids repeating events", () => {
+  // Soccer Practice, Monday-Friday 10:30 AM-1:00 PM. DATE is a Tuesday.
+  const soccer: RecurringCommitment = {
+    id: "soccer",
+    title: "Soccer Practice",
+    daysOfWeek: [1, 2, 3, 4, 5],
+    startTime: "10:30",
+    endTime: "13:00",
+    type: "sports",
+  }
+  const busy = (s: StudySession) => toMinutes(s.startTime) < toMinutes("13:00") && toMinutes(s.endTime) > toMinutes("10:30")
+  // Only 9:00-14:00 is plannable, so practice takes half of it.
+  const settings = {
+    ...plannerSettingsFor({ ...DEFAULT_STUDENT_PREFERENCES, studyStart: "09:00", studyEnd: "14:00" }),
+    maxShareOfFreeTime: 1,
+  }
+
+  it("never suggests studying during practice (e.g. 11:00-12:00)", () => {
+    const tasks = [task({ estimateMinutes: 180, priority: "critical", dueDate: DATE })]
+    const plan = generatePlan({ date: DATE, tasks, events: [], now: NOW, recurringCommitments: [soccer], settings })
+    expect(plan.suggestions.length).toBeGreaterThan(0)
+    expect(plan.suggestions.some(busy)).toBe(false)
+    expect(plan.freeMinutes).toBe(90 + 60) // 9:00-10:30 and 13:00-14:00
+  })
+
+  it("uses that time again once the commitment has ended or before it starts", () => {
+    const tasks = [task({ estimateMinutes: 180, priority: "critical", dueDate: DATE })]
+    const ended = { ...soccer, endDate: "2026-09-21" }
+    const notYet = { ...soccer, startDate: "2026-09-23" }
+    for (const commitment of [ended, notYet]) {
+      const plan = generatePlan({ date: DATE, tasks, events: [], now: NOW, recurringCommitments: [commitment], settings })
+      expect(plan.freeMinutes).toBe(300)
+    }
+  })
+
+  it("combines repeating events, one-time events and scheduled study sessions", () => {
+    const events = [
+      event("09:00", "10:00", { title: "Dentist", type: "personal" }),
+      event("13:00", "13:30", { id: "session-1", sessionId: "session-1", taskId: "other", type: "study" }),
+    ]
+    const tasks = [task({ estimateMinutes: 180, priority: "critical", dueDate: DATE })]
+    const plan = generatePlan({ date: DATE, tasks, events, now: NOW, recurringCommitments: [soccer], settings })
+    expect(plan.freeMinutes).toBe(30 + 30) // 10:00-10:30 and 13:30-14:00
+    for (const session of plan.suggestions) {
+      expect(busy(session)).toBe(false)
+      for (const e of events) expect(overlaps(session, e)).toBe(false)
+    }
+  })
+})
+
 describe("calculateTaskUrgency", () => {
   it("ranks closer deadlines higher", () => {
     expect(calculateTaskUrgency(task({ dueDate: DATE }), DATE)).toBeGreaterThan(

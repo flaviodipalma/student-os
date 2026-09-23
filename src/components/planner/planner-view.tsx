@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { useCourses } from "@/lib/course-store"
 import { useEvents } from "@/lib/event-store"
-import { eventsOn, toMinutes } from "@/lib/events"
+import { toMinutes } from "@/lib/events"
 import { addDays, formatDuration, formatRelativeDay, formatTime, fromDateKey } from "@/lib/format"
 import { buildDayTimeline, urgencyReasons, type DailyPlan, type StudySession } from "@/lib/planner"
 import { usePlan, usePlanActions } from "@/lib/planner-store"
@@ -23,7 +23,7 @@ const sessionMinutes = (s: StudySession) => toMinutes(s.endTime) - toMinutes(s.s
 
 export function PlannerView() {
   const { tasks, today } = useTasks()
-  const { events } = useEvents()
+  const { scheduleOn } = useEvents()
   const [date, setDate] = useState(today)
   const plan = usePlan(date)
   const tomorrow = addDays(today, 1)
@@ -31,7 +31,7 @@ export function PlannerView() {
   // "today", "tomorrow", "Friday", "Wed, Oct 1"
   const dayWord = date === today ? "today" : date === tomorrow ? "tomorrow" : formatRelativeDay(fromDateKey(date), fromDateKey(today))
   const taskById = new Map(tasks.map((task) => [task.id, task]))
-  const dayEvents = eventsOn(events, date)
+  const dayEvents = scheduleOn(date)
 
   return (
     <div className="space-y-6">

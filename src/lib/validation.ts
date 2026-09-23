@@ -145,16 +145,39 @@ export const commitmentFields = z.object({
   startTime: timeOfDay,
   endTime: timeOfDay,
   type: eventType,
+  description: z.string().trim().max(500, "Keep the description under 500 characters.").optional(),
+  startDate: dateKey.optional(),
+  endDate: dateKey.optional(),
 })
-export const createCommitmentSchema = commitmentFields.extend({ id }).refine(endAfterStart, endAfterStartIssue)
-export const updateCommitmentSchema = commitmentFields.partial().refine(endAfterStart, endAfterStartIssue)
+const datesInOrder = (value: { startDate?: string | null; endDate?: string | null }) =>
+  !value.startDate || !value.endDate || value.endDate >= value.startDate
+const datesInOrderIssue = { message: "The end date can't be before the start date.", path: ["endDate"] }
+
+export const createCommitmentSchema = commitmentFields
+  .extend({ id })
+  .refine(endAfterStart, endAfterStartIssue)
+  .refine(datesInOrder, datesInOrderIssue)
+// null clears an optional field.
+export const updateCommitmentSchema = commitmentFields
+  .extend({
+    description: z.string().trim().max(500, "Keep the description under 500 characters.").nullable().optional(),
+    startDate: dateKey.nullable().optional(),
+    endDate: dateKey.nullable().optional(),
+  })
+  .partial()
+  .refine(endAfterStart, endAfterStartIssue)
+  .refine(datesInOrder, datesInOrderIssue)
 
 // Everything collected in onboarding steps 1-3, saved together.
 export const onboardingDetailsSchema = z.object({
   profile: profileSchema,
   preferences: preferencesSchema,
-  commitments: z.array(commitmentFields.refine(endAfterStart, endAfterStartIssue)).max(30),
+  commitments: z
+    .array(commitmentFields.refine(endAfterStart, endAfterStartIssue).refine(datesInOrder, datesInOrderIssue))
+    .max(30),
 })
 
 // One weekly commitment as entered in a form (no id yet).
-export const commitmentInputSchema = commitmentFields.refine(endAfterStart, endAfterStartIssue)
+export const commitmentInputSchema = commitmentFields
+  .refine(endAfterStart, endAfterStartIssue)
+  .refine(datesInOrder, datesInOrderIssue)

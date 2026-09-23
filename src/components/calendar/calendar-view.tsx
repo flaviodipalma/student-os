@@ -33,7 +33,7 @@ function rangeTitle(view: View, days: string[]): string {
 }
 
 export function CalendarView() {
-  const { events } = useEvents()
+  const { scheduleBetween } = useEvents()
   const now = useNow()
   const today = toDateKey(now)
   const [view, setView] = useState<View>("week")
@@ -48,6 +48,8 @@ export function CalendarView() {
     view === "week"
       ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i))
       : [anchor]
+  // Only the visible days: weekly commitments are expanded for these dates.
+  const events = scheduleBetween(days[0], days[days.length - 1])
   const step = view === "week" ? 7 : 1
   const showsToday = days.includes(today)
 

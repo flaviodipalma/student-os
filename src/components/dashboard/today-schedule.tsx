@@ -4,7 +4,6 @@ import Link from "next/link"
 import { DayTimeline } from "@/components/planner/day-timeline"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useEvents } from "@/lib/event-store"
-import { eventsOn } from "@/lib/events"
 import { buildDayTimeline } from "@/lib/planner"
 import { usePlan } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
@@ -12,10 +11,11 @@ import { useTasks } from "@/lib/task-store"
 // Today's calendar events plus the Planner's suggested study sessions.
 // Uses the same usePlan() as the Planner page, so both always agree.
 export function TodaySchedule({ className }: { className?: string }) {
-  const { events } = useEvents()
+  const { scheduleOn } = useEvents()
   const { today } = useTasks()
   const plan = usePlan(today)
-  const todays = eventsOn(events, today)
+  // Events, study sessions and today's weekly commitments: same source as the Calendar.
+  const todays = scheduleOn(today)
   const items = buildDayTimeline(plan, todays)
   const suggested = plan.suggestions.length
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { RepeatIcon } from "lucide-react"
 import { formatTime, formatWeekday, fromDateKey } from "@/lib/format"
 import { eventTypeLabel, eventsOn, layoutDay, toMinutes } from "@/lib/events"
 import type { CalendarEvent } from "@/lib/types"
@@ -179,7 +180,7 @@ function DayColumn({
             key={event.id}
             type="button"
             onClick={() => onSelectEvent(event)}
-            aria-label={`${event.title}, ${time}, ${eventTypeLabel[event.type]}${event.completed ? ", done" : ""}`}
+            aria-label={`${event.title}, ${time}, ${eventTypeLabel[event.type]}${event.commitmentId ? ", repeats weekly" : ""}${event.completed ? ", done" : ""}`}
             className={cn(
               "absolute overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-left text-xs leading-tight shadow-xs outline-none transition-colors focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50",
               eventStyle[event.type].block,
@@ -195,12 +196,16 @@ function DayColumn({
           >
             {compact ? (
               <p className="truncate">
+                {event.commitmentId && <RepeatMark />}
                 <span className={cn(academic ? "font-semibold" : "font-medium")}>{event.title}</span>
                 <span className="opacity-75"> · {formatTime(fromDateKey(date, event.startTime))}</span>
               </p>
             ) : (
               <>
-                <p className={cn("line-clamp-2", academic ? "font-semibold" : "font-medium")}>{event.title}</p>
+                <p className={cn("line-clamp-2", academic ? "font-semibold" : "font-medium")}>
+                  {event.commitmentId && <RepeatMark />}
+                  {event.title}
+                </p>
                 <p className="mt-0.5 truncate opacity-75">{time}</p>
               </>
             )}
@@ -220,4 +225,9 @@ function DayColumn({
       )}
     </div>
   )
+}
+
+// Small icon on repeating events (weekly commitments).
+function RepeatMark() {
+  return <RepeatIcon aria-hidden className="mr-1 inline size-3 -translate-y-px opacity-70" />
 }
