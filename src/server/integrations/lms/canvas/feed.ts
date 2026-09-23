@@ -1,6 +1,8 @@
 import "server-only"
 
 import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
+import type { ExternalCalendarEvent } from "@/lib/calendar/external-events"
+import { icsEventsToExternal } from "../../calendar/ics-events"
 import { fetchIcsFeed } from "../feed-fetch"
 import { parseIcs, type IcsEvent } from "../ical"
 import { LmsError } from "../provider"
@@ -12,8 +14,8 @@ import type { Fetch } from "./oauth"
 // a private iCalendar link Canvas gives every student, no developer key needed.
 //
 // What Canvas puts in it (from Canvas's own calendar-feed code):
-//   UID      "event-assignment-<assignment id>" for assignments
-//            ("event-calendar-event-<id>" for calendar events, which aren't imported)
+//   UID      "event-assignment-<assignment id>" for assignments (-> tasks)
+//            "event-calendar-event-<id>" for calendar events (-> calendar events)
 //   SUMMARY  "<title> [<course code>]"
 //   DTSTART  the due time in UTC, or a date for all-day items; undated items are left out
 //   URL      a Canvas calendar link with include_contexts=course_<course id>
@@ -139,4 +141,16 @@ function assignmentFrom(
       submissionStatus: "unknown",
     },
   }
+}
+
+const CALENDAR_EVENT_UID = /^event-calendar-event-(\d+)$/
+
+// Canvas calendar events (exams, class meetings, office hours added to the Canvas
+// calendar) -> normalized external calendar events. Assignments aren't events:
+// they become tasks (above). The link is kept only if it's on the student's Canvas.
+export function canvasFeedCalendarEvents(text: string, baseUrl: string): { events: ExternalCalendarEvent[]; skipped: number } {
+  return icsEventsToExternal(parseIcs(text), "canvas", (event) => {
+    const id = event.uid?.match(CALENDAR_EVENT_UID)?.[1]
+    return id ? { externalId: `calendar-event-${id}`, url: safeCanvasUrl(event.url, baseUrl) } : null
+  })
 }

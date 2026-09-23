@@ -301,7 +301,7 @@ async function setTaskSource(
 }
 
 // A transaction-scoped Postgres advisory lock (released at commit/rollback).
-async function tryLock(db: Database, key: string): Promise<boolean> {
+export async function tryLock(db: Database, key: string): Promise<boolean> {
   const result = (await db.execute(sql`select pg_try_advisory_xact_lock(hashtext(${key})) as locked`)) as unknown
   const rows = (Array.isArray(result) ? result : (result as { rows: unknown[] }).rows) as { locked: boolean }[]
   return rows[0]?.locked === true

@@ -24,4 +24,9 @@ export const eventStyle: Record<EventType, { block: string; swatch: string }> = 
     block: "border-pink-500 bg-pink-50 text-pink-950 hover:bg-pink-100/70",
     swatch: "bg-pink-500",
   },
+  // External calendar events of unknown kind: neutral.
+  other: {
+    block: "border-slate-400 bg-slate-100/80 text-slate-900 hover:bg-slate-100",
+    swatch: "bg-slate-400",
+  },
 }

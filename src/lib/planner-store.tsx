@@ -21,7 +21,7 @@ import { plannerInputFor } from "@/lib/planner-input"
 const PlannerContext = createContext<Planner | null>(null)
 
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
-  const { tasks, courses, events, studySessions, preferences, recurringCommitments } = useAppStore()
+  const { tasks, courses, events, studySessions, preferences, recurringCommitments, externalEvents, timeZone } = useAppStore()
   const now = useNow()
   // The clock ticks every 30 seconds; the plan only needs to move on each minute.
   const minute = Math.floor(now.getTime() / 60_000)
@@ -30,11 +30,11 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     () =>
       createPlanner(
         plannerInputFor(
-          { tasks, courses, events, studySessions, preferences, recurringCommitments },
+          { tasks, courses, events, studySessions, preferences, recurringCommitments, externalEvents, timeZone },
           new Date(minute * 60_000)
         )
       ),
-    [tasks, courses, events, studySessions, recurringCommitments, preferences, minute]
+    [tasks, courses, events, studySessions, recurringCommitments, preferences, externalEvents, timeZone, minute]
   )
 
   return <PlannerContext value={planner}>{children}</PlannerContext>

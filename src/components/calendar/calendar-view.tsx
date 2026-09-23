@@ -1,20 +1,26 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react"
+import { ChevronLeftIcon, ChevronRightIcon, EyeOffIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
 import { useMediaQuery } from "@/lib/use-media-query"
 import { useEvents } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
-import type { CalendarEvent } from "@/lib/types"
+import { eventSourceNames, type CalendarEvent, type EventSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EventFormDialog, type EventDraft } from "./event-form-dialog"
+import { ExternalEventDialog, HiddenEventsDialog } from "./external-event-dialog"
 import { eventStyle } from "./event-style"
 import { TimeGrid } from "./time-grid"
 
 type View = "day" | "week"
+
+// Which sources to show. Study sessions and weekly commitments are Student OS items.
+type SourceFilter = "all" | EventSource
+const sourceOf = (event: CalendarEvent): EventSource => event.source ?? "student_os"
 
 // Weeks start on Monday.
 function startOfWeek(date: string): string {
@@ -35,6 +41,7 @@ function rangeTitle(view: View, days: string[]): string {
 
 export function CalendarView() {
   const { scheduleBetween } = useEvents()
+  const { externalEvents } = useAppStore()
   const now = useNow()
   const today = toDateKey(now)
   // Phones start on the Day view (a week doesn't fit); the student's own choice wins.
@@ -47,13 +54,22 @@ export function CalendarView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarEvent | undefined>()
   const [draft, setDraft] = useState<EventDraft | undefined>()
+  // External (Canvas / Blackboard) events open read-only details instead of the form.
+  const [externalOpen, setExternalOpen] = useState(false)
+  const [externalId, setExternalId] = useState<string | undefined>()
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  const [filter, setFilter] = useState<SourceFilter>("all")
+  // Filters appear only once there's something to filter (an external calendar is connected).
+  const sources = [...new Set(externalEvents.map((event) => event.source))].sort()
+  const hiddenCount = externalEvents.filter((event) => event.hidden).length
 
   const days =
     view === "week"
       ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i))
       : [anchor]
   // Only the visible days: weekly commitments are expanded for these dates.
-  const events = scheduleBetween(days[0], days[days.length - 1])
+  const all = scheduleBetween(days[0], days[days.length - 1])
+  const events = filter === "all" ? all : all.filter((event) => sourceOf(event) === filter)
   const step = view === "week" ? 7 : 1
   const showsToday = days.includes(today)
 
@@ -64,6 +80,11 @@ export function CalendarView() {
   }
 
   function openEdit(event: CalendarEvent) {
+    if (event.externalEventId) {
+      setExternalId(event.externalEventId)
+      setExternalOpen(true)
+      return
+    }
     setEditing(event)
     setDraft(undefined)
     setDialogOpen(true)
@@ -143,11 +164,39 @@ export function CalendarView() {
         </div>
       </div>
 
+      {(sources.length > 0 || hiddenCount > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="group" aria-label="Show events from" className="inline-flex flex-wrap rounded-lg bg-muted p-1">
+            {(["all", "student_os", ...sources] as SourceFilter[]).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={filter === option}
+                onClick={() => setFilter(option)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:py-2",
+                  filter === option ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {option === "all" ? "All" : eventSourceNames[option]}
+              </button>
+            ))}
+          </div>
+          {hiddenCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setHiddenOpen(true)}>
+              <EyeOffIcon data-icon="inline-start" />
+              {hiddenCount} hidden
+            </Button>
+          )}
+        </div>
+      )}
+
       {events.length === 0 && (
         // Nothing in view: say so, and offer to add something (the grid stays clickable too).
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            No events scheduled {view === "week" ? "this week" : "this day"}. Click a time below or add one.
+            {filter === "all" ? "No events scheduled" : `No ${eventSourceNames[filter]} events`}{" "}
+            {view === "week" ? "this week" : "this day"}. Click a time below or add one.
           </p>
           <Button variant="outline" onClick={openNewFromButton}>
             <PlusIcon data-icon="inline-start" />
@@ -181,6 +230,8 @@ export function CalendarView() {
         event={editing}
         draft={draft}
       />
+      <ExternalEventDialog eventId={externalId} open={externalOpen} onOpenChange={setExternalOpen} />
+      <HiddenEventsDialog open={hiddenOpen} onOpenChange={setHiddenOpen} />
     </div>
   )
 }

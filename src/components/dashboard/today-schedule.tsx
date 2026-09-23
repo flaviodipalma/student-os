@@ -11,6 +11,7 @@ import { formatTime, fromDateKey } from "@/lib/format"
 import { buildDayTimeline, type DailyPlan, type TimelineItem } from "@/lib/planner"
 import { usePlan } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
+import { eventSourceNames } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 // A short version of today's plan: what's left of the day, in order.
@@ -83,11 +84,13 @@ export function TodaySchedule({ className }: { className?: string }) {
                   ? item.event.title
                   : `Study — ${taskTitle.get(item.session.taskId) ?? item.event?.title ?? "task"}`
               const style = item.kind === "event" ? eventStyle[item.event.type].block : eventStyle.study.block
+              // Where it's from: the same calendar items as the Calendar (study sessions are Student OS).
+              const source = eventSourceNames[(item.kind === "event" && item.event.source) || "student_os"]
               return (
                 <li
                   key={item.key}
                   className={cn(
-                    "grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-2 text-sm",
+                    "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-sm",
                     suggested ? "border border-dashed border-primary/45 bg-primary/[0.04]" : cn("border-l-[3px]", style)
                   )}
                 >
@@ -101,6 +104,7 @@ export function TodaySchedule({ className }: { className?: string }) {
                     )}
                     <span className="truncate">{title}</span>
                   </span>
+                  <span className="text-[11px] whitespace-nowrap text-muted-foreground">{source}</span>
                 </li>
               )
             })}

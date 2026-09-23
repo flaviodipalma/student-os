@@ -31,7 +31,7 @@ import { useCourses } from "@/lib/course-store"
 import { fromDateKey } from "@/lib/format"
 import { useCommitments, useEvents, useStudySessions } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes, fromMinutes, toMinutes } from "@/lib/events"
-import type { CalendarEvent, EventInput, EventType, RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
+import type { CalendarEvent, EventInput, NativeEventType, RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
 import { commitmentInputSchema, eventInputSchema } from "@/lib/validation"
 
 // Where a new event starts out, e.g. from clicking an empty spot on the calendar.
@@ -121,7 +121,8 @@ function EventForm({
   )
   // New events default to "personal": a "study" event would count toward the
   // daily study limit, which a class, appointment or shift shouldn't.
-  const [type, setType] = useState<EventType>(source?.type ?? "personal")
+  // (Only the student's own events open here; external ones are read-only.)
+  const [type, setType] = useState<NativeEventType>(source?.type && source.type !== "other" ? source.type : "personal")
   const [courseId, setCourseId] = useState(event?.courseId ?? NO_COURSE)
   const [description, setDescription] = useState(source?.description ?? "")
   // Only new events can be switched to repeating; a repeating event stays one.
@@ -272,7 +273,7 @@ function EventForm({
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Type" htmlFor="event-type">
-              <SimpleSelect id="event-type" value={type} onChange={(v) => setType(v as EventType)} options={typeOptions} />
+              <SimpleSelect id="event-type" value={type} onChange={(v) => setType(v as NativeEventType)} options={typeOptions} />
             </Field>
             {/* Recurring commitments aren't linked to a course (put the course code in the title). */}
             {!repeats && (

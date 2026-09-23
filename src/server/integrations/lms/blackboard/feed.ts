@@ -1,6 +1,9 @@
 import "server-only"
 
+import type { ExternalCalendarEvent } from "@/lib/calendar/external-events"
 import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
+import { icsEventsToExternal } from "../../calendar/ics-events"
+import { sameOriginUrl } from "../base-url"
 import { fetchIcsFeed, type Fetch } from "../feed-fetch"
 import { parseIcs, type IcsEvent } from "../ical"
 import { utcToLocalDue } from "../normalize"
@@ -20,6 +23,8 @@ import { parseBlackboardBaseUrl } from "./config"
 //   DTSTART  the due time (TZID=<zone>); DESCRIPTION empty
 //   Nothing says which course an item belongs to, and there's no link.
 //   Items span a year back and a year ahead.
+//   Other events (course calendar entries, office hours, per Blackboard's help)
+//   become calendar events, identified by their UID (see blackboardFeedCalendarEvents).
 // So feed items go into one "Blackboard" course the student can rename or move
 // tasks out of, and only items due from today on are imported: the feed can't
 // say whether older work was turned in, and a year of past items would flood
@@ -128,4 +133,17 @@ function assignmentFrom(event: IcsEvent, timeZone: string | undefined): LmsAssig
     estimatedMinutes: null,
     submissionStatus: "unknown",
   }
+}
+
+// Blackboard calendar entries that aren't gradable items (course events, office
+// hours, ...) -> normalized external calendar events. Gradable items are
+// deadlines: they become tasks (above), not events. Identified by their full
+// UID (stable in Blackboard's feed); a link is kept only if it's on the same
+// Blackboard host.
+export function blackboardFeedCalendarEvents(text: string, baseUrl: string): { events: ExternalCalendarEvent[]; skipped: number } {
+  return icsEventsToExternal(parseIcs(text), "blackboard", (event) => {
+    const uid = event.uid?.trim()
+    if (!uid || GRADABLE_ITEM_UID.test(uid) || uid.length > 300) return null
+    return { externalId: uid, url: sameOriginUrl(event.url, baseUrl) }
+  })
 }

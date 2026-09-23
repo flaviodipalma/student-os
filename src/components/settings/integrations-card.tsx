@@ -461,7 +461,7 @@ function ConnectLmsForm({
 
 function ConnectedActions({ provider, name, firstSync }: { provider: LmsProviderId; name: string; firstSync: boolean }) {
   const router = useRouter()
-  const { replaceCoursesAndTasks } = useAppStore()
+  const { replaceCoursesAndTasks, replaceExternalEvents } = useAppStore()
   const [syncing, setSyncing] = useState(false)
   const [result, setResult] = useState<LmsSyncResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -477,6 +477,7 @@ function ConnectedActions({ provider, name, firstSync }: { provider: LmsProvider
       return router.refresh()
     }
     replaceCoursesAndTasks(outcome.data.courses, outcome.data.tasks)
+    replaceExternalEvents(outcome.data.externalEvents)
     setResult(outcome.data.result)
     router.refresh() // updates "Last synced"
   }
@@ -512,6 +513,12 @@ function SyncSummary({ result, name }: { result: LmsSyncResult; name: string }) 
     result.assignmentsWithoutDueDate > 0 &&
       `${plural(result.assignmentsWithoutDueDate, "assignment")} without a due date in ${name} weren't imported`,
     result.coursesSkipped > 0 && `${plural(result.coursesSkipped, "course")} skipped (see below)`,
+    (result.calendarEvents?.added ?? 0) > 0 && `${plural(result.calendarEvents!.added, "calendar event")} added`,
+    (result.calendarEvents?.updated ?? 0) > 0 && `${plural(result.calendarEvents!.updated, "calendar event")} updated`,
+    (result.calendarEvents?.removed ?? 0) > 0 &&
+      `${plural(result.calendarEvents!.removed, "calendar event")} no longer in ${name} (removed from your calendar)`,
+    (result.calendarEvents?.skipped ?? 0) > 0 &&
+      `${plural(result.calendarEvents!.skipped, "all-day or untimed calendar item")} not shown`,
   ].filter(Boolean)
 
   return (

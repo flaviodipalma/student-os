@@ -13,6 +13,8 @@ import {
   fakeBlackboard,
 } from "@/server/test-utils/fake-blackboard"
 import { createTestDb } from "@/server/test-utils/test-db"
+import { syncExternalCalendar } from "@/server/integrations/calendar/calendar-sync"
+import { listExternalEvents } from "@/server/services/external-events"
 
 // The integration server actions, as the browser calls them. The signed-in
 // student comes from the (mocked) verified session, never from the request.
@@ -64,7 +66,7 @@ const canvasFixture = (async (input: RequestInfo | URL, init: RequestInit = {}) 
   return new Response("{}", { status: 404 })
 }) as typeof fetch
 
-const { connectBlackboardAction, connectBlackboardFeedAction, connectCanvasAction, connectCanvasFeedAction, disconnectLmsAction, syncLmsAction } =
+const { connectBlackboardAction, connectBlackboardFeedAction, connectCanvasAction, setExternalEventHiddenAction, connectCanvasFeedAction, disconnectLmsAction, syncLmsAction } =
   await import("./integrations")
 const { handleLmsCallback } = await import("@/server/integrations/lms/oauth-callback")
 const { NextRequest } = await import("next/server")
@@ -386,5 +388,57 @@ describe("Blackboard", () => {
     const response = await callback({ code: "good-code", state: "x" })
     expect(new URL(response.headers.get("location")!).pathname).toBe("/login")
     expect(blackboard.requests).toEqual([])
+  })
+})
+
+// ---- External calendar events: hide / restore ------------------------------------------
+
+describe("External calendar events", () => {
+  async function withEvent(name: string) {
+    const user = await connectedStudent(name)
+    await syncExternalCalendar(
+      t.db,
+      user,
+      "canvas",
+      [
+        {
+          source: "canvas",
+          externalId: "calendar-event-9",
+          title: "CSC215 Exam",
+          description: null,
+          startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+          endsAt: new Date(Date.now() + 90_000_000).toISOString(),
+          location: null,
+          url: null,
+        },
+      ],
+      { now: new Date() }
+    )
+    const [event] = await listExternalEvents(t.db, user)
+    return { user, event }
+  }
+
+  it("the signed-in student hides and restores their own event", async () => {
+    const { user, event } = await withEvent("Alice")
+    session.userId = user
+    expect(await setExternalEventHiddenAction(event.id, true)).toMatchObject({ ok: true, data: { id: event.id, hidden: true } })
+    expect(await setExternalEventHiddenAction(event.id, false)).toMatchObject({ ok: true, data: { hidden: false } })
+  })
+
+  it("nobody else can hide it, and bad input is refused", async () => {
+    const { user, event } = await withEvent("Alice")
+    expect(await setExternalEventHiddenAction(event.id, true)).toMatchObject({ ok: false, code: "unauthorized" })
+    session.userId = await t.addUser("Bob")
+    expect(await setExternalEventHiddenAction(event.id, true)).toMatchObject({ ok: false, code: "not-found" })
+    expect(await setExternalEventHiddenAction("not-a-uuid", true)).toMatchObject({ ok: false, code: "validation" })
+    expect(await setExternalEventHiddenAction(event.id, "yes")).toMatchObject({ ok: false, code: "validation" })
+    expect((await listExternalEvents(t.db, user))[0].hidden).toBe(false)
+  })
+
+  it("disconnecting Canvas stops showing its calendar events", async () => {
+    const { user } = await withEvent("Alice")
+    session.userId = user
+    expect(await disconnectLmsAction("canvas")).toEqual({ ok: true, data: null })
+    expect(await listExternalEvents(t.db, user)).toEqual([])
   })
 })

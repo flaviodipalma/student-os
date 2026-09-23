@@ -6,8 +6,9 @@ import { dateFromWallClock, wallClockIn } from "@/lib/time-zone"
 import type { Database } from "../../../db/types"
 import { loadLmsFeed } from "../connections"
 import type { CredentialVault } from "../credential-vault"
+import { addCalendarToSync } from "../../calendar/calendar-sync"
 import { runSync } from "../sync"
-import { canvasFeedToLms, fetchCanvasFeed } from "./feed"
+import { canvasFeedCalendarEvents, canvasFeedToLms, fetchCanvasFeed } from "./feed"
 import type { Fetch } from "./oauth"
 
 // Syncs a Canvas calendar-feed connection: download the feed once, turn it into
@@ -23,12 +24,16 @@ export async function syncCanvasFeed(
   // The student's today: the feed may leave out older items, so only tasks due
   // from today on can be reported as "no longer in Canvas".
   const today = toDateKey(dateFromWallClock(wallClockIn(options.timeZone, now)))
-  return runSync(db, userId, { provider: "canvas", name: "Canvas" }, options, async () => {
+  // The same download also carries the calendar events (saved after the tasks).
+  let calendar: ReturnType<typeof canvasFeedCalendarEvents> | null = null
+  const result = await runSync(db, userId, { provider: "canvas", name: "Canvas" }, options, async () => {
     const feed = await loadLmsFeed(db, userId, "canvas", vault)
-    const data = canvasFeedToLms(await fetchCanvasFeed(feed.feedUrl, options.fetch), {
+    const text = await fetchCanvasFeed(feed.feedUrl, options.fetch)
+    const data = canvasFeedToLms(text, {
       baseUrl: feed.baseUrl,
       timeZone: options.timeZone,
     })
+    calendar = canvasFeedCalendarEvents(text, feed.baseUrl)
     return {
       provider: "canvas",
       name: "Canvas",
@@ -37,4 +42,5 @@ export async function syncCanvasFeed(
       getAssignments: async (courseId) => data.assignments.filter((a) => a.courseExternalId === courseId),
     }
   })
+  return addCalendarToSync(db, userId, "canvas", calendar, result, now)
 }

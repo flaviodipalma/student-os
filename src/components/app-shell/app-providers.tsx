@@ -12,16 +12,18 @@ import type { AppData } from "@/server/services/app-data"
 export function AppProviders({
   data,
   wallClock,
+  timeZone,
   children,
 }: {
   data: AppData
   wallClock: WallClock
+  timeZone: string | undefined
   children: React.ReactNode
 }) {
   return (
     <ClockProvider wallClock={wallClock}>
       <FeedbackProvider>
-        <AppStoreProvider initial={data}>
+        <AppStoreProvider initial={data} timeZone={timeZone}>
           <PlannerProvider>{children}</PlannerProvider>
         </AppStoreProvider>
       </FeedbackProvider>

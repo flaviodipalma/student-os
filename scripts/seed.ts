@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 import { toDateKey } from "@/lib/format"
+import type { NativeEventType } from "@/lib/types"
 import * as schema from "@/server/db/schema"
 import type { Database } from "@/server/db/types"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
@@ -118,7 +119,8 @@ async function main() {
           date: event.date,
           startTime: event.startTime,
           endTime: event.endTime,
-          type: event.type,
+          // Sample events only use the five student event types.
+          type: event.type as NativeEventType,
           description: event.description,
           courseId,
         })

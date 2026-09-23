@@ -1,6 +1,6 @@
 import "server-only"
 
-import { wallClockIn } from "@/lib/time-zone"
+import { isValidTimeZone, wallClockIn } from "@/lib/time-zone"
 
 // A small iCalendar (RFC 5545) reader: just what's needed to read an LMS
 // calendar feed (Canvas, Blackboard). Handles folded lines, escaped text, and
@@ -14,7 +14,12 @@ export type IcsEvent = {
   summary: string | null
   description: string | null
   url: string | null
+  location: string | null
   start: IcsStart | null
+  // DTEND, when the event has one.
+  end: IcsStart | null
+  // DURATION in milliseconds (used when there's no DTEND), when the event has one.
+  durationMs: number | null
 }
 
 type Property = { name: string; params: Record<string, string>; value: string }
@@ -86,8 +91,18 @@ function parseStart(property: Property): IcsStart | null {
     const instant = new Date(Date.UTC(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]))
     return Number.isNaN(instant.getTime()) ? null : { kind: "instant", instant }
   }
+  // An unknown zone can't be placed correctly: unreadable, rather than guessed.
+  if (!isValidTimeZone(tzid)) return null
   const instant = zonedToInstant(parts, tzid)
   return instant ? { kind: "instant", instant } : null
+}
+
+// "PT1H30M", "P1D", "P1W" (RFC 5545 3.3.6) -> milliseconds. Negative or unreadable: null.
+export function parseDuration(value: string): number | null {
+  const match = value.trim().match(/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/)
+  if (!match || !match.slice(1).some(Boolean)) return null
+  const [weeks, days, hours, minutes, seconds] = match.slice(1).map((part) => Number(part ?? 0))
+  return ((((weeks * 7 + days) * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000
 }
 
 export function parseIcs(text: string): IcsEvent[] {
@@ -97,7 +112,7 @@ export function parseIcs(text: string): IcsEvent[] {
     const property = parseLine(line)
     if (!property) continue
     if (property.name === "BEGIN" && property.value.trim().toUpperCase() === "VEVENT") {
-      current = { uid: null, summary: null, description: null, url: null, start: null }
+      current = { uid: null, summary: null, description: null, url: null, location: null, start: null, end: null, durationMs: null }
     } else if (property.name === "END" && property.value.trim().toUpperCase() === "VEVENT") {
       if (current) events.push(current)
       current = null
@@ -106,7 +121,10 @@ export function parseIcs(text: string): IcsEvent[] {
       else if (property.name === "SUMMARY") current.summary = unescapeText(property.value)
       else if (property.name === "DESCRIPTION") current.description = unescapeText(property.value)
       else if (property.name === "URL") current.url = property.value.trim()
+      else if (property.name === "LOCATION") current.location = unescapeText(property.value)
       else if (property.name === "DTSTART") current.start = parseStart(property)
+      else if (property.name === "DTEND") current.end = parseStart(property)
+      else if (property.name === "DURATION") current.durationMs = parseDuration(property.value)
     }
   }
   return events

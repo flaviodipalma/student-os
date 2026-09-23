@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   disconnectLmsAction: vi.fn(),
   refresh: vi.fn(),
   replaceCoursesAndTasks: vi.fn(),
+  replaceExternalEvents: vi.fn(),
 }))
 vi.mock("@/app/actions/integrations", () => ({
   syncLmsAction: mocks.syncLmsAction,
@@ -24,7 +25,9 @@ vi.mock("@/app/actions/integrations", () => ({
   connectBlackboardFeedAction: vi.fn(async () => ({ error: null, connected: false })),
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
-vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({ replaceCoursesAndTasks: mocks.replaceCoursesAndTasks }) }))
+vi.mock("@/lib/app-store", () => ({
+  useAppStore: () => ({ replaceCoursesAndTasks: mocks.replaceCoursesAndTasks, replaceExternalEvents: mocks.replaceExternalEvents }),
+}))
 
 const { IntegrationsCard, formatSyncedAgo } = await import("./integrations-card")
 
@@ -121,12 +124,13 @@ describe("Canvas in Settings", () => {
     await user.click(busy)
     expect(mocks.syncLmsAction).toHaveBeenCalledTimes(1)
 
-    finish({ ok: true, data: { result: result(), courses: [], tasks: [] } })
+    finish({ ok: true, data: { result: result(), courses: [], tasks: [], externalEvents: [] } })
     expect(await screen.findByText("Canvas sync complete.")).toBeTruthy()
     for (const line of ["2 courses added", "8 assignments added as tasks", "3 assignments updated", "1 assignment without a due date in Canvas weren't imported"]) {
       expect(screen.getByText(line)).toBeTruthy()
     }
     expect(mocks.replaceCoursesAndTasks).toHaveBeenCalledWith([], [])
+    expect(mocks.replaceExternalEvents).toHaveBeenCalledWith([])
     expect(mocks.refresh).toHaveBeenCalled()
     expect((screen.getByRole("button", { name: /Sync now/ }) as HTMLButtonElement).disabled).toBe(false)
   })
@@ -143,6 +147,7 @@ describe("Canvas in Settings", () => {
         }),
         courses: [],
         tasks: [],
+        externalEvents: [],
       },
     })
     render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
@@ -240,7 +245,7 @@ describe("Blackboard in Settings", () => {
   })
 
   it("syncs Blackboard (not Canvas) and shows the summary in Blackboard's words", async () => {
-    mocks.syncLmsAction.mockResolvedValue({ ok: true, data: { result: result({ provider: "blackboard" }), courses: [], tasks: [] } })
+    mocks.syncLmsAction.mockResolvedValue({ ok: true, data: { result: result({ provider: "blackboard" }), courses: [], tasks: [], externalEvents: [] } })
     render(
       <IntegrationsCard
         integrations={withBlackboard({ lastSyncedAt: new Date().toISOString() }, true, { lastSyncedAt: new Date().toISOString() })}

@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { formatTime, fromDateKey } from "@/lib/format"
 import { formatDateRange, formatDays, weekdayLabels } from "@/lib/recurring"
-import type { EventType, RecurringCommitmentInput } from "@/lib/types"
+import type { NativeEventType, RecurringCommitmentInput } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { commitmentInputSchema, firstIssue } from "@/lib/validation"
 
@@ -215,7 +215,7 @@ function CommitmentForm({
             id="commitment-type"
             value={value.type}
             options={typeOptions}
-            onChange={(type) => set({ type: type as EventType })}
+            onChange={(type) => set({ type: type as NativeEventType })}
           />
         </Field>
       </div>

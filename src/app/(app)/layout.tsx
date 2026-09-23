@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const account = { firstName: app.data.student.firstName, email: app.user.email ?? "" }
 
   return (
-    <AppProviders data={app.data} wallClock={app.wallClock}>
+    <AppProviders data={app.data} wallClock={app.wallClock} timeZone={app.timeZone}>
       <div className="flex min-h-svh">
         <Sidebar account={account} />
         <div className="flex min-w-0 flex-1 flex-col">

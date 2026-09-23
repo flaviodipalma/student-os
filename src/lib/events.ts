@@ -1,4 +1,4 @@
-import type { CalendarEvent, EventType } from "@/lib/types"
+import type { CalendarEvent, EventType, NativeEventType } from "@/lib/types"
 
 // Labels and time maths for calendar events, shared by the Calendar and Dashboard.
 
@@ -8,9 +8,12 @@ export const eventTypeLabel: Record<EventType, string> = {
   sports: "Sports",
   work: "Work",
   personal: "Personal",
+  other: "Other",
 }
 
-export const eventTypes = Object.keys(eventTypeLabel) as EventType[]
+// The types a student can give their own events and commitments ("Other" is
+// only for external calendar events whose kind isn't known).
+export const eventTypes: NativeEventType[] = ["class", "study", "sports", "work", "personal"]
 
 // "14:30" -> 870 (minutes since midnight)
 export function toMinutes(time: string): number {

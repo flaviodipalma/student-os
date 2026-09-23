@@ -7,8 +7,9 @@ import type { Database } from "../../../db/types"
 import { loadLmsFeed } from "../connections"
 import type { CredentialVault } from "../credential-vault"
 import type { Fetch } from "../feed-fetch"
+import { addCalendarToSync } from "../../calendar/calendar-sync"
 import { runSync } from "../sync"
-import { blackboardFeedToLms, fetchBlackboardFeed } from "./feed"
+import { blackboardFeedCalendarEvents, blackboardFeedToLms, fetchBlackboardFeed } from "./feed"
 
 // Syncs a Blackboard calendar-link connection: download the feed once, turn it
 // into normalized data, then the same sync as every LMS source (matching,
@@ -23,12 +24,16 @@ export async function syncBlackboardFeed(
   // The student's today: only items due from today on are imported, so only
   // those can be reported as "no longer in Blackboard".
   const today = toDateKey(dateFromWallClock(wallClockIn(options.timeZone, now)))
-  return runSync(db, userId, { provider: "blackboard", name: "Blackboard" }, options, async () => {
+  // The same download also carries the calendar events (saved after the tasks).
+  let calendar: ReturnType<typeof blackboardFeedCalendarEvents> | null = null
+  const result = await runSync(db, userId, { provider: "blackboard", name: "Blackboard" }, options, async () => {
     const feed = await loadLmsFeed(db, userId, "blackboard", vault)
-    const data = blackboardFeedToLms(await fetchBlackboardFeed(feed.feedUrl, options.fetch), {
+    const text = await fetchBlackboardFeed(feed.feedUrl, options.fetch)
+    const data = blackboardFeedToLms(text, {
       timeZone: options.timeZone,
       today,
     })
+    calendar = blackboardFeedCalendarEvents(text, feed.baseUrl)
     return {
       provider: "blackboard",
       name: "Blackboard",
@@ -37,4 +42,5 @@ export async function syncBlackboardFeed(
       getAssignments: async (courseId) => data.assignments.filter((a) => a.courseExternalId === courseId),
     }
   })
+  return addCalendarToSync(db, userId, "blackboard", calendar, result, now)
 }

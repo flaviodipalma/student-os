@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import type { LmsSyncResult } from "@/lib/lms/types"
-import { lmsProviderIds, type Course, type LmsProviderId, type Task } from "@/lib/types"
+import { lmsProviderIds, type Course, type ExternalEventRecord, type LmsProviderId, type Task } from "@/lib/types"
 import { parse, runAction } from "@/server/actions"
 import { getCurrentUser } from "@/server/auth"
 import { blackboardAllowedHosts, parseBlackboardBaseUrl } from "@/server/integrations/lms/blackboard/config"
@@ -31,6 +31,7 @@ import { LmsError } from "@/server/integrations/lms/provider"
 import { getLmsProvider } from "@/server/integrations/lms/registry"
 import { syncLms } from "@/server/integrations/lms/sync"
 import { listCourses } from "@/server/services/courses"
+import { listExternalEvents, removeExternalEventsFrom, setExternalEventHidden } from "@/server/services/external-events"
 import { listTasks } from "@/server/services/tasks"
 import { getStudentTimeZone } from "@/server/student-clock"
 
@@ -135,9 +136,11 @@ export async function connectBlackboardFeedAction(
 
 export type LmsSyncOutcome = {
   result: LmsSyncResult
-  // The student's courses and tasks after the sync, so the app shows them at once.
+  // The student's courses, tasks and external calendar events after the sync,
+  // so the app shows them at once.
   courses: Course[]
   tasks: Task[]
+  externalEvents: ExternalEventRecord[]
 }
 
 export async function syncLmsAction(provider: unknown): Promise<ActionResult<LmsSyncOutcome>> {
@@ -152,13 +155,18 @@ export async function syncLmsAction(provider: unknown): Promise<ActionResult<Lms
           ? await syncCanvasFeed(db, userId, vault(), options)
           : await syncBlackboardFeed(db, userId, vault(), options)
         : await syncLms(db, userId, getLmsProvider(id), vault(), options)
-    const [courses, tasks] = await Promise.all([listCourses(db, userId), listTasks(db, userId)])
-    return { result, courses, tasks }
+    const [courses, tasks, externalEvents] = await Promise.all([
+      listCourses(db, userId),
+      listTasks(db, userId),
+      listExternalEvents(db, userId),
+    ])
+    return { result, courses, tasks, externalEvents }
   })
 }
 
 // Disconnects: asks the LMS to revoke the token (best effort), then deletes the
-// connection and its tokens. Imported courses and tasks stay.
+// connection and its tokens. Imported courses and tasks stay; the LMS's calendar
+// events stop showing (kept, and back if the calendar is connected again).
 export async function disconnectLmsAction(provider: unknown): Promise<ActionResult<null>> {
   return runAction(async ({ db, userId }) => {
     const id = parse(providerSchema, provider)
@@ -170,6 +178,15 @@ export async function disconnectLmsAction(provider: unknown): Promise<ActionResu
       // Revoking is a courtesy; the tokens are deleted below regardless.
     }
     await disconnectLms(db, userId, id)
+    await removeExternalEventsFrom(db, userId, id)
     return null
   })
+}
+
+// "Hide from Student OS" / "Restore" for an external calendar event: a local
+// flag on the student's own copy. Nothing is sent to Canvas or Blackboard.
+const eventIdSchema = z.string().uuid()
+
+export async function setExternalEventHiddenAction(id: unknown, hidden: unknown): Promise<ActionResult<ExternalEventRecord>> {
+  return runAction(async ({ db, userId }) => setExternalEventHidden(db, userId, parse(eventIdSchema, id), parse(z.boolean(), hidden)))
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 import { RepeatIcon } from "lucide-react"
 import { formatTime, formatWeekday, fromDateKey } from "@/lib/format"
 import { eventTypeLabel, eventsOn, layoutDay, toMinutes } from "@/lib/events"
-import type { CalendarEvent } from "@/lib/types"
+import { eventSourceNames, type CalendarEvent } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { eventStyle } from "./event-style"
 
@@ -175,12 +175,14 @@ function DayColumn({
         const compact = height < 40
         const time = `${formatTime(fromDateKey(date, event.startTime))} – ${formatTime(fromDateKey(date, event.endTime))}`
         const academic = event.type === "class" || event.type === "study"
+        // External events say where they're from; the student's own items don't need a label on the grid.
+        const sourceName = event.source && event.source !== "student_os" ? eventSourceNames[event.source] : null
         return (
           <button
             key={event.id}
             type="button"
             onClick={() => onSelectEvent(event)}
-            aria-label={`${event.title}, ${time}, ${eventTypeLabel[event.type]}${event.commitmentId ? ", repeats weekly" : ""}${event.completed ? ", done" : ""}`}
+            aria-label={`${event.title}, ${time}, ${sourceName ? `from ${sourceName}` : eventTypeLabel[event.type]}${event.commitmentId ? ", repeats weekly" : ""}${event.completed ? ", done" : ""}`}
             className={cn(
               "absolute overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-left text-xs leading-tight shadow-xs outline-none transition-colors focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/50",
               eventStyle[event.type].block,
@@ -199,6 +201,7 @@ function DayColumn({
                 {event.commitmentId && <RepeatMark />}
                 <span className={cn(academic ? "font-semibold" : "font-medium")}>{event.title}</span>
                 <span className="opacity-75"> · {formatTime(fromDateKey(date, event.startTime))}</span>
+                {sourceName && <span className="opacity-60"> · {sourceName}</span>}
               </p>
             ) : (
               <>
@@ -207,6 +210,7 @@ function DayColumn({
                   {event.title}
                 </p>
                 <p className="mt-0.5 truncate opacity-75">{time}</p>
+                {sourceName && <p className="mt-0.5 truncate text-[10px] font-medium tracking-wide uppercase opacity-60">{sourceName}</p>}
               </>
             )}
           </button>

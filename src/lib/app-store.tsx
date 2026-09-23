@@ -25,8 +25,10 @@ import {
   updatePreferencesAction,
   updateProfileAction,
 } from "@/app/actions/settings"
+import { setExternalEventHiddenAction } from "@/app/actions/integrations"
 import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
+import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
 import { pickCourseColor } from "@/lib/course-colors"
 import { useNow } from "@/lib/clock"
@@ -38,6 +40,7 @@ import type {
   Course,
   CourseInput,
   EventInput,
+  ExternalEventRecord,
   ProfileInput,
   RecurringCommitment,
   RecurringCommitmentInput,
@@ -71,7 +74,11 @@ type AppStore = {
   studySessions: StudySessionRecord[]
   preferences: StudentPreferences
   recurringCommitments: RecurringCommitment[]
-  // Events and study sessions as calendar items (one-time things, each stored once).
+  // Read-only copies of Canvas / Blackboard calendar events (hidden ones included).
+  externalEvents: ExternalEventRecord[]
+  // The student's time zone (external events are shown at local times in it).
+  timeZone: string | undefined
+  // Events, visible external events and study sessions as calendar items (one-time things).
   calendarItems: CalendarEvent[]
   // Everything on the student's schedule from `from` to `to` (inclusive):
   // calendarItems plus that range's weekly commitment occurrences.
@@ -94,6 +101,9 @@ type AppStore = {
   importSyllabus: (request: SyllabusImportRequest) => Promise<ActionResult<SyllabusImportSaved>>
   // After an LMS sync: the saved courses and tasks, as the server has them now.
   replaceCoursesAndTasks: (courses: Course[], tasks: Task[]) => void
+  replaceExternalEvents: (events: ExternalEventRecord[]) => void
+  // Local only: the event stays in Canvas / Blackboard.
+  setExternalEventHidden: (id: string, hidden: boolean) => void
   // Profile, preferences and weekly commitments. These return the result so
   // forms can show validation messages next to the fields.
   updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
@@ -131,7 +141,15 @@ const NETWORK_ERROR: ActionResult<never> = {
   code: "database",
 }
 
-export function AppStoreProvider({ initial, children }: { initial: AppData; children: React.ReactNode }) {
+export function AppStoreProvider({
+  initial,
+  timeZone,
+  children,
+}: {
+  initial: AppData
+  timeZone?: string
+  children: React.ReactNode
+}) {
   // The student's local date, from the shared clock: it moves on at midnight
   // even if the page stays open.
   const today = toDateKey(useNow())
@@ -144,6 +162,7 @@ export function AppStoreProvider({ initial, children }: { initial: AppData; chil
   const [student, setStudent] = useState(initial.student)
   const [preferences, setPreferences] = useState(initial.preferences)
   const [recurringCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
+  const [externalEvents, setExternalEvents] = useState(initial.externalEvents ?? [])
 
   // Awaits a server action; runs onOk with the saved record (and confirms with
   // `success`, if given), or undoes the change and explains why.
@@ -164,8 +183,12 @@ export function AppStoreProvider({ initial, children }: { initial: AppData; chil
   }
 
   const calendarItems = useMemo(
-    () => [...events, ...sessionsAsCalendarItems(studySessions, tasks, courses)],
-    [events, studySessions, tasks, courses]
+    () => [
+      ...events,
+      ...externalEventsAsCalendarItems(externalEvents, timeZone),
+      ...sessionsAsCalendarItems(studySessions, tasks, courses),
+    ],
+    [events, externalEvents, timeZone, studySessions, tasks, courses]
   )
 
   // For saves where the form needs the outcome: returns it, and handles expired sessions.
@@ -184,6 +207,8 @@ export function AppStoreProvider({ initial, children }: { initial: AppData; chil
     tasks,
     events,
     studySessions,
+    externalEvents,
+    timeZone,
     calendarItems,
     scheduleBetween: (from, to) => scheduleBetween(calendarItems, recurringCommitments, from, to),
     getCommitment: (id) => recurringCommitments.find((commitment) => commitment.id === id),
@@ -405,6 +430,20 @@ export function AppStoreProvider({ initial, children }: { initial: AppData; chil
     replaceCoursesAndTasks: (nextCourses, nextTasks) => {
       setCourses(nextCourses)
       setTasks(nextTasks)
+    },
+    replaceExternalEvents: setExternalEvents,
+    setExternalEventHidden: (id, hidden) => {
+      const before = externalEvents.find((event) => event.id === id)
+      if (!before) return
+      const toggle = (value: boolean) =>
+        setExternalEvents((prev) => prev.map((event) => (event.id === id ? { ...event, hidden: value } : event)))
+      toggle(hidden)
+      save(
+        setExternalEventHiddenAction(id, hidden),
+        (saved) => setExternalEvents((prev) => replaceById(prev, saved)),
+        () => toggle(before.hidden),
+        hidden ? "Hidden from Student OS." : "Event restored."
+      )
     },
 
     // ---- Syllabus import (saved first, then shown: it's one confirmed step)

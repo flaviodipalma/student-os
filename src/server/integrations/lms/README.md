@@ -9,6 +9,13 @@ calendar link ("Share Calendar", no school approval needed) or three-legged OAut
 **and approved by the student's school**). Canvas and Blackboard can be connected
 at the same time.
 
+**What students use today: the calendar feeds only.** Full API access (courses,
+assignment details, submission status) needs each university to approve Student OS,
+which hasn't happened yet. A calendar connection is NOT full Canvas/Blackboard API
+access: it brings in assignment due dates (as tasks) and calendar events (as
+read-only events on the Calendar), nothing more. Calendar events are described in
+`src/lib/calendar/README.md`.
+
 ## Layers
 
 ```
@@ -157,7 +164,9 @@ Calendar Feed). `canvas/feed.ts` reads it, following the format in Canvas's own
 calendar-feed code: `UID:event-assignment-<id>` (the API's assignment id),
 `SUMMARY:<title> [<course code>]`, `DTSTART` in UTC (or a date for all-day
 items), and a calendar `URL` with `include_contexts=course_<course id>`.
-Undated items aren't in the feed. Calendar events (lectures etc.) are skipped.
+Undated items aren't in the feed. Calendar events (`UID:event-calendar-event-<id>`:
+exams, class meetings, office hours added to the Canvas calendar) become read-only
+calendar events, not tasks (`canvasFeedCalendarEvents`; see `src/lib/calendar/README.md`).
 
 - The link is a secret: `connectCanvasFeedAction` checks it's a Canvas feed on an
   allowed host over HTTPS, downloads it once to confirm it works, and stores it
@@ -341,6 +350,10 @@ doesn't document it):
   imported**: the feed has no submission status, and importing a year of past work
   as to-do would flood the Planner. Only those can be reported "no longer in Blackboard".
 - No submission status (always unknown), no estimates, no link.
+- Other entries (course calendar events, office hours: not gradable items) become
+  read-only calendar events, identified by their full UID
+  (`blackboardFeedCalendarEvents`; see `src/lib/calendar/README.md`). The sample
+  feed had none, so their exact shape isn't confirmed yet.
 
 ### Blackboard setup (institution admin required)
 

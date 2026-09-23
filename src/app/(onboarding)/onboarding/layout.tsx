@@ -13,7 +13,7 @@ export default async function OnboardingLayout({ children }: LayoutProps<"/onboa
   if (app.data.student.onboardingCompleted) redirect("/dashboard")
 
   return (
-    <AppProviders data={app.data} wallClock={app.wallClock}>
+    <AppProviders data={app.data} wallClock={app.wallClock} timeZone={app.timeZone}>
       <main className="min-h-svh bg-muted/40 px-4 py-8 sm:py-12">{children}</main>
     </AppProviders>
   )

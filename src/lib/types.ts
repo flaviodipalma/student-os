@@ -78,7 +78,18 @@ export type TaskInput = Omit<Task, "id" | "source">
 
 // Something that occupies time on the calendar. Events are single-day: they
 // start and end on `date`. (Tasks are different: things to get done, with a due date.)
-export type EventType = "class" | "sports" | "work" | "personal" | "study"
+// "other" is only for events from an external calendar whose kind isn't known
+// (students pick one of the five types for their own events).
+export type NativeEventType = "class" | "sports" | "work" | "personal" | "study"
+export type EventType = NativeEventType | "other"
+
+// Where a calendar item comes from. Student OS items (events, weekly commitments,
+// study sessions) are the student's own; the others are read-only copies from an
+// external calendar.
+export type ExternalCalendarSource = LmsProviderId
+export type EventSource = "student_os" | ExternalCalendarSource
+
+export const eventSourceNames: Record<EventSource, string> = { student_os: "Student OS", ...lmsProviderNames }
 
 export type CalendarEvent = {
   id: string
@@ -96,9 +107,32 @@ export type CalendarEvent = {
   commitmentId?: string
   taskId?: string
   completed?: boolean
+  // Unset = Student OS. External items (see src/lib/calendar/external-events.ts)
+  // also carry their stored event's id, and a location and link when the source has them.
+  source?: EventSource
+  externalEventId?: string
+  location?: string
+  url?: string
 }
 
-export type EventInput = Omit<CalendarEvent, "id" | "sessionId" | "commitmentId" | "taskId" | "completed">
+export type EventInput = Omit<
+  CalendarEvent,
+  "id" | "sessionId" | "commitmentId" | "taskId" | "completed" | "source" | "externalEventId" | "location" | "url" | "type"
+> & { type: NativeEventType }
+
+// An event copied from an external calendar, as the app loads it. Instants are
+// ISO 8601 (UTC); `hidden` = the student hid it from Student OS.
+export type ExternalEventRecord = {
+  id: string
+  source: ExternalCalendarSource
+  title: string
+  description: string | null
+  startsAt: string
+  endsAt: string
+  location: string | null
+  url: string | null
+  hidden: boolean
+}
 
 // Time set aside to work on a task, stored when the student accepts, completes or
 // skips a Planner suggestion. skipped = removed from that day's plan.
@@ -150,7 +184,7 @@ export type RecurringCommitment = {
   daysOfWeek: number[]
   startTime: string
   endTime: string
-  type: EventType
+  type: NativeEventType
   description?: string
   // Optional first and last day (inclusive); unset = no limit.
   startDate?: string

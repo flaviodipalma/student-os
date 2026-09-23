@@ -332,3 +332,38 @@ export const lmsConnections = pgTable(
   },
   (t) => [unique("lms_connections_user_provider_key").on(t.userId, t.provider)]
 ).enableRLS()
+
+// Events copied from a student's external calendar (Canvas, Blackboard). Read-only
+// copies: Student OS never changes the original. One row per (student, source,
+// external id), so re-syncing never duplicates, and Canvas "123" and Blackboard
+// "123" are different rows. Times are real instants (timestamptz); they're shown
+// in the student's time zone. See src/lib/calendar/external-events.ts.
+export const externalCalendarEvents = pgTable(
+  "external_calendar_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    source: lmsProvider("source").notNull(),
+    externalId: text("external_id").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    location: text("location"),
+    url: text("url"),
+    // The student hid it from Student OS (kept hidden through later syncs).
+    hidden: boolean("hidden").notNull().default(false),
+    // When it disappeared from the provider (not shown; comes back if it reappears).
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    unique("external_calendar_events_user_source_key").on(t.userId, t.source, t.externalId),
+    index("external_calendar_events_user_starts_idx").on(t.userId, t.startsAt),
+    check("external_calendar_events_end_after_start", sql`${t.endsAt} > ${t.startsAt}`),
+    check("external_calendar_events_title_length", sql`char_length(btrim(${t.title})) between 1 and 200`),
+  ]
+).enableRLS()

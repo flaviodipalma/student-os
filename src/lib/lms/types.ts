@@ -92,4 +92,7 @@ export type LmsSyncResult = {
   // Safe, student-facing messages.
   errors: string[]
   syncedAt: string
+  // Calendar events from the same source (calendar feeds only; see
+  // src/lib/calendar/external-events.ts). Absent when the source has no calendar.
+  calendarEvents?: { added: number; updated: number; removed: number; skipped: number; failed: number }
 }

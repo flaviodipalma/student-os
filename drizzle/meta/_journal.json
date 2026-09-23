@@ -43,6 +43,13 @@
       "when": 1790178280993,
       "tag": "0005_task_estimate_optional_and_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790194559205,
+      "tag": "0006_external_calendar_events",
+      "breakpoints": true
     }
   ]
 }
