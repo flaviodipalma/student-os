@@ -1,9 +1,35 @@
-// The Student OS planner: rule-based, no AI. Takes tasks + calendar events for a
-// date and suggests study sessions. Pure functions only; no React in here.
+// The Student OS planner: rule-based and deterministic, no AI. Takes the
+// student's tasks, schedule and preferences and answers "What should I do
+// today?" with recommended study sessions. Pure functions only; no React here.
+//
+//   settings.ts     every rule and weight, in one place
+//   availability.ts free time and the study budget for a day
+//   scoring.ts      remaining work, task scores and their reasons
+//   generate-plan.ts  the day-by-day planner (createPlanner / generatePlan)
+//   warnings.ts     "Needs attention"
+//   timeline.ts     one day as an ordered list, for display
 
-export { generatePlan, plannedMinutesFor, dailyTarget, type PlanInput } from "./generate-plan"
-export { calculateTaskUrgency, urgencyReasons } from "./urgency"
-export { findFreeSlots } from "./availability"
-export { buildDayTimeline, type TimelineItem } from "./timeline"
-export { DEFAULT_MAX_STUDY_MINUTES_PER_DAY, DEFAULT_PLANNER_SETTINGS, type PlannerSettings } from "./settings"
-export type { DailyPlan, StudySession, StudySessionStatus, UnscheduledTask, PlanStatus } from "./types"
+export { createPlanner, generatePlan, dailyTarget, type Planner, type PlanInput } from "./generate-plan"
+export { calculateTaskUrgency, compareScored, plannedMinutesFor, reasonsOf, scoreTask } from "./scoring"
+export { dayAvailability, findFreeSlots } from "./availability"
+export { buildDayTimeline, partOfDay, type TimelineItem, type PartOfDay } from "./timeline"
+export {
+  DEFAULT_MAX_STUDY_MINUTES_PER_DAY,
+  DEFAULT_PLANNER_SETTINGS,
+  DEFAULT_SCORING,
+  type PlannerSettings,
+  type ScoringWeights,
+} from "./settings"
+export type {
+  AvailableTimeBlock,
+  DailyPlan,
+  PlannerInput,
+  PlannerWarning,
+  PlanStatus,
+  RecommendedStudySession,
+  ScoreFactor,
+  ScoredTask,
+  StudySession,
+  StudySessionStatus,
+  UnscheduledTask,
+} from "./types"

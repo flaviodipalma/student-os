@@ -1,42 +1,58 @@
 "use client"
 
-import { useMemo } from "react"
+import { createContext, use, useMemo } from "react"
 import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
-import { generatePlan, type DailyPlan, type StudySession } from "@/lib/planner"
+import { createPlanner, type DailyPlan, type Planner, type StudySession } from "@/lib/planner"
 import { plannerSettingsFor } from "@/lib/preferences"
 
 // Connects the planner (pure logic in src/lib/planner) to the student's saved data.
 //
 //   database -> tasks + events + study sessions + weekly commitments
-//            + the student's study preferences -> generatePlan -> suggestions
+//            + the student's study preferences -> createPlanner -> DailyPlan per date
 //
-// usePlan(date) is used by both the Planner page and the Dashboard, so they
-// always agree. Suggestions themselves aren't stored; they're recalculated from
-// the saved data. What the student does with them is stored as a study session:
-//   accept -> scheduled, mark done -> completed, remove -> skipped.
+// One planner is shared by every page (PlannerProvider), so the Dashboard and
+// the Planner page read the very same DailyPlan. It's rebuilt only when the
+// data, preferences or the current minute change; plans are cached per date.
+// Recommendations themselves aren't stored. What the student does with them is
+// stored as a study session: accept -> scheduled, mark done -> completed,
+// remove -> skipped.
 
-export function usePlan(date: string): DailyPlan {
+const PlannerContext = createContext<Planner | null>(null)
+
+export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const { tasks, calendarItems, studySessions, preferences, recurringCommitments } = useAppStore()
   const now = useNow()
+  // The clock ticks every 30 seconds; the plan only needs to move on each minute.
+  const minute = Math.floor(now.getTime() / 60_000)
 
-  return useMemo(() => {
-    const skippedTaskIds = studySessions
-      .filter((session) => session.status === "skipped" && session.date === date)
-      .map((session) => session.taskId)
-    return generatePlan({
-      date,
+  const planner = useMemo(() => {
+    // Tasks removed from a day's plan, by date.
+    const skipped: Record<string, string[]> = {}
+    for (const session of studySessions) {
+      if (session.status === "skipped") (skipped[session.date] ??= []).push(session.taskId)
+    }
+    return createPlanner({
       tasks,
       // Events and scheduled/completed study sessions (all dates, so time already
       // planned for a task counts), plus the weekly commitments: the planner
       // treats both as busy time, using the same occurrence rules as the Calendar.
       events: calendarItems,
       recurringCommitments,
-      now,
-      skippedTaskIds,
+      now: new Date(minute * 60_000),
+      skipped,
       settings: plannerSettingsFor(preferences),
     })
-  }, [date, tasks, calendarItems, studySessions, recurringCommitments, preferences, now])
+  }, [tasks, calendarItems, studySessions, recurringCommitments, preferences, minute])
+
+  return <PlannerContext value={planner}>{children}</PlannerContext>
+}
+
+// The plan for one date. Same object for every component asking for that date.
+export function usePlan(date: string): DailyPlan {
+  const planner = use(PlannerContext)
+  if (!planner) throw new Error("usePlan must be used inside PlannerProvider")
+  return useMemo(() => planner.planFor(date), [planner, date])
 }
 
 export function usePlanActions() {

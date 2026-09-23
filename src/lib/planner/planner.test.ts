@@ -89,10 +89,12 @@ describe("generatePlan", () => {
     expect(plan.suggestions.map((s) => s.taskId)).toEqual([open.id])
   })
 
-  it("says so when there are no tasks to schedule", () => {
-    const plan = generatePlan({ date: DATE, tasks: [task({ status: "completed" })], events: [], now: NOW })
-    expect(plan.status).toBe("no-tasks")
-    expect(plan.suggestions).toEqual([])
+  it("says so when there are no tasks, or all of them are done", () => {
+    const none = generatePlan({ date: DATE, tasks: [], events: [], now: NOW })
+    expect(none.status).toBe("no-tasks")
+    const done = generatePlan({ date: DATE, tasks: [task({ status: "completed" })], events: [], now: NOW })
+    expect(done.status).toBe("all-done")
+    expect(done.suggestions).toEqual([])
   })
 
   it("considers more urgent tasks first", () => {
@@ -208,7 +210,7 @@ describe("generatePlan", () => {
     const fullyBooked = { ...booked, endTime: "17:30" }
     const covered = generatePlan({ date: DATE, tasks: [assignment], events: [fullyBooked], now: NOW })
     expect(covered.suggestions).toEqual([])
-    expect(covered.status).toBe("no-tasks")
+    expect(covered.status).toBe("covered")
   })
 
   it("shows existing linked sessions as booked, not as new suggestions", () => {
@@ -242,7 +244,7 @@ describe("generatePlan", () => {
     expect(generatePlan({ date: DATE, tasks: [overdue], events: [], now: NOW }).suggestions).toHaveLength(1)
     expect(generatePlan({ date: "2026-09-21", tasks: [overdue], events: [], now: NOW }).status).toBe("past")
     // Planning Thursday: a task due Wednesday can no longer be helped that day.
-    expect(generatePlan({ date: "2026-09-24", tasks: [task()], events: [], now: NOW }).status).toBe("no-tasks")
+    expect(generatePlan({ date: "2026-09-24", tasks: [task()], events: [], now: NOW }).status).toBe("covered")
   })
 
   it("leaves out tasks the student skipped", () => {

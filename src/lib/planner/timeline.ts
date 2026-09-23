@@ -54,3 +54,13 @@ export function buildDayTimeline(plan: DailyPlan, eventsOnDay: CalendarEvent[]):
   return withGaps
 }
 
+
+// Morning (before noon), afternoon (noon-5 PM), evening (5 PM on), by start time.
+export type PartOfDay = "morning" | "afternoon" | "evening"
+
+export function partOfDay(start: string): PartOfDay {
+  const minutes = toMinutes(start)
+  if (minutes < 12 * 60) return "morning"
+  if (minutes < 17 * 60) return "afternoon"
+  return "evening"
+}

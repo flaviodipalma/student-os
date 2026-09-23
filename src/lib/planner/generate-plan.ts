@@ -1,80 +1,271 @@
-import { byStart, durationMinutes, fromMinutes, toMinutes } from "@/lib/events"
-import { daysBetween, fromDateKey, toDateKey } from "@/lib/format"
+import { byStart, fromMinutes, toMinutes } from "@/lib/events"
+import { addDays, daysBetween, formatDuration, fromDateKey, toDateKey } from "@/lib/format"
 import { isDone } from "@/lib/tasks"
-import { commitmentsOn } from "@/lib/recurring"
-import type { CalendarEvent, RecurringCommitment, Task } from "@/lib/types"
-import { findFreeSlots, roundUp, totalMinutes, type Slot } from "./availability"
-import { DEFAULT_PLANNER_SETTINGS, type PlannerSettings } from "./settings"
-import type { DailyPlan, StudySession, UnscheduledTask } from "./types"
-import { calculateTaskUrgency } from "./urgency"
+import type { CalendarEvent, Task } from "@/lib/types"
+import { dayAvailability, roundDown, roundUp, type DayAvailability } from "./availability"
+import { compareScored, completedMinutesFor, estimateOf, plannedMinutesFor, reasonsOf, scoreTask } from "./scoring"
+import { DEFAULT_PLANNER_SETTINGS, DEFAULT_SCORING, type PlannerSettings } from "./settings"
+import type { DailyPlan, PlannerInput, ScoredTask, StudySession, UnscheduledTask } from "./types"
+import { buildWarnings } from "./warnings"
 
-export type PlanInput = {
+// The planner: rule-based and deterministic (same input, same plan; no AI, no
+// randomness). For each day it runs:
+//
+//   1. Normalize the schedule: events, study sessions and weekly commitments on that day
+//   2. Available time: free blocks in the study window, and the day's study budget
+//   3. Remaining work per task: estimate − completed − already booked − planned on earlier days
+//   4. Score the open tasks (scoring.ts) and sort them, highest first
+//   5. Give each task its share of the day, in the earliest free blocks that fit,
+//      in the student's preferred block length, with breaks, within the budget
+//   6. Record what didn't fit, and build "Needs attention" (warnings.ts)
+//
+// Days are planned in order, starting today: a later day's plan assumes the
+// earlier days' recommendations happen, so big tasks are spread over several
+// days instead of piling up. Recommendations aren't stored; accepting,
+// completing or removing one stores a study session, and the plan is rebuilt.
+
+export type Planner = {
+  settings: PlannerSettings
+  // The plan for one date. Plans are computed once per planner and cached.
+  planFor: (date: string) => DailyPlan
+}
+
+export function createPlanner(input: PlannerInput): Planner {
+  const settings: PlannerSettings = {
+    ...DEFAULT_PLANNER_SETTINGS,
+    ...input.settings,
+    scoring: input.settings?.scoring ?? DEFAULT_SCORING,
+  }
+  const { now, events } = input
+  const today = toDateKey(now)
+  const commitments = input.recurringCommitments ?? []
+  const openTasks = input.tasks.filter((task) => !isDone(task))
+
+  // Per task: its estimate, whether work has started, and the work still to plan.
+  const estimates = new Map(openTasks.map((task) => [task.id, estimateOf(task, settings)]))
+  const started = new Map(
+    openTasks.map((task) => [task.id, task.status === "in_progress" || completedMinutesFor(task.id, events) > 0])
+  )
+  const baselineRemaining = () =>
+    new Map(
+      openTasks.map((task) => [task.id, Math.max(0, estimates.get(task.id)!.minutes - plannedMinutesFor(task.id, events, today))])
+    )
+
+  // Each day's availability before the planner adds anything (for lookahead).
+  const baseline = new Map<string, DayAvailability>()
+  const availabilityOn = (date: string) => {
+    if (!baseline.has(date)) baseline.set(date, dayAvailability(date, events, commitments, now, settings))
+    return baseline.get(date)!
+  }
+  // Study time the planner could find from `from` to `to` (inclusive). Beyond
+  // the lookahead the planner doesn't guess: it's treated as plenty.
+  const capacityBetween = (from: string, to: string) => {
+    if (to < from) return 0
+    if (daysBetween(fromDateKey(from), fromDateKey(to)) >= settings.lookaheadDays) return Infinity
+    let total = 0
+    for (let date = from; date <= to; date = addDays(date, 1)) total += availabilityOn(date).budget
+    return total
+  }
+
+  function planDay(date: string, remaining: Map<string, number>): DailyPlan {
+    // 1-2. The day's schedule and free time (a fresh copy: placing sessions uses it up).
+    const day = dayAvailability(date, events, commitments, now, settings)
+    const skipped = input.skipped?.[date] ?? []
+    const plan: DailyPlan = {
+      date,
+      status: "ok",
+      suggestions: [],
+      existingSessions: existingSessionsOn(day.items, date),
+      unscheduled: [],
+      skippedTaskIds: skipped,
+      ranked: [],
+      available: day.free,
+      studyMinutes: day.bookedStudyMinutes,
+      studyLimit: settings.maxStudyMinutesPerDay,
+      freeMinutes: day.freeMinutes,
+      warnings: [],
+    }
+
+    // 3-4. Open tasks that need time on this day, scored and sorted.
+    //      Overdue work is only planned for today; skipped tasks wait for another day.
+    plan.ranked = openTasks
+      .filter((task) => !skipped.includes(task.id))
+      .filter((task) => task.dueDate >= date || date === today)
+      .filter((task) => remaining.get(task.id)! > 0)
+      .map((task) =>
+        scoreTask(
+          task,
+          {
+            date,
+            today,
+            remainingMinutes: remaining.get(task.id)!,
+            estimateMissing: estimates.get(task.id)!.missing,
+            started: started.get(task.id)!,
+            capacityBeforeDue: capacityBetween(date, task.dueDate <= date ? date : addDays(task.dueDate, -1)),
+          },
+          settings.scoring
+        )
+      )
+      .sort(compareScored)
+
+    if (plan.ranked.length === 0) {
+      plan.status = input.tasks.length === 0 ? "no-tasks" : openTasks.length === 0 ? "all-done" : "covered"
+    } else {
+      const hasUsableTime = day.slots.some((slot) => slot.end - slot.start >= settings.minBlockMinutes)
+      placeSessions(plan, day, remaining)
+      plan.status =
+        day.limitLeft <= 0 ? "limit-reached" : !hasUsableTime && plan.suggestions.length === 0 ? "no-time" : "ok"
+    }
+
+    // 6. Needs attention.
+    plan.warnings = buildWarnings({ plan, today, openTasks, settings })
+    return plan
+  }
+
+  // 5. Place study sessions for the ranked tasks. Updates `remaining` with what was planned.
+  function placeSessions(plan: DailyPlan, day: DayAvailability, remaining: Map<string, number>) {
+    const dayEnd = toMinutes(settings.dayEnd)
+    let budget = day.budget
+
+    for (const scored of plan.ranked) {
+      const { task } = scored
+      const left0 = remaining.get(task.id)!
+      const daysLeft = Math.max(scored.daysLeft, 0)
+      // Work due later today has to finish before its due time.
+      const cutoff = task.dueDate === plan.date && task.dueTime ? Math.min(dayEnd, toMinutes(task.dueTime)) : dayEnd
+      // What later days (before the deadline) could still take on.
+      const laterCapacity = daysLeft <= 1 ? 0 : capacityBetween(addDays(plan.date, 1), addDays(task.dueDate, -1))
+      const target = dailyTarget(left0, daysLeft, laterCapacity, settings)
+      const reasons = reasonsOf(scored)
+      if (target < left0) reasons.push(`Spread over several days (${formatDuration(left0)} left)`)
+
+      let left = target
+      let scheduled = 0
+      let hitLimit = false
+      while (left > 0) {
+        // The shortest block worth placing: a full minimum block, or what's left if less.
+        const smallest = Math.min(settings.minBlockMinutes, roundUp(left, 5))
+        const ideal = idealBlock(left, settings)
+        const wanted = Math.min(ideal, roundDown(budget, 5))
+        if (wanted < smallest) {
+          hitLimit = true
+          break
+        }
+        // The earliest free block with room for at least the smallest useful block.
+        const slot = day.slots.find((s) => roundDown(Math.min(s.end, cutoff) - s.start, 5) >= smallest)
+        if (!slot) break
+        const space = roundDown(Math.min(slot.end, cutoff) - slot.start, 5)
+        // Adapt to the real gap: a 45-minute gap gets a 45-minute session.
+        const length = Math.min(wanted, space)
+        const start = slot.start
+        plan.suggestions.push({
+          id: `${task.id}@${plan.date}T${fromMinutes(start)}`,
+          taskId: task.id,
+          date: plan.date,
+          startTime: fromMinutes(start),
+          endTime: fromMinutes(start + length),
+          status: "suggested",
+          score: scored.score,
+          reasons: [...reasons, placementReason(length, ideal, space)],
+        })
+        // Use up the block, plus a break before any next study block.
+        slot.start = Math.min(slot.end, start + length + settings.breakMinutes)
+        left = Math.max(0, left - length)
+        budget -= length
+        scheduled += length
+      }
+
+      remaining.set(task.id, left0 - scheduled)
+      if (left > 0) plan.unscheduled.push(unscheduledEntry(task, left, scheduled, hitLimit, day, cutoff, scored))
+    }
+
+    plan.suggestions.sort((a, b) => a.startTime.localeCompare(b.startTime))
+    plan.studyMinutes = day.bookedStudyMinutes + (day.budget - budget)
+  }
+
+  function unscheduledEntry(
+    task: Task,
+    left: number,
+    scheduled: number,
+    hitLimit: boolean,
+    day: DayAvailability,
+    cutoff: number,
+    scored: ScoredTask
+  ): UnscheduledTask {
+    // Out of budget while usable free time remains = the daily limit stopped it.
+    // Otherwise the day simply ran out of free time.
+    const freeTimeLeft = day.slots.some(
+      (slot) => Math.min(slot.end, cutoff) - slot.start >= Math.min(left, settings.minBlockMinutes)
+    )
+    return {
+      taskId: task.id,
+      missingMinutes: left,
+      scheduledMinutes: scheduled,
+      reason: hitLimit && freeTimeLeft ? "daily-limit" : "no-time",
+      atRisk: scored.daysLeft <= 2,
+    }
+  }
+
+  // Plans are simulated day by day from today, and cached.
+  const plans = new Map<string, DailyPlan>()
+  const simulated = baselineRemaining()
+  let simulatedThrough = addDays(today, -1)
+
+  function planFor(date: string): DailyPlan {
+    const cached = plans.get(date)
+    if (cached) return cached
+    let plan: DailyPlan
+    if (date < today) {
+      plan = pastPlan(date)
+    } else if (daysBetween(fromDateKey(today), fromDateKey(date)) > settings.lookaheadDays) {
+      // Far ahead: planned on its own, from today's view of the remaining work.
+      plan = planDay(date, baselineRemaining())
+    } else {
+      while (simulatedThrough < date) {
+        simulatedThrough = addDays(simulatedThrough, 1)
+        plans.set(simulatedThrough, planDay(simulatedThrough, simulated))
+      }
+      plan = plans.get(date)!
+    }
+    plans.set(date, plan)
+    return plan
+  }
+
+  function pastPlan(date: string): DailyPlan {
+    const day = dayAvailability(date, events, commitments, now, settings)
+    return {
+      date,
+      status: "past",
+      suggestions: [],
+      existingSessions: existingSessionsOn(day.items, date),
+      unscheduled: [],
+      skippedTaskIds: input.skipped?.[date] ?? [],
+      ranked: [],
+      available: [],
+      studyMinutes: day.bookedStudyMinutes,
+      studyLimit: settings.maxStudyMinutesPerDay,
+      freeMinutes: 0,
+      warnings: [],
+    }
+  }
+
+  return { settings, planFor }
+}
+
+// One-date convenience (tests, and anywhere only a single day is needed).
+export type PlanInput = Omit<PlannerInput, "skipped"> & {
   date: string
-  tasks: Task[]
-  events: CalendarEvent[]
-  // The current time. Decides what "today" is and stops the planner using time that has passed.
-  now: Date
   // Tasks the student removed from this date's plan.
   skippedTaskIds?: string[]
-  // Weekly commitments (practice, work…). Their times that day count as busy.
-  recurringCommitments?: RecurringCommitment[]
-  settings?: Partial<PlannerSettings>
 }
 
-// Minutes of a task already covered by study sessions on the calendar:
-// completed sessions (any day) plus sessions from today onward.
-// A past session that wasn't marked done doesn't count; it was probably missed.
-export function plannedMinutesFor(taskId: string, events: CalendarEvent[], today: string): number {
-  return events
-    .filter((e) => e.type === "study" && e.taskId === taskId && (e.completed || e.date >= today))
-    .reduce((sum, e) => sum + durationMinutes(e), 0)
+export function generatePlan({ date, skippedTaskIds, ...input }: PlanInput): DailyPlan {
+  return createPlanner({ ...input, skipped: skippedTaskIds ? { [date]: skippedTaskIds } : undefined }).planFor(date)
 }
 
-// How much of a task's remaining time to aim for on one day.
-// Due today or tomorrow (or overdue): all of it. Otherwise spread it evenly over
-// the days left, but never less than one short block so progress actually happens.
-export function dailyTarget(remaining: number, daysLeft: number, settings: PlannerSettings): number {
-  if (daysLeft <= 1) return remaining
-  const share = roundUp(remaining / daysLeft, 15)
-  return Math.min(remaining, Math.max(share, settings.minBlockMinutes))
-}
-
-// The block length we'd like for `left` minutes of work.
-// With a preferred block length (from the student's preferences), work is done
-// in blocks of that length, with a shorter last block (90 min at 60 -> 60 + 30),
-// unless the remainder would be shorter than a minimum block.
-// Without one, anything longer than the maximum is split into equal blocks (3h -> 2 x 90 min).
-function idealBlock(left: number, settings: PlannerSettings): number {
-  const preferred = settings.preferredBlockMinutes
-  if (preferred) {
-    if (left <= preferred) return roundUp(left, 5)
-    if (left - preferred < settings.minBlockMinutes && left <= settings.maxBlockMinutes) return roundUp(left, 5)
-    return preferred
-  }
-  if (left <= settings.maxBlockMinutes) return roundUp(left, 5)
-  const blocks = Math.ceil(left / settings.maxBlockMinutes)
-  return roundUp(left / blocks, 15)
-}
-
-// Shrinks a block to fit `space` minutes, snapping to a standard length.
-function fitBlock(wanted: number, space: number, settings: PlannerSettings): number {
-  if (wanted <= space) return wanted
-  const sizes = settings.blockSizes.filter((size) => size <= space && size <= wanted && size >= settings.minBlockMinutes)
-  return sizes.length > 0 ? Math.max(...sizes) : 0
-}
-
-export function generatePlan(input: PlanInput): DailyPlan {
-  const settings = { ...DEFAULT_PLANNER_SETTINGS, ...input.settings }
-  const { date, tasks, events, now } = input
-  const today = toDateKey(now)
-  const skipped = input.skippedTaskIds ?? []
-
-  // Everything that takes time that day: events, study sessions, weekly commitments.
-  const dayEvents = [
-    ...events.filter((e) => e.date === date),
-    ...commitmentsOn(input.recurringCommitments ?? [], date),
-  ]
-  const existingSessions: StudySession[] = dayEvents
+// Study sessions already on the calendar for the day, linked to a task.
+function existingSessionsOn(items: CalendarEvent[], date: string): StudySession[] {
+  return items
     .filter((e) => e.type === "study" && e.taskId)
     .sort(byStart)
     .map((e) => ({
@@ -86,115 +277,50 @@ export function generatePlan(input: PlanInput): DailyPlan {
       endTime: e.endTime,
       status: e.completed ? "completed" : "scheduled",
     }))
-  const existingStudy = dayEvents.filter((e) => e.type === "study").reduce((sum, e) => sum + durationMinutes(e), 0)
+}
 
-  const plan: DailyPlan = {
-    date,
-    status: "ok",
-    suggestions: [],
-    existingSessions,
-    unscheduled: [],
-    skippedTaskIds: skipped,
-    studyMinutes: existingStudy,
-    studyLimit: settings.maxStudyMinutesPerDay,
-    freeMinutes: 0,
+// Why the session has the length it has (the last "Why this?" reason).
+function placementReason(length: number, ideal: number, space: number): string {
+  if (length >= ideal) return "Fits your available time"
+  if (space <= length) return `Shortened to fit a ${formatDuration(length)} gap`
+  return "Shortened to stay within your daily study limit"
+}
+
+// How much of a task's remaining work to aim for on one day.
+// - Due today or tomorrow (or overdue): all of it.
+// - Otherwise an even share over the days left (at least one minimum block,
+//   so progress actually happens)…
+// - …but more if the later days before the deadline can't hold the rest.
+export function dailyTarget(
+  remaining: number,
+  daysLeft: number,
+  laterCapacity: number,
+  settings: Pick<PlannerSettings, "minBlockMinutes">
+): number {
+  if (daysLeft <= 1) return remaining
+  const evenShare = Math.max(roundUp(remaining / daysLeft, 15), settings.minBlockMinutes)
+  const catchUp = remaining - laterCapacity
+  return Math.min(remaining, Math.max(evenShare, catchUp))
+}
+
+// The block length we'd like for `left` minutes of work.
+// With a preferred block length (from the student's preferences), work is done
+// in blocks of that length, with a shorter last block (90 min at 60 -> 60 + 30),
+// unless the remainder would be shorter than a minimum block (70 at 60 -> 70).
+// Without one, anything longer than the maximum is split into equal blocks (3h -> 2 x 90 min).
+// Never longer than the maximum continuous study time.
+function idealBlock(left: number, settings: PlannerSettings): number {
+  return Math.min(settings.maxBlockMinutes, idealLength(left, settings))
+}
+
+function idealLength(left: number, settings: PlannerSettings): number {
+  const preferred = settings.preferredBlockMinutes
+  if (preferred) {
+    if (left <= preferred) return roundUp(left, 5)
+    if (left - preferred < settings.minBlockMinutes && left <= settings.maxBlockMinutes) return roundUp(left, 5)
+    return preferred
   }
-  if (date < today) return { ...plan, status: "past" }
-
-  // 1. Free time: gaps between events, inside the planning hours, and not in the past.
-  const dayEnd = toMinutes(settings.dayEnd)
-  let dayStart = toMinutes(settings.dayStart)
-  if (date === today) dayStart = Math.max(dayStart, roundUp(now.getHours() * 60 + now.getMinutes(), 15))
-  const slots: Slot[] = findFreeSlots(dayEvents, dayStart, dayEnd)
-  plan.freeMinutes = totalMinutes(slots)
-  const hasUsableTime = slots.some((slot) => slot.end - slot.start >= settings.minBlockMinutes)
-
-  // 2. Tasks that need time: not done, not skipped, not already covered by sessions,
-  //    and not due before this date (overdue work is only planned for today).
-  const candidates = tasks
-    .filter((task) => !isDone(task) && !skipped.includes(task.id))
-    .filter((task) => task.dueDate >= date || date === today)
-    .map((task) => ({ task, remaining: task.estimateMinutes - plannedMinutesFor(task.id, events, today) }))
-    .filter(({ remaining }) => remaining > 0)
-    // 3. Most urgent first (ties: earlier due date first).
-    .sort(
-      (a, b) =>
-        calculateTaskUrgency(b.task, date) - calculateTaskUrgency(a.task, date) ||
-        a.task.dueDate.localeCompare(b.task.dueDate)
-    )
-  if (candidates.length === 0) return { ...plan, status: "no-tasks" }
-
-  // 4. Study budget: the daily limit minus study already booked, and never more
-  //    than a share of the day's open time. Study already booked counts as used
-  //    open time, so accepting a suggestion doesn't make room for extra study.
-  const limitLeft = settings.maxStudyMinutesPerDay - existingStudy
-  const shareLeft = Math.floor((plan.freeMinutes + existingStudy) * settings.maxShareOfFreeTime) - existingStudy
-  let budget = Math.max(0, Math.min(limitLeft, shareLeft))
-
-  // 5. Give each task its share of today, in order, in the earliest gaps that fit.
-  const suggestions: StudySession[] = []
-  const unscheduled: UnscheduledTask[] = []
-  for (const { task, remaining } of candidates) {
-    const daysLeft = daysBetween(fromDateKey(date), fromDateKey(task.dueDate))
-    // Work due later today has to finish before its due time.
-    const cutoff = task.dueDate === date && task.dueTime ? Math.min(dayEnd, toMinutes(task.dueTime)) : dayEnd
-    let left = dailyTarget(remaining, Math.max(daysLeft, 0), settings)
-    let scheduled = 0
-    let hitLimit = false
-
-    while (left > 0) {
-      // If the study budget can't cover the ideal block, fall back to the
-      // largest standard block it can cover.
-      let wanted = idealBlock(left, settings)
-      if (wanted > budget) {
-        const sizes = settings.blockSizes.filter((size) => size <= budget && size >= settings.minBlockMinutes)
-        wanted = sizes.length > 0 ? Math.max(...sizes) : 0
-      }
-      if (wanted <= 0) {
-        hitLimit = true
-        break
-      }
-      const slot = slots.find((s) => fitBlock(wanted, Math.min(s.end, cutoff) - s.start, settings) > 0)
-      if (!slot) break
-      const length = fitBlock(wanted, Math.min(slot.end, cutoff) - slot.start, settings)
-      const start = slot.start
-      suggestions.push({
-        id: `${task.id}@${date}T${fromMinutes(start)}`,
-        taskId: task.id,
-        date,
-        startTime: fromMinutes(start),
-        endTime: fromMinutes(start + length),
-        status: "suggested",
-      })
-      // Use up the slot, plus a short break before any next study block.
-      slot.start = Math.min(slot.end, start + length + settings.breakMinutes)
-      left = Math.max(0, left - length)
-      budget -= length
-      scheduled += length
-    }
-
-    if (left > 0) {
-      // Out of budget while free time remains = the daily limit stopped it.
-      // Otherwise the day simply ran out of free time.
-      const freeTimeLeft = slots.some(
-        (slot) => Math.min(slot.end, cutoff) - slot.start >= Math.min(left, settings.minBlockMinutes)
-      )
-      unscheduled.push({
-        taskId: task.id,
-        missingMinutes: left,
-        scheduledMinutes: scheduled,
-        reason: hitLimit && freeTimeLeft ? "daily-limit" : "no-time",
-        atRisk: daysLeft <= 2,
-      })
-    }
-  }
-
-  suggestions.sort((a, b) => a.startTime.localeCompare(b.startTime))
-  return {
-    ...plan,
-    status: limitLeft <= 0 ? "limit-reached" : !hasUsableTime && suggestions.length === 0 ? "no-time" : "ok",
-    suggestions,
-    unscheduled,
-    studyMinutes: existingStudy + suggestions.reduce((sum, s) => sum + toMinutes(s.endTime) - toMinutes(s.startTime), 0),
-  }
+  if (left <= settings.maxBlockMinutes) return roundUp(left, 5)
+  const blocks = Math.ceil(left / settings.maxBlockMinutes)
+  return roundUp(left / blocks, 15)
 }
