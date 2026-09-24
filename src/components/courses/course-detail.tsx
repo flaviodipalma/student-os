@@ -41,13 +41,13 @@ export function CourseDetail({ courseId }: { courseId: string }) {
       <title>{`${course.code} ${course.name} · Student OS`}</title>
       <Link
         href="/courses"
-        className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <ArrowLeftIcon aria-hidden className="size-4" />
         All courses
       </Link>
 
-      <header className="flex overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+      <header className="flex overflow-hidden rounded-xl bg-card ring-1 ring-border">
         <span aria-hidden className={cn("w-1.5 shrink-0", courseColorClass[course.color])} />
         <div className="flex-1 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

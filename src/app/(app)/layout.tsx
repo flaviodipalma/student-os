@@ -7,6 +7,8 @@ import { MobileNav } from "@/components/app-shell/mobile-nav"
 import { NotificationBell } from "@/components/notifications/notification-center"
 import { MobileTabBar } from "@/components/app-shell/nav-links"
 import { Sidebar } from "@/components/app-shell/sidebar"
+import { SavedThemeSync } from "@/components/theme/theme-provider"
+import { ThemeMenu } from "@/components/theme/theme-menu"
 import { loadSignedInApp } from "@/server/app-loader"
 
 // Shell for every signed-in page: sidebar on desktop; on smaller screens a top bar
@@ -24,13 +26,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <AppProviders data={app.data} wallClock={app.wallClock} timeZone={app.timeZone}>
+      <SavedThemeSync saved={app.theme} />
       <div className="flex min-h-svh">
         <Sidebar account={account} />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur lg:hidden">
             <MobileNav account={account} />
             <Brand />
-            <NotificationBell className="ml-auto" />
+            <ThemeMenu className="ml-auto" />
+            <NotificationBell />
           </header>
           {/* Extra space at the bottom on small screens for the tab bar. */}
           <main className="flex-1 px-4 pt-6 pb-24 sm:px-6 lg:px-10 lg:py-10">

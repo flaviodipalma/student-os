@@ -22,7 +22,7 @@ export function CourseCard({ course }: { course: Course }) {
   return (
     <Link
       href={`/courses/${course.id}`}
-      className="group flex overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 transition-shadow outline-none hover:shadow-md hover:ring-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group flex overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-md hover:ring-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <span aria-hidden className={cn("w-1.5 shrink-0", courseColorClass[course.color])} />
       <div className="flex min-w-0 flex-1 flex-col p-5">
@@ -32,7 +32,7 @@ export function CourseCard({ course }: { course: Course }) {
               {course.code}
               {workload.overdue > 0 && (
                 // Needs attention: said in words and with an icon, not only color.
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800 ring-1 ring-red-600/15">
+                <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger ring-1 ring-danger-border">
                   <CircleAlertIcon aria-hidden className="size-3.5" />
                   {workload.overdue} overdue
                 </span>

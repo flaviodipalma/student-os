@@ -124,7 +124,7 @@ export function TodaySchedule({ className }: { className?: string }) {
 
         <Link
           href="/planner"
-          className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="inline-flex min-h-8 items-center gap-1 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           View full plan
           <ArrowRightIcon aria-hidden className="size-4" />

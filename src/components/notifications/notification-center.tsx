@@ -24,12 +24,12 @@ import { cn } from "@/lib/utils"
 // the server; this only shows them and marks them read or dismissed.
 
 export const notificationMeta: Record<NotificationType, { icon: typeof BellIcon; action: string; tone: string }> = {
-  task_overdue: { icon: TriangleAlertIcon, action: "Open task", tone: "text-red-600" },
-  important_deadline: { icon: FlagIcon, action: "Open task", tone: "text-amber-600" },
-  task_due_soon: { icon: AlarmClockIcon, action: "Open task", tone: "text-amber-600" },
-  study_session_upcoming: { icon: CalendarClockIcon, action: "Open study session", tone: "text-indigo-600" },
+  task_overdue: { icon: TriangleAlertIcon, action: "Open task", tone: "text-danger" },
+  important_deadline: { icon: FlagIcon, action: "Open task", tone: "text-warning" },
+  task_due_soon: { icon: AlarmClockIcon, action: "Open task", tone: "text-warning" },
+  study_session_upcoming: { icon: CalendarClockIcon, action: "Open study session", tone: "text-primary" },
   study_session_missed: { icon: CalendarXIcon, action: "Open study session", tone: "text-muted-foreground" },
-  event_upcoming: { icon: CalendarClockIcon, action: "Open calendar", tone: "text-teal-600" },
+  event_upcoming: { icon: CalendarClockIcon, action: "Open calendar", tone: "text-info" },
   daily_plan_ready: { icon: ClipboardListIcon, action: "Open planner", tone: "text-primary" },
 }
 
@@ -56,7 +56,7 @@ export function NotificationBell({ className }: { className?: string }) {
         {unread > 0 && (
           <span
             aria-hidden
-            className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] leading-4 font-semibold text-white"
+            className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger-solid px-1 text-[10px] leading-4 font-semibold text-white"
           >
             {unread > 9 ? "9+" : unread}
           </span>
@@ -115,14 +115,14 @@ export function NotificationItem({ notification, onOpen, compact = false }: { no
           )}
         </p>
         <p className="text-sm">{notification.message}</p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+        <div className="flex flex-wrap gap-x-4">
           <Link
             href={notification.link}
             onClick={() => {
               markRead(notification.id)
               onOpen?.()
             }}
-            className="rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex min-h-8 items-center rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {meta.action}
           </Link>
@@ -130,7 +130,7 @@ export function NotificationItem({ notification, onOpen, compact = false }: { no
             <button
               type="button"
               onClick={() => markRead(notification.id)}
-              className="rounded-sm text-xs font-medium text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex min-h-8 items-center rounded-sm text-xs font-medium text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               Mark as read
             </button>

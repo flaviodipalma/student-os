@@ -104,7 +104,7 @@ export function IntegrationsCard({
         {integrations === null ? (
           <p className="text-sm text-muted-foreground">We couldn&apos;t load your integrations right now. Please try again later.</p>
         ) : (
-          <ul className="divide-y rounded-lg ring-1 ring-foreground/10">
+          <ul className="divide-y rounded-lg ring-1 ring-border">
             {integrations.map((integration) => (
               <li key={integration.provider} className="px-4 py-4">
                 {!integration.available ? (
@@ -134,8 +134,8 @@ export function Notice({ tone, children }: { tone: "success" | "error" | "info";
       role={tone === "error" ? "alert" : "status"}
       className={cn(
         "flex items-start gap-2 rounded-lg px-3 py-2 text-sm",
-        tone === "success" && "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200",
-        tone === "error" && "bg-red-50 text-red-900 ring-1 ring-red-200",
+        tone === "success" && "bg-success-soft text-success ring-1 ring-success-border",
+        tone === "error" && "bg-danger-soft text-danger ring-1 ring-danger-border",
         tone === "info" && "bg-muted text-foreground"
       )}
     >
@@ -202,7 +202,7 @@ function ProviderHeader({
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                needsAttention ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"
+                needsAttention ? "bg-warning-soft text-warning" : "bg-success-soft text-success"
               )}
             >
               {needsAttention ? "Needs attention" : "Connected"}
@@ -543,7 +543,7 @@ function SyncSummary({ result, name }: { result: LmsSyncResult; name: string }) 
       role="status"
       className={cn(
         "space-y-2 rounded-lg px-3 py-3 text-sm ring-1",
-        issues ? "bg-amber-50 ring-amber-200" : "bg-emerald-50 ring-emerald-200"
+        issues ? "bg-warning-soft ring-warning-border" : "bg-success-soft ring-success-border"
       )}
     >
       <p className="font-medium">{issues ? `${name} sync completed with some issues.` : `${name} sync complete.`}</p>

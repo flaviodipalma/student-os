@@ -61,6 +61,7 @@ export const notificationType = pgEnum("notification_type", [
   "event_upcoming",
   "daily_plan_ready",
 ])
+export const themePreference = pgEnum("theme_preference", ["light", "dark", "system"])
 export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
@@ -132,6 +133,8 @@ export const studentPreferences = pgTable(
     remindDailyPlan: boolean("remind_daily_plan").notNull().default(true),
     reminderMinutes: integer("reminder_minutes").notNull().default(30),
     browserNotifications: boolean("browser_notifications").notNull().default(false),
+    // Appearance: Light / Dark / System. Null = never chosen (the device's cookie decides).
+    theme: themePreference("theme"),
     ...timestamps,
   },
   (t) => [

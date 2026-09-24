@@ -87,8 +87,8 @@ export function AccountCard({
               role={banner.tone === "error" ? "alert" : "status"}
               className={
                 banner.tone === "error"
-                  ? "flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                  : "flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+                  ? "flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
+                  : "flex items-start gap-2 rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
               }
             >
               {banner.tone === "error" ? <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" /> : <CircleCheckIcon aria-hidden className="mt-0.5 size-4 shrink-0" />}
@@ -166,7 +166,7 @@ function MethodRow({
       <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
-          {name} <span className="ml-1 text-xs font-normal text-emerald-700 dark:text-emerald-400">Connected</span>
+          {name} <span className="ml-1 text-xs font-normal text-success">Connected</span>
         </p>
         {detail && <p className="truncate text-xs text-muted-foreground">{detail}</p>}
         {error && (

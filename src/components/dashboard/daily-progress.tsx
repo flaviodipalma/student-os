@@ -26,7 +26,7 @@ export function DailyProgress({ className }: { className?: string }) {
   return (
     <section
       aria-labelledby="progress-heading"
-      className={cn("rounded-xl bg-card p-4 ring-1 ring-foreground/10", className)}
+      className={cn("rounded-xl bg-card p-4 ring-1 ring-border", className)}
     >
       <h2 id="progress-heading" className="text-sm font-medium text-muted-foreground">
         Today&apos;s progress

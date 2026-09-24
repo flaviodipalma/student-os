@@ -149,7 +149,7 @@ function Section({
             </Button>
             {extraAction}
             {status.saved && (
-              <span role="status" className="inline-flex items-center gap-1 text-sm text-emerald-700">
+              <span role="status" className="inline-flex items-center gap-1 text-sm text-success">
                 <CheckIcon aria-hidden className="size-4" />
                 Saved
               </span>

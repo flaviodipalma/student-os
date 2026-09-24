@@ -65,7 +65,7 @@ export function NotificationProvider({
 }) {
   const router = useRouter()
   const { showError } = useFeedback()
-  const { tasks, studySessions } = useAppStore()
+  const { tasks, studySessions, events, recurringCommitments, externalEvents } = useAppStore()
   const [notifications, setNotifications] = useState(initial)
   const [preferences, setPreferences] = useState(initialPreferences)
   // Read by the sync (which shouldn't restart when settings change).
@@ -101,8 +101,9 @@ export function NotificationProvider({
     }
   }, [sync])
 
-  // Soon after the student's work changes (a task done, a session moved), so
-  // reminders follow straight away. The first render is the load sync above.
+  // Soon after the student's work or schedule changes (a task done, a session or
+  // event moved, a weekly commitment edited, a calendar synced), so reminders
+  // follow straight away. The first render is the load sync above.
   const loaded = useRef(false)
   useEffect(() => {
     if (!loaded.current) {
@@ -111,7 +112,7 @@ export function NotificationProvider({
     }
     const timer = setTimeout(sync, AFTER_CHANGE_MS)
     return () => clearTimeout(timer)
-  }, [tasks, studySessions, sync])
+  }, [tasks, studySessions, events, recurringCommitments, externalEvents, sync])
 
   // Changes show at once; if saving fails, the list is reloaded from the server.
   const run = (request: Promise<ActionResult<null>>) =>

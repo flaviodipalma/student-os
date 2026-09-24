@@ -61,7 +61,7 @@ export function SyllabusImporter({ onFinished }: { onFinished?: () => void } = {
       {!onFinished && (
         <Link
           href="/courses"
-          className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <ArrowLeftIcon aria-hidden className="size-4" />
           Courses

@@ -60,7 +60,7 @@ export function TimeGrid({
   return (
     <div
       ref={scrollerRef}
-      className="h-[calc(100svh-15rem)] min-h-[28rem] overflow-auto rounded-xl bg-card ring-1 ring-foreground/10"
+      className="h-[calc(100svh-15rem)] min-h-[28rem] overflow-auto rounded-xl bg-card ring-1 ring-border"
     >
       <div className={cn(isWeek && "min-w-[46rem]")}>
         {/* Day headers */}
@@ -225,8 +225,8 @@ function DayColumn({
           className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
           style={{ top: (nowMinutes / 60) * HOUR_PX - 4 }}
         >
-          <span className="-ml-1 size-2 rounded-full bg-red-500" />
-          <span className="h-0.5 flex-1 bg-red-500" />
+          <span className="-ml-1 size-2 rounded-full bg-danger-solid" />
+          <span className="h-0.5 flex-1 bg-danger-solid" />
         </div>
       )}
     </div>

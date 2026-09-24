@@ -71,7 +71,7 @@ export function CalendarConnections({
           {notice.text}
         </Notice>
       ))}
-      <ul className="divide-y rounded-lg ring-1 ring-foreground/10">
+      <ul className="divide-y rounded-lg ring-1 ring-border">
         {calendars.map((calendar) => (
           <li key={calendar.provider} className="space-y-3 px-4 py-4">
             <CalendarRow calendar={calendar} timeZone={timeZone} />
@@ -100,7 +100,7 @@ function CalendarRow({ calendar, timeZone }: { calendar: CalendarIntegrationStat
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                  needsAttention ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"
+                  needsAttention ? "bg-warning-soft text-warning" : "bg-success-soft text-success"
                 )}
               >
                 {needsAttention ? "Needs attention" : "Connected"}
@@ -217,7 +217,7 @@ function ConnectedActions({ provider, name }: { provider: CalendarProviderId; na
       </div>
       {error && <Notice tone="error">{error}</Notice>}
       {result && (
-        <div role="status" className="space-y-1 rounded-lg bg-emerald-50 px-3 py-3 text-sm ring-1 ring-emerald-200">
+        <div role="status" className="space-y-1 rounded-lg bg-success-soft px-3 py-3 text-sm ring-1 ring-success-border">
           <p className="font-medium">{name} synced.</p>
           {lines.length > 0 ? (
             <ul className="list-inside list-disc space-y-0.5">

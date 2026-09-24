@@ -1,24 +1,34 @@
-import { CircleDashedIcon, ExternalLinkIcon } from "lucide-react"
+import { ChevronDownIcon, ChevronsUpIcon, ChevronUpIcon, CircleDashedIcon, EqualIcon, ExternalLinkIcon, type LucideIcon } from "lucide-react"
 import { priorityLabel } from "@/lib/tasks"
 import { lmsProviderNames, type ExternalSource, type Priority } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const priorityClass: Record<Priority, string> = {
-  critical: "bg-red-600 text-white ring-red-700",
-  high: "bg-red-50 text-red-700 ring-red-600/15",
-  medium: "bg-amber-50 text-amber-800 ring-amber-600/20",
-  low: "bg-muted text-muted-foreground ring-foreground/10",
+  critical: "bg-danger-solid text-white ring-danger-solid",
+  high: "bg-danger-soft text-danger ring-danger-border",
+  medium: "bg-warning-soft text-warning ring-warning-border",
+  low: "bg-muted text-muted-foreground ring-border",
+}
+
+// Priority is said with an icon and a word, never by color alone.
+const priorityIcon: Record<Priority, LucideIcon> = {
+  critical: ChevronsUpIcon,
+  high: ChevronUpIcon,
+  medium: EqualIcon,
+  low: ChevronDownIcon,
 }
 
 export function PriorityBadge({ priority, className }: { priority: Priority; className?: string }) {
+  const Icon = priorityIcon[priority]
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        "inline-flex shrink-0 items-center gap-0.5 rounded-md py-0.5 pr-1.5 pl-1 text-xs font-medium ring-1 ring-inset",
         priorityClass[priority],
         className
       )}
     >
+      <Icon aria-hidden className="size-3.5" />
       {priorityLabel[priority]}
       <span className="sr-only"> priority</span>
     </span>
@@ -44,7 +54,7 @@ export function SourceBadge({ source }: { source: ExternalSource }) {
     <span className="inline-flex items-center gap-2">
       <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">From {name}</span>
       {(source.submissionStatus === "submitted" || source.submissionStatus === "graded") && (
-        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-600/15 ring-inset">
+        <span className="rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success ring-1 ring-success-border ring-inset">
           {source.submissionStatus === "graded" ? "Graded" : "Submitted"} in {name}
         </span>
       )}

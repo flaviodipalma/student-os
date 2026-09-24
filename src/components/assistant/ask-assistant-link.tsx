@@ -23,7 +23,7 @@ export function AskAssistantLink({
     <Link
       href={query ? `/assistant?${query}` : "/assistant"}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
+        "inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50",
         className
       )}
     >

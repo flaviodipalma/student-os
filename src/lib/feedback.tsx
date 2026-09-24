@@ -41,7 +41,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
               role={toast.kind === "error" ? "alert" : "status"}
               className={cn(
                 "pointer-events-auto flex max-w-md items-start gap-2 rounded-lg px-4 py-3 text-sm shadow-lg",
-                toast.kind === "error" ? "bg-foreground text-background" : "bg-emerald-700 text-white"
+                toast.kind === "error" ? "bg-foreground text-background" : "bg-foreground text-background [&>svg:first-child]:text-success"
               )}
             >
               <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />

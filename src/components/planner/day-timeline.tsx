@@ -107,9 +107,9 @@ export function DayTimeline({
           className={cn(
             "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
             state === "suggested" && "bg-primary/10 text-primary",
-            state === "scheduled" && "bg-background/70 text-indigo-900",
+            state === "scheduled" && "bg-background/70 text-event-study-fg",
             state === "completed" && "bg-background text-muted-foreground",
-            state === "missed" && "bg-amber-100 text-amber-900"
+            state === "missed" && "bg-warning-soft text-warning"
           )}
         >
           {state === "suggested" ? "Recommended" : state === "scheduled" ? "Scheduled" : state === "missed" ? "Missed" : "Done"}
@@ -121,7 +121,7 @@ export function DayTimeline({
           : state === "scheduled"
             ? cn("border-transparent border-l-[3px]", eventStyle.study.block)
             : state === "missed"
-              ? "border-amber-300 bg-amber-50/60"
+              ? "border-warning-border bg-warning-soft/60"
               : "border-foreground/10 bg-muted/50 text-muted-foreground"
     }
 

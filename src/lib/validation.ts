@@ -147,7 +147,7 @@ export const preferencesSchema = z
       .min(15, "Plan at least 15 minutes of study a day.")
       .max(720, "That's more than 12 hours of study a day."),
     preferredBlockMinutes: z.union([z.literal(30), z.literal(45), z.literal(60), z.literal(90)], {
-      error: "Pick a study block length of 30, 45, 60 or 90 minutes.",
+      error: "Pick a study session length of 30, 45, 60 or 90 minutes.",
     }),
     breakMinutes: z.int().min(0).max(60, "Breaks can be at most 60 minutes."),
   })

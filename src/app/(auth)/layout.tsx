@@ -17,9 +17,9 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
         You don&apos;t organize college. Student OS does: it plans your study time around your classes and deadlines.
       </p>
-      <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-sm ring-1 ring-foreground/10 sm:p-8">
+      <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-8">
         {!supabaseEnv() && (
-          <p role="alert" className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p role="alert" className="mb-4 rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning">
             Sign-in isn&apos;t set up yet: add the Supabase settings to .env.local (see .env.example).
           </p>
         )}

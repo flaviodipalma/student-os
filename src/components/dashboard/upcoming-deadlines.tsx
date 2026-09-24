@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils"
 
 // How close a deadline is: overdue, 0–1 days urgent, 2–3 days soon, later is calm.
 function urgencyOf(daysLeft: number) {
-  if (daysLeft < 0) return { label: "Overdue", bar: "bg-red-600", text: "text-red-700" }
-  if (daysLeft <= 1) return { label: "Urgent", bar: "bg-red-500", text: "text-red-700" }
-  if (daysLeft <= 3) return { label: "Soon", bar: "bg-amber-500", text: "text-amber-700" }
+  if (daysLeft < 0) return { label: "Overdue", bar: "bg-danger-solid", text: "text-danger" }
+  if (daysLeft <= 1) return { label: "Urgent", bar: "bg-danger-solid", text: "text-danger" }
+  if (daysLeft <= 3) return { label: "Soon", bar: "bg-event-sports", text: "text-warning" }
   return { label: null, bar: "bg-foreground/15", text: "text-muted-foreground" }
 }
 

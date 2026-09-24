@@ -71,6 +71,13 @@
       "when": 1790214720937,
       "tag": "0009_calendar_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790217099234,
+      "tag": "0010_theme_preference",
+      "breakpoints": true
     }
   ]
 }

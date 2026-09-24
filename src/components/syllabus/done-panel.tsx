@@ -20,8 +20,8 @@ export function DonePanel({
   const name = course ? `${course.code} — ${course.name}` : "your course"
 
   return (
-    <section className="rounded-xl bg-card p-8 text-center ring-1 ring-foreground/10">
-      <CircleCheckIcon aria-hidden className="mx-auto size-10 text-emerald-600" />
+    <section className="rounded-xl bg-card p-8 text-center ring-1 ring-border">
+      <CircleCheckIcon aria-hidden className="mx-auto size-10 text-success" />
       <h1 className="mt-4 text-xl font-semibold">Imported into Student OS</h1>
       <p className="mt-1 text-muted-foreground">
         {result.createdCourse ? "Created " : "Updated "}

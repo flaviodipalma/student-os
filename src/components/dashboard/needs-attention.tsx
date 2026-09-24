@@ -70,15 +70,15 @@ function WarningItem({ warning, today }: { warning: PlannerWarning; today: strin
         : { href: "/planner", label: "Open planner" }
   return (
     <li className="flex gap-3 px-4 py-3">
-      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", high ? "text-red-600" : "text-amber-600")} />
+      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", high ? "text-danger" : "text-warning")} />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-xs font-medium text-muted-foreground">
-          <span className={high ? "text-red-700" : "text-amber-800"}>{high ? "Urgent" : "Heads up"}</span>
+          <span className={high ? "text-danger" : "text-warning"}>{high ? "Urgent" : "Heads up"}</span>
         </p>
         <p className="text-sm">{warning.message}</p>
         <Link
           href={link.href}
-          className="inline-block rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="inline-flex min-h-8 items-center rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {link.label}
         </Link>

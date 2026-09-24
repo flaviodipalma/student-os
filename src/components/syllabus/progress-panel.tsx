@@ -24,7 +24,7 @@ export function ProgressPanel({
   const current = steps.findIndex((s) => s.stage === stage)
 
   return (
-    <section aria-labelledby="progress-title" className="rounded-xl bg-card p-6 ring-1 ring-foreground/10 sm:p-8">
+    <section aria-labelledby="progress-title" className="rounded-xl bg-card p-6 ring-1 ring-border sm:p-8">
       <div className="flex items-center gap-3">
         <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
           <FileTextIcon aria-hidden className="size-5 text-muted-foreground" />

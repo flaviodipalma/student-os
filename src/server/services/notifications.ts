@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, lt, notInArray, or, sql } from "drizzle
 import { generateNotifications } from "@/lib/notifications/generate"
 import { createPlanner } from "@/lib/planner"
 import { plannerInputFor } from "@/lib/planner-input"
-import { dateFromWallClock, wallClockIn } from "@/lib/time-zone"
+import { dateFromWallClock, instantAt, wallClockIn } from "@/lib/time-zone"
 import { toDateKey } from "@/lib/format"
 import { scheduleBetween } from "@/lib/recurring"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
@@ -121,10 +121,18 @@ export async function syncNotifications(
   ])
 
   // Today's plan comes from the Planner itself (the same input the app uses).
+  // The reminder comes once a day, from the start of the study window, so the
+  // Planner only runs when that reminder is actually due (not on every sync).
   let plan: { studySessions: number; events: number } | null = null
-  if (prefs.enabled && prefs.dailyPlanReminder) {
-    const localNow = dateFromWallClock(wallClockIn(timeZone, now))
-    const today = toDateKey(localNow)
+  const localNow = dateFromWallClock(wallClockIn(timeZone, now))
+  const today = toDateKey(localNow)
+  const planReminderDue =
+    prefs.enabled &&
+    prefs.dailyPlanReminder &&
+    now.getTime() >= instantAt(today, study.studyStart, timeZone).getTime() &&
+    (await db.select({ id: notifications.id }).from(notifications).where(and(mine(userId), eq(notifications.dedupeKey, `daily_plan_ready:${today}`))).limit(1))
+      .length === 0
+  if (planReminderDue) {
     const daily = createPlanner(
       plannerInputFor({ tasks, courses, events, studySessions, recurringCommitments: commitments, preferences: study, externalEvents, timeZone }, localNow)
     ).planFor(today)

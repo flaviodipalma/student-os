@@ -53,7 +53,7 @@ export function StudyPreferencesFields({
 
       <div className="grid gap-1.5">
         <span id="pref-block-label" className="text-sm font-medium">
-          Preferred study block
+          Preferred study session length
         </span>
         <div role="radiogroup" aria-labelledby="pref-block-label" className="inline-flex w-fit rounded-lg bg-muted p-1">
           {STUDY_BLOCK_OPTIONS.map((minutes) => (
@@ -76,7 +76,7 @@ export function StudyPreferencesFields({
         </div>
       </div>
 
-      <Field label="Break between blocks" htmlFor="pref-break">
+      <Field label="Break between study sessions" htmlFor="pref-break">
         <div className="w-44">
           <SimpleSelect
             id="pref-break"

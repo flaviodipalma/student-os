@@ -123,7 +123,7 @@ export function WeekOverview({ className }: { className?: string }) {
             <figcaption className="text-sm font-medium">Committed hours per day</figcaption>
             <ul aria-label="Legend" className="flex gap-3 text-xs text-muted-foreground">
               <li className="inline-flex items-center gap-1.5">
-                <span aria-hidden className="size-2.5 rounded-sm bg-teal-500" />
+                <span aria-hidden className="size-2.5 rounded-sm bg-event-class" />
                 Commitments
               </li>
               <li className="inline-flex items-center gap-1.5">
@@ -141,7 +141,7 @@ export function WeekOverview({ className }: { className?: string }) {
             {days.map((day, index) => {
               const segments = [
                 { hours: day.studyHours, className: "bg-primary" },
-                { hours: day.fixedHours, className: "bg-teal-500" },
+                { hours: day.fixedHours, className: "bg-event-class" },
               ].filter((segment) => segment.hours > 0)
               return (
                 <div
@@ -170,7 +170,7 @@ export function WeekOverview({ className }: { className?: string }) {
                   <div
                     aria-hidden
                     className={cn(
-                      "pointer-events-none absolute bottom-full z-10 mb-1 hidden w-44 rounded-lg bg-popover p-2.5 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 group-hover:block group-focus-visible:block",
+                      "pointer-events-none absolute bottom-full z-10 mb-1 hidden w-44 rounded-lg bg-popover p-2.5 text-xs text-popover-foreground shadow-md ring-1 ring-border group-hover:block group-focus-visible:block",
                       // Keep the tooltip inside the card at the edges.
                       index < 2 ? "left-0" : index > 4 ? "right-0" : "left-1/2 -translate-x-1/2"
                     )}

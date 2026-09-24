@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
+import type { ThemePreference } from "@/lib/theme"
 import type { NotificationPreferences, StudentPreferences } from "@/lib/types"
 import { studentPreferences } from "../db/schema"
 import type { Database } from "../db/types"
@@ -71,4 +72,20 @@ export async function saveNotificationPreferences(
     .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, ...values })
     .onConflictDoUpdate({ target: studentPreferences.userId, set: { ...values, updatedAt: new Date() } })
   return getNotificationPreferences(db, userId)
+}
+
+// ---- Appearance (same row) -----------------------------------------------------
+
+// The student's saved theme, or null if they've never chosen one.
+export async function getThemePreference(db: Database, userId: string): Promise<ThemePreference | null> {
+  const [row] = await db.select({ theme: studentPreferences.theme }).from(studentPreferences).where(eq(studentPreferences.userId, userId))
+  return row?.theme ?? null
+}
+
+export async function saveThemePreference(db: Database, userId: string, theme: ThemePreference): Promise<ThemePreference> {
+  await db
+    .insert(studentPreferences)
+    .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, theme })
+    .onConflictDoUpdate({ target: studentPreferences.userId, set: { theme, updatedAt: new Date() } })
+  return theme
 }

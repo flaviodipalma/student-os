@@ -325,7 +325,7 @@ function ProposalCard({
   return (
     <div className={cn("rounded-lg border p-3 text-sm", !outcome && "border-primary/40 bg-primary/5")}>
       <p className="font-medium">{pending.summary}</p>
-      {pending.note && <p className="mt-1 text-amber-800 dark:text-amber-300">{pending.note}</p>}
+      {pending.note && <p className="mt-1 text-warning">{pending.note}</p>}
       {outcome ? (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           {outcome === "confirmed" ? <CheckIcon aria-hidden className="size-3.5" /> : <XIcon aria-hidden className="size-3.5" />}

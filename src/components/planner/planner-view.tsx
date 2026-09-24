@@ -318,9 +318,9 @@ function RemovedFromPlan({ plan, taskById }: { plan: DailyPlan; taskById: Map<st
 
 function Legend() {
   const keys = [
-    { label: "Fixed event", swatch: "bg-teal-100 border-l-[3px] border-teal-500" },
+    { label: "Fixed event", swatch: "bg-event-class-bg border-l-[3px] border-event-class" },
     { label: "Recommended", swatch: "border border-dashed border-primary/60 bg-primary/5" },
-    { label: "Scheduled study", swatch: "bg-indigo-100 border-l-[3px] border-indigo-600" },
+    { label: "Scheduled study", swatch: "bg-event-study-bg border-l-[3px] border-event-study" },
     { label: "Done", swatch: "border border-foreground/15 bg-muted" },
   ]
   return (
@@ -368,7 +368,7 @@ function headline(plan: DailyPlan, dayWord: string): { title: string; detail: st
         detail: "You can change the limit in Settings.",
       }
     default:
-      return { title: "No new sessions to recommend", detail: "The free time left is too short for a study block." }
+      return { title: "No new sessions to recommend", detail: "The free time left is too short for a study session." }
   }
 }
 
@@ -499,7 +499,7 @@ function WarningIcon({ warning }: { warning: PlannerWarning }) {
       aria-hidden
       className={cn(
         "mt-0.5 size-4 shrink-0",
-        warning.severity === "high" ? "text-red-600" : warning.severity === "medium" ? "text-amber-600" : "text-muted-foreground"
+        warning.severity === "high" ? "text-danger" : warning.severity === "medium" ? "text-warning" : "text-muted-foreground"
       )}
     />
   )
@@ -533,7 +533,7 @@ function UnscheduledList({
               >
                 {task.title}
               </button>
-              <span className={cn("shrink-0 text-xs font-medium", item.atRisk ? "text-red-700" : "text-muted-foreground")}>
+              <span className={cn("shrink-0 text-xs font-medium", item.atRisk ? "text-danger" : "text-muted-foreground")}>
                 {item.atRisk ? "At risk" : "Can wait"}
               </span>
             </div>

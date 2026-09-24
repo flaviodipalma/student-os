@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   savePrefs: vi.fn(),
   push: vi.fn(),
   warnings: [] as unknown[],
+  // A stable store (like the real one): arrays only change when data changes.
+  store: { tasks: [] as unknown[], studySessions: [] as unknown[], events: [] as unknown[], recurringCommitments: [] as unknown[], externalEvents: [] as unknown[] },
 }))
 vi.mock("@/lib/planner-store", () => ({ usePlan: () => ({ warnings: mocks.warnings }) }))
 vi.mock("@/lib/task-store", () => ({ useTasks: () => ({ today: "2026-09-29", tasks: [] }) }))
@@ -29,7 +31,7 @@ vi.mock("@/app/actions/notifications", () => ({
   updateNotificationPreferencesAction: mocks.savePrefs,
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }))
-vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({ tasks: [], studySessions: [] }) }))
+vi.mock("@/lib/app-store", () => ({ useAppStore: () => mocks.store }))
 vi.mock("@/lib/feedback", () => ({ useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock("@/lib/clock", () => ({ useNow: () => new Date("2026-09-29T20:10:00Z") }))
 
@@ -189,6 +191,28 @@ describe("the store", () => {
     expect(shown).toEqual([])
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
     vi.unstubAllGlobals()
+  })
+
+  it("syncs again soon after an event, weekly commitment or external calendar changes (reminders follow)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const view = withStore(<NotificationBell />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10)
+    })
+    const afterLoad = mocks.sync.mock.calls.length
+    for (const key of ["events", "recurringCommitments", "externalEvents"] as const) {
+      mocks.store = { ...mocks.store, [key]: [{ id: key }] }
+      view.rerender(
+        <NotificationProvider initial={list} initialPreferences={DEFAULT_NOTIFICATION_PREFERENCES}>
+          <NotificationBell />
+        </NotificationProvider>
+      )
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_600)
+      })
+    }
+    expect(mocks.sync.mock.calls.length - afterLoad).toBe(3)
+    vi.useRealTimers()
   })
 })
 

@@ -58,7 +58,7 @@ export function TaskRow({
         )}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           {showCourse && course && <CourseTag code={course.code} color={course.color} />}
-          <span className={cn("inline-flex items-center gap-1", overdue && "font-medium text-red-700")}>
+          <span className={cn("inline-flex items-center gap-1", overdue && "font-medium text-danger")}>
             <CalendarIcon aria-hidden className="size-3.5" />
             {overdue ? `Overdue · was due ${formatDue(task, today)}` : `Due ${formatDue(task, today)}`}
           </span>

@@ -102,6 +102,10 @@ export function ReviewPanel({
           Check each item against your syllabus. Fix anything that&apos;s wrong, remove what you don&apos;t need, and add
           anything missing. Nothing is added until you import.
         </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Time estimates the syllabus doesn&apos;t give are filled with a typical length for that kind of work (shown in
+          grey). Change them if you know better; you can also edit them later.
+        </p>
       </header>
 
       <Card>
@@ -270,7 +274,7 @@ function ItemRow({
         "rounded-lg border p-3 transition-colors",
         !item.selected && "bg-muted/40",
         invalid && item.selected && "border-destructive/60",
-        item.needsReview && item.selected && !invalid && "border-amber-300"
+        item.needsReview && item.selected && !invalid && "border-warning-border"
       )}
     >
       <div className="flex items-start gap-3">
@@ -323,7 +327,7 @@ function ItemRow({
           {(item.needsReview || duplicate) && (
             <ul className="space-y-1 text-xs">
               {item.needsReview && (
-                <li className="flex items-start gap-1.5 text-amber-800">
+                <li className="flex items-start gap-1.5 text-warning">
                   <CircleAlertIcon aria-hidden className="mt-px size-3.5 shrink-0" />
                   <span>
                     Check this{item.reviewReason ? `: ${item.reviewReason}` : "."}

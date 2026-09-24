@@ -124,7 +124,7 @@ describe("preferences", () => {
       "Plan at least 15 minutes of study a day."
     )
     expect(check({ ...DEFAULT_STUDENT_PREFERENCES, preferredBlockMinutes: 50 })).toBe(
-      "Pick a study block length of 30, 45, 60 or 90 minutes."
+      "Pick a study session length of 30, 45, 60 or 90 minutes."
     )
     expect(profileSchema.safeParse({ ...profile, firstName: "  " }).success).toBe(false)
     expect(onboardingDetailsSchema.safeParse({ profile, preferences: DEFAULT_STUDENT_PREFERENCES, commitments: [] }).success).toBe(true)

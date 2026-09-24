@@ -113,7 +113,7 @@ export function OnboardingFlow() {
 
       <Progress step={step} />
 
-      <section aria-labelledby="onboarding-title" className="mt-6 rounded-xl bg-card p-5 ring-1 ring-foreground/10 sm:p-8">
+      <section aria-labelledby="onboarding-title" className="mt-6 rounded-xl bg-card p-5 ring-1 ring-border sm:p-8">
         <p className="text-sm font-medium text-primary">
           Step {step + 1} of {steps.length}
         </p>

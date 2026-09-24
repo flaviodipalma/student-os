@@ -128,7 +128,7 @@ export function NotificationSettingsFields({
           onChange={toggleDesktop}
         />
         {permissionNote && (
-          <p role="status" className="text-xs text-amber-800">
+          <p role="status" className="text-xs text-warning">
             {permissionNote}
           </p>
         )}

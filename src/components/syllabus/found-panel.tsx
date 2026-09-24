@@ -63,7 +63,7 @@ export function FoundPanel({
         {count > 0 && (
           <ul className="mt-2 flex flex-wrap gap-2 text-sm">
             {[...byType].map(([type, n]) => (
-              <li key={type} className="rounded-md bg-background px-2 py-0.5 ring-1 ring-foreground/10">
+              <li key={type} className="rounded-md bg-background px-2 py-0.5 ring-1 ring-border">
                 {n} {typeLabel[type].toLowerCase()}
                 {n === 1 ? "" : "s"}
               </li>
@@ -74,7 +74,7 @@ export function FoundPanel({
         {(toCheck > 0 || duplicates > 0 || draft.warnings.length > 0) && (
           <ul className="mt-4 space-y-1.5 text-sm">
             {toCheck > 0 && (
-              <li className="flex items-start gap-2 text-amber-800">
+              <li className="flex items-start gap-2 text-warning">
                 <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
                 {toCheck} {toCheck === 1 ? "item needs" : "items need"} a closer look (for example, a missing year or date).
               </li>
@@ -98,7 +98,7 @@ export function FoundPanel({
 
       <div className="flex flex-wrap gap-2">
         <Button size="lg" onClick={onReview}>
-          Review imported information
+          Review before importing
         </Button>
         <Button size="lg" variant="outline" onClick={onStartOver}>
           Upload a different file

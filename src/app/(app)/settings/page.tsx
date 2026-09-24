@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { AccountCard } from "@/components/settings/account-card"
+import { AppearanceCard } from "@/components/settings/appearance-card"
 import type { CalendarOutcomes } from "@/components/settings/calendar-connections"
 import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
 import { SettingsView } from "@/components/settings/settings-view"
@@ -23,6 +24,7 @@ const sections = [
   { id: "study-preferences", label: "Study preferences" },
   { id: "recurring-commitments", label: "Recurring commitments" },
   { id: "notifications", label: "Notifications" },
+  { id: "appearance", label: "Appearance" },
   { id: "integrations", label: "Integrations" },
   { id: "account", label: "Account" },
 ]
@@ -81,6 +83,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </nav>
       <div className="space-y-6">
         <SettingsView />
+        <AppearanceCard />
         <IntegrationsCard
           integrations={integrations}
           outcomes={outcomes}
