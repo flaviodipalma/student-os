@@ -17,7 +17,10 @@ const mocks = vi.hoisted(() => ({
   dismiss: vi.fn(async () => ({ ok: true, data: null })),
   savePrefs: vi.fn(),
   push: vi.fn(),
+  warnings: [] as unknown[],
 }))
+vi.mock("@/lib/planner-store", () => ({ usePlan: () => ({ warnings: mocks.warnings }) }))
+vi.mock("@/lib/task-store", () => ({ useTasks: () => ({ today: "2026-09-29", tasks: [] }) }))
 vi.mock("@/app/actions/notifications", () => ({
   syncNotificationsAction: mocks.sync,
   markNotificationReadAction: mocks.markRead,
@@ -133,17 +136,25 @@ describe("notification center", () => {
 })
 
 describe("Dashboard: Needs attention", () => {
-  it("unread reminders, most important first; not the daily plan or read ones", () => {
+  it("the Planner's warnings (with a severity in words) plus reminders about something starting soon", () => {
+    mocks.warnings = [
+      { id: "overdue", kind: "overdue", severity: "high", message: "Database Project is overdue.", taskIds: ["n2"], action: "view-task" },
+      { id: "no-estimate", kind: "no-estimate", severity: "low", message: "Essay has no time estimate.", taskIds: ["x"] },
+    ]
     withStore(<NeedsAttention />)
-    const items = screen.getAllByRole("listitem").map((item) => within(item).getByText(/\.$/).textContent)
-    expect(items).toEqual([
-      "Database Project was due yesterday.",
-      "Study session starting in 15 minutes: work on Essay.",
-      "Psychology Paper is due tomorrow.",
-    ])
+    const items = screen.getAllByRole("listitem").map((item) => item.textContent)
+    expect(items[0]).toContain("Urgent")
+    expect(items[0]).toContain("Database Project is overdue.")
+    // Low-value notes stay on the Planner page; overdue / deadline reminders aren't repeated.
+    expect(screen.queryByText("Essay has no time estimate.")).toBeNull()
+    expect(screen.queryByText("Database Project was due yesterday.")).toBeNull()
+    expect(screen.getByText("Study session starting in 15 minutes: work on Essay.")).toBeTruthy()
+    expect(screen.getByText("Psychology Paper is due tomorrow.")).toBeTruthy()
+    expect(screen.getAllByRole("link", { name: "Open task" })[0].getAttribute("href")).toBe("/tasks?task=n2")
   })
 
   it("nothing to show: no card", () => {
+    mocks.warnings = []
     const { container } = withStore(<NeedsAttention />, [list[3], list[4]])
     expect(container.innerHTML).toBe("")
   })
@@ -164,14 +175,14 @@ describe("the store", () => {
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
     mocks.sync.mockImplementation(async () => ({ ok: true, data: { notifications: list, created: ["n2"] } }))
 
-    withStore(<NeedsAttention />, [], { browserNotifications: true })
+    withStore(<NotificationBell />, [], { browserNotifications: true })
     await waitFor(() => expect(mocks.sync).toHaveBeenCalled())
     await waitFor(() => expect(shown).toEqual(["task_overdue: Database Project was due yesterday."]))
 
     // Turned off: nothing on the desktop.
     cleanup()
     shown.length = 0
-    withStore(<NeedsAttention />, [], { browserNotifications: false })
+    withStore(<NotificationBell />, [], { browserNotifications: false })
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
     })

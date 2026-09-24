@@ -25,8 +25,8 @@ const steps = [
   { title: "About you", description: "So Student OS knows what to call you." },
   { title: "Study preferences", description: "When and how you like to study. The defaults work for most students." },
   {
-    title: "Weekly schedule",
-    description: "Recurring commitments like practice, work or clubs. The Planner keeps these times free.",
+    title: "Recurring commitments",
+    description: "Things you do every week, like practice, work or clubs. The Planner keeps these times free.",
   },
   { title: "Courses", description: "Add your classes now, or skip and do it later." },
 ]
@@ -122,10 +122,13 @@ export function OnboardingFlow() {
         </h1>
         <p className="mt-1 text-muted-foreground">{current.description}</p>
         {step === 0 && (
-          <p className="mt-4 rounded-lg bg-primary/[0.06] px-4 py-3 text-sm">
-            Student OS helps you figure out what to work on today. Four quick steps, and you can skip anything you
-            don&apos;t need yet.
-          </p>
+          <div className="mt-4 rounded-lg bg-primary/[0.06] px-4 py-3 text-sm">
+            <p className="font-semibold">You don&apos;t organize college. Student OS does.</p>
+            <p className="mt-1 text-muted-foreground">
+              Add your classes and deadlines, and Student OS plans your study time around your schedule, and tells you
+              what to work on right now. Four quick steps; skip anything you don&apos;t need yet.
+            </p>
+          </div>
         )}
 
         <div className="mt-6">
@@ -171,9 +174,14 @@ export function OnboardingFlow() {
 
         {!importing && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
-            <Button variant="ghost" onClick={() => go(step - 1)} disabled={step === 0 || busy}>
-              Back
-            </Button>
+            {/* No "Back" on the first step (there's nothing to go back to). */}
+            {step > 0 ? (
+              <Button variant="ghost" onClick={() => go(step - 1)} disabled={busy}>
+                Back
+              </Button>
+            ) : (
+              <span />
+            )}
             <div className="flex flex-wrap gap-2">
               {step === 1 && (
                 <Button

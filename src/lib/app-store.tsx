@@ -102,6 +102,9 @@ type AppStore = {
   // After an LMS sync: the saved courses and tasks, as the server has them now.
   replaceCoursesAndTasks: (courses: Course[], tasks: Task[]) => void
   replaceExternalEvents: (events: ExternalEventRecord[]) => void
+  // After the server saved something for the student (e.g. a change confirmed in
+  // the Assistant): the saved tasks and study sessions, added or replaced by id.
+  applySaved: (saved: { tasks: Task[]; studySessions: StudySessionRecord[] }) => void
   // Local only: the event stays in Canvas / Blackboard.
   setExternalEventHidden: (id: string, hidden: boolean) => void
   // Profile, preferences and weekly commitments. These return the result so
@@ -432,6 +435,14 @@ export function AppStoreProvider({
       setTasks(nextTasks)
     },
     replaceExternalEvents: setExternalEvents,
+    applySaved: (saved) => {
+      const upsert = <T extends { id: string }>(prev: T[], items: T[]) => {
+        const ids = new Set(items.map((item) => item.id))
+        return [...prev.filter((x) => !ids.has(x.id)), ...items]
+      }
+      if (saved.tasks.length) setTasks((prev) => upsert(prev, saved.tasks))
+      if (saved.studySessions.length) setStudySessions((prev) => upsert(prev, saved.studySessions))
+    },
     setExternalEventHidden: (id, hidden) => {
       const before = externalEvents.find((event) => event.id === id)
       if (!before) return

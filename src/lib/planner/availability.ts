@@ -2,7 +2,7 @@ import { busyRanges, toMinutes } from "@/lib/events"
 import { toDateKey } from "@/lib/format"
 import { commitmentsOn } from "@/lib/recurring"
 import type { CalendarEvent, RecurringCommitment } from "@/lib/types"
-import { workedMinutes } from "./scoring"
+import { isMissed, workedMinutes } from "./scoring"
 import type { PlannerSettings } from "./settings"
 import type { AvailableTimeBlock } from "./types"
 
@@ -97,8 +97,11 @@ export function dayAvailability(
 
   const freeMinutes = totalMinutes(free)
   // Study counted against the daily limit: booked sessions, and the minutes actually
-  // worked in a partly done one (45 of 90 counts 45).
-  const bookedStudyMinutes = study.reduce((sum, e) => sum + workedMinutes(e), 0)
+  // worked in a partly done one (45 of 90 counts 45). A missed session doesn't count:
+  // that time wasn't used for studying, and its work is planned again.
+  const today = toDateKey(now)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const bookedStudyMinutes = study.filter((e) => !isMissed(e, today, nowMinutes)).reduce((sum, e) => sum + workedMinutes(e), 0)
   // Booked study counts as used free time, so accepting a suggestion doesn't make room for more.
   const limitLeft = settings.maxStudyMinutesPerDay - bookedStudyMinutes
   const shareLeft = Math.floor((freeMinutes + bookedStudyMinutes) * settings.maxShareOfFreeTime) - bookedStudyMinutes

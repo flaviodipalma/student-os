@@ -5,6 +5,8 @@ import {
   AlertTriangleIcon,
   CalendarClockIcon,
   CheckIcon,
+  CircleDashedIcon,
+  MoreHorizontalIcon,
   ChevronDownIcon,
   CircleCheckBigIcon,
   ExternalLinkIcon,
@@ -16,7 +18,9 @@ import {
 import { CourseTag } from "@/components/course-tag"
 import { PriorityBadge } from "@/components/tasks/task-badges"
 import { TaskFormDialog } from "@/components/tasks/task-form-dialog"
+import { AskAssistantLink } from "@/components/assistant/ask-assistant-link"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
@@ -74,6 +78,9 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
           <p className="mt-1.5 text-muted-foreground">
             Recommended study around your classes and commitments. You decide what to keep.
           </p>
+          <AskAssistantLink date={date} className="mt-2 text-primary">
+            Ask Student OS about this plan
+          </AskAssistantLink>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Plan for" className="inline-flex rounded-lg bg-muted p-1">
@@ -121,8 +128,9 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
           .reduce((sum, e) => sum + toMinutes(e.endTime) - toMinutes(e.startTime), 0)}
       />
 
+      {/* Phones and tablets: "Needs attention" comes before the (long) day timeline. */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-        <Card>
+        <Card className="order-2 xl:order-none">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Your day</CardTitle>
             <CardDescription>Fixed events and study sessions, in order. Accept the ones you&apos;ll do.</CardDescription>
@@ -147,7 +155,7 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        <div className="order-1 space-y-6 xl:order-none">
           <NeedsAttention
             plan={plan}
             taskById={taskById}
@@ -226,7 +234,8 @@ function SessionDetails({
           This session ended without being marked done, so its work is back in your plan. Mark it done if you studied.
         </p>
       )}
-      <div className="flex flex-wrap gap-1.5">
+      {/* The main actions as buttons; the rest in a menu, so each session stays compact. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {state === "suggested" && (
           <Button size="sm" onClick={() => actions.accept(session)}>
             <CheckIcon data-icon="inline-start" />
@@ -234,35 +243,44 @@ function SessionDetails({
           </Button>
         )}
         {state !== "completed" ? (
-          <>
-            <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
-              <CircleCheckBigIcon data-icon="inline-start" />
-              Done
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setPartlyOpen(true)}>
-              Partly done
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRescheduleOpen(true)}>
-              <CalendarClockIcon data-icon="inline-start" />
-              {state === "suggested" ? "Other time" : "Reschedule"}
-            </Button>
-          </>
+          <Button size="sm" variant="outline" onClick={() => actions.complete(session)}>
+            <CircleCheckBigIcon data-icon="inline-start" />
+            Done
+          </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={() => actions.undoComplete(session)}>
             <RotateCcwIcon data-icon="inline-start" />
             Undo
           </Button>
         )}
-        {state !== "completed" && (
-          <Button size="sm" variant="ghost" onClick={() => actions.remove(session)} aria-label={`Skip ${task.title} for this day`}>
-            <XIcon data-icon="inline-start" />
-            Skip
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" onClick={onShowTask} aria-label={`Open task: ${task.title}`}>
-          <ExternalLinkIcon data-icon="inline-start" />
-          Open task
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button size="sm" variant="ghost" />} aria-label={`More actions for ${task.title}`}>
+            <MoreHorizontalIcon data-icon="inline-start" />
+            More
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {state !== "completed" && (
+              <>
+                <DropdownMenuItem onClick={() => setPartlyOpen(true)}>
+                  <CircleDashedIcon />
+                  Partly done…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRescheduleOpen(true)}>
+                  <CalendarClockIcon />
+                  {state === "suggested" ? "Schedule at another time…" : "Reschedule…"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => actions.remove(session)}>
+                  <XIcon />
+                  Skip for this day
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuItem onClick={onShowTask}>
+              <ExternalLinkIcon />
+              Open task
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {partlyOpen && <PartlyDoneDialog session={session} taskTitle={task.title} open onOpenChange={setPartlyOpen} />}
       {rescheduleOpen && (
@@ -501,7 +519,7 @@ function UnscheduledList({
   const { getCourse } = useCourses()
   return (
     <ul className="mt-2 space-y-2">
-      {plan.unscheduled.map((item) => {
+      {plan.unscheduled.filter((item) => item.atRisk).map((item) => {
         const task = taskById.get(item.taskId)
         if (!task) return null
         const course = getCourse(task.courseId)

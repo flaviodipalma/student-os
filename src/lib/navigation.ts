@@ -4,6 +4,7 @@ import {
   CalendarDaysIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
+  MessageSquareTextIcon,
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -13,6 +14,8 @@ export type NavItem = {
   href: string
   icon: LucideIcon
   description: string
+  // Also in the bar along the bottom on phones (everything is in the menu).
+  inTabBar?: boolean
 }
 
 // Single source of truth for the app's main sections.
@@ -49,10 +52,17 @@ export const navItems: NavItem[] = [
     description: "A daily and weekly plan built from everything above.",
   },
   {
+    title: "Assistant",
+    href: "/assistant",
+    icon: MessageSquareTextIcon,
+    description: "Ask about your plan, deadlines and schedule.",
+  },
+  {
     title: "Settings",
     href: "/settings",
     icon: SettingsIcon,
     description: "Preferences for your account and planner.",
+    inTabBar: false,
   },
 ]
 

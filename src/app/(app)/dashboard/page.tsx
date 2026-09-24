@@ -25,12 +25,15 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] md:items-end">
         <DashboardHeader greeting={greetingFor(now)} dateLabel={formatLongDate(now)} />
-        <DailyProgress />
+        {/* Next to the greeting on wider screens; below "What should I do now?" on phones. */}
+        <DailyProgress className="max-md:hidden" />
       </div>
 
       <GettingStarted />
 
+      {/* The one question the Dashboard answers first. */}
       <DashboardWhatNow />
+      <DailyProgress className="md:hidden" />
 
       <NeedsAttention />
 

@@ -34,6 +34,7 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <Section
+        id="profile"
         title="About you"
         description="Your name is used in greetings; term and year help keep things organized."
         onSave={async () => {
@@ -46,6 +47,7 @@ export function SettingsView() {
       </Section>
 
       <Section
+        id="study-preferences"
         title="Study preferences"
         description="The Planner only suggests study time inside your window, up to your daily maximum, in blocks of your preferred length."
         onSave={async () => {
@@ -61,6 +63,25 @@ export function SettingsView() {
       >
         <StudyPreferencesFields value={preferences} onChange={setPreferences} />
       </Section>
+
+      <Card id="recurring-commitments">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Recurring commitments</CardTitle>
+          <CardDescription>
+            Things you do every week. They show on your calendar, and the Planner never schedules study over them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CommitmentsEditor
+            commitments={store.recurringCommitments}
+            onAdd={async (input) => toMessage(await store.addCommitment(input))}
+            onUpdate={async (id, input) => toMessage(await store.updateCommitment(id, input))}
+            onDelete={store.deleteCommitment}
+            withDates
+            confirmDelete
+          />
+        </CardContent>
+      </Card>
 
       <Section
         id="notifications"
@@ -79,25 +100,6 @@ export function SettingsView() {
       >
         <NotificationSettingsFields value={notificationPrefs} onChange={setNotificationPrefs} />
       </Section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Recurring commitments</CardTitle>
-          <CardDescription>
-            Things you do every week. They show on your calendar, and the Planner never schedules study over them.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CommitmentsEditor
-            commitments={store.recurringCommitments}
-            onAdd={async (input) => toMessage(await store.addCommitment(input))}
-            onUpdate={async (id, input) => toMessage(await store.updateCommitment(id, input))}
-            onDelete={store.deleteCommitment}
-            withDates
-            confirmDelete
-          />
-        </CardContent>
-      </Card>
     </div>
   )
 }

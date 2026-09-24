@@ -14,9 +14,11 @@ export function DailyProgress({ className }: { className?: string }) {
   const { tasks, today } = useTasks()
   const plan = usePlan(today)
   const minutes = (s: { startTime: string; endTime: string }) => toMinutes(s.endTime) - toMinutes(s.startTime)
-  const sessions = [...plan.existingSessions, ...plan.suggestions]
-  const planned = sessions.reduce((sum, s) => sum + minutes(s), 0)
-  const done = plan.existingSessions.filter((s) => s.status === "completed").reduce((sum, s) => sum + minutes(s), 0)
+  // Missed sessions aren't part of the plan any more (their work is planned again).
+  const sessions = [...plan.existingSessions.filter((s) => s.status !== "missed"), ...plan.suggestions]
+  const worked = (s: (typeof sessions)[number]) => (s.status === "completed" && s.completedMinutes ? s.completedMinutes : minutes(s))
+  const planned = sessions.reduce((sum, s) => sum + worked(s), 0)
+  const done = plan.existingSessions.filter((s) => s.status === "completed").reduce((sum, s) => sum + worked(s), 0)
   const percent = planned === 0 ? 0 : Math.round((done / planned) * 100)
   const dueToday = todaysTasks(tasks, today)
   const dueDone = dueToday.filter(isDone).length

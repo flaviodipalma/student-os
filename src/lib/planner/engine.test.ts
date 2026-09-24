@@ -309,8 +309,15 @@ describe("daily study limit", () => {
     expect(total(plan.suggestions)).toBeLessThanOrEqual(240)
     expect(plan.unscheduled.length).toBeGreaterThan(0)
     const warning = plan.warnings.find((w) => w.kind === "unscheduled")!
-    expect(warning.message).toBe(`${plan.unscheduled.length} tasks could not fit into today's plan.`)
+    expect(warning.message).toBe(`${plan.unscheduled.length} tasks due soon didn't fully fit into today's plan.`)
     expect(warning.action).toBe("plan-next-day")
+  })
+
+  it("work due later that didn't fit isn't reported (it's planned on later days)", () => {
+    const tasks = Array.from({ length: 5 }, () => task({ estimateMinutes: 120, priority: "high", dueDate: "2026-10-09" }))
+    const plan = generatePlan({ date: DATE, tasks, events: [], now: NOW, settings: prefs({ maxStudyMinutesPerDay: 60 }) })
+    expect(plan.unscheduled.length).toBeGreaterThan(0)
+    expect(plan.warnings.find((w) => w.kind === "unscheduled")).toBeUndefined()
   })
 
   it("gives the limited time to the highest-scoring work first", () => {

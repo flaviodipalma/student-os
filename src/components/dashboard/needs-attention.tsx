@@ -1,48 +1,88 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { AlertTriangleIcon, InfoIcon } from "lucide-react"
 import { NotificationItem } from "@/components/notifications/notification-center"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { addDays } from "@/lib/format"
 import { useNotifications } from "@/lib/notification-store"
+import type { PlannerWarning } from "@/lib/planner"
+import { usePlan } from "@/lib/planner-store"
+import { useTasks } from "@/lib/task-store"
 import type { NotificationType } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
-// "Needs attention" on the Dashboard: the few unread reminders that matter most
-// right now, from the same notifications as the bell (no logic of its own).
-// Today's plan is already on the Dashboard, so that reminder isn't repeated here.
+// "Needs attention" on the Dashboard: real problems with today's plan, from the
+// Planner (overdue work, not enough time before a deadline, missed sessions,
+// important work due tomorrow), plus reminders about something starting soon.
+// Low-value notes (e.g. missing estimates) stay on the Planner page. Nothing is
+// worked out here: warnings come from the Planner, reminders from notifications.
 
-const MAX_ITEMS = 4
-const priority: Record<NotificationType, number> = {
-  task_overdue: 0,
-  study_session_upcoming: 1,
-  event_upcoming: 2,
-  task_due_soon: 3,
-  important_deadline: 4,
-  study_session_missed: 5,
-  daily_plan_ready: 99,
-}
+const MAX_ITEMS = 5
+// Reminders that are about "right now" (overdue and deadline reminders are
+// already covered by the Planner's warnings).
+const timely: NotificationType[] = ["study_session_upcoming", "event_upcoming", "task_due_soon"]
 
 export function NeedsAttention({ className }: { className?: string }) {
+  const { today } = useTasks()
+  const plan = usePlan(today)
   const { notifications } = useNotifications()
-  const items = notifications
-    .filter((notification) => !notification.readAt && notification.type !== "daily_plan_ready")
-    .sort((a, b) => priority[a.type] - priority[b.type] || b.scheduledFor.localeCompare(a.scheduledFor))
-  if (items.length === 0) return null
+  const warnings = plan.warnings.filter((warning) => warning.severity !== "low" || warning.kind === "missed")
+  const reminders = notifications.filter((n) => !n.readAt && timely.includes(n.type))
+  const total = warnings.length + reminders.length
+  if (total === 0) return null
+
+  const shownWarnings = warnings.slice(0, MAX_ITEMS)
+  const shownReminders = reminders.slice(0, Math.max(0, MAX_ITEMS - shownWarnings.length))
 
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Needs attention</CardTitle>
         <CardDescription>
-          {items.length === 1 ? "1 reminder" : `${items.length} reminders`}
-          {items.length > MAX_ITEMS && ` · showing the ${MAX_ITEMS} most important (all in the bell)`}
+          {total === 1 ? "1 thing" : `${total} things`} to look at
+          {total > MAX_ITEMS && ` · the ${MAX_ITEMS} most important`}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
         <ul className="divide-y">
-          {items.slice(0, MAX_ITEMS).map((notification) => (
+          {shownWarnings.map((warning) => (
+            <WarningItem key={warning.id} warning={warning} today={today} />
+          ))}
+          {shownReminders.map((notification) => (
             <NotificationItem key={notification.id} notification={notification} compact />
           ))}
         </ul>
       </CardContent>
     </Card>
+  )
+}
+
+// Severity is said in words too, not only with color.
+function WarningItem({ warning, today }: { warning: PlannerWarning; today: string }) {
+  const high = warning.severity === "high"
+  const Icon = high ? AlertTriangleIcon : InfoIcon
+  const link =
+    warning.action === "view-task" && warning.taskIds[0]
+      ? { href: `/tasks?task=${warning.taskIds[0]}`, label: "Open task" }
+      : warning.action === "plan-next-day"
+        ? { href: `/planner?date=${addDays(today, 1)}`, label: "Plan tomorrow" }
+        : { href: "/planner", label: "Open planner" }
+  return (
+    <li className="flex gap-3 px-4 py-3">
+      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", high ? "text-red-600" : "text-amber-600")} />
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">
+          <span className={high ? "text-red-700" : "text-amber-800"}>{high ? "Urgent" : "Heads up"}</span>
+        </p>
+        <p className="text-sm">{warning.message}</p>
+        <Link
+          href={link.href}
+          className="inline-block rounded-sm text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {link.label}
+        </Link>
+      </div>
+    </li>
   )
 }

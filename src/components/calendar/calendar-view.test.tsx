@@ -85,7 +85,7 @@ describe("Calendar with external events", () => {
     expect(block(/^Psychology Exam, 10:00 AM – 12:00 PM, from Blackboard/)).toBeTruthy()
     // Hidden events aren't on the grid.
     expect(screen.queryByRole("button", { name: /^Old meeting/ })).toBeNull()
-    expect(within(block(/^CSC215 Exam/)).getByText("Canvas")).toBeTruthy()
+    expect(within(block(/^CSC215 Exam/)).getByText(/· Canvas/)).toBeTruthy()
   })
 
   it("filters by source (default All)", async () => {

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { AlertTriangleIcon, ArrowRightIcon, RepeatIcon, SparklesIcon } from "lucide-react"
+import { ArrowRightIcon, RepeatIcon, SparklesIcon } from "lucide-react"
 import { eventStyle } from "@/components/calendar/event-style"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useNow } from "@/lib/clock"
@@ -25,7 +25,8 @@ function summary(plan: DailyPlan, events: number): string {
   if (plan.status === "no-tasks") return "You're all caught up."
   if (plan.status === "all-done") return "All your tasks are done. Nice work!"
   if (plan.status === "no-time" && events === 0) return "You don't have any available study time today."
-  const parts = [`${events} ${events === 1 ? "event" : "events"}`]
+  // Only what's still ahead today.
+  const parts = [events === 0 ? "No more events today" : `${events} ${events === 1 ? "event" : "events"} left today`]
   if (suggested > 0) parts.push(`${suggested} recommended study ${suggested === 1 ? "session" : "sessions"}`)
   return parts.join(" · ")
 }
@@ -45,14 +46,15 @@ export function TodaySchedule({ className }: { className?: string }) {
       (item.kind === "event" || item.kind === "session") && toMinutes(item.end) > nowMinutes
   )
   const shown = upcoming.slice(0, MAX_ITEMS)
-  const urgent = plan.warnings.filter((warning) => warning.severity === "high")
   const time = (hhmm: string) => formatTime(fromDateKey(today, hhmm))
+  // Events still ahead today (finished ones aren't part of "what's left").
+  const eventsLeft = todays.filter((e) => !e.sessionId && toMinutes(e.endTime) > nowMinutes).length
 
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Today&apos;s plan</CardTitle>
-        <CardDescription>{summary(plan, todays.filter((e) => !e.sessionId).length)}</CardDescription>
+        <CardDescription>{summary(plan, eventsLeft)}</CardDescription>
         <CardAction>
           <Link
             href="/calendar"
@@ -63,14 +65,6 @@ export function TodaySchedule({ className }: { className?: string }) {
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
-        {urgent.length > 0 && (
-          <p className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
-            <AlertTriangleIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-red-600" />
-            {urgent[0].message}
-            {urgent.length > 1 && ` (+${urgent.length - 1} more in your plan)`}
-          </p>
-        )}
-
         {shown.length === 0 ? (
           <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
             {upcoming.length === 0 && todays.length > 0 ? "Nothing else planned for today." : summary(plan, 0)}
@@ -84,8 +78,14 @@ export function TodaySchedule({ className }: { className?: string }) {
                   ? item.event.title
                   : `Study — ${taskTitle.get(item.session.taskId) ?? item.event?.title ?? "task"}`
               const style = item.kind === "event" ? eventStyle[item.event.type].block : eventStyle.study.block
-              // Where it's from: the same calendar items as the Calendar (study sessions are Student OS).
-              const source = eventSourceNames[(item.kind === "event" && item.event.source) || "student_os"]
+              // Events say where they're from (Student OS, Canvas, Blackboard); study sessions
+              // say whether they're already scheduled or recommended by the Planner.
+              const label =
+                item.kind === "event"
+                  ? eventSourceNames[item.event.source ?? "student_os"]
+                  : suggested
+                    ? "Recommended"
+                    : "Scheduled"
               return (
                 <li
                   key={item.key}
@@ -104,7 +104,15 @@ export function TodaySchedule({ className }: { className?: string }) {
                     )}
                     <span className="truncate">{title}</span>
                   </span>
-                  <span className="text-[11px] whitespace-nowrap text-muted-foreground">{source}</span>
+                  {/* On phones "Recommended" is said by the dashed border and icon; the text stays for screen readers. */}
+                  <span
+                    className={cn(
+                      "text-[11px] whitespace-nowrap",
+                      suggested ? "font-medium text-primary max-sm:sr-only" : "text-muted-foreground"
+                    )}
+                  >
+                    {label}
+                  </span>
                 </li>
               )
             })}

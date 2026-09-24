@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { CheckIcon, ChevronDownIcon, CoffeeIcon, ExternalLinkIcon, PlayIcon } from "lucide-react"
+import { AskAssistantLink } from "@/components/assistant/ask-assistant-link"
 import { Button } from "@/components/ui/button"
 import { useCourses } from "@/lib/course-store"
 import { formatDuration, formatTime, fromDateKey } from "@/lib/format"
@@ -67,8 +68,9 @@ export function WhatNowCard({ onOpenTask, className }: { onOpenTask: (task: Task
               </Button>
             </div>
           </div>
-          {answer.reasons.length > 0 && (
-            <div>
+          <div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              {answer.reasons.length > 0 && (
               <button
                 type="button"
                 aria-expanded={whyOpen}
@@ -79,6 +81,9 @@ export function WhatNowCard({ onOpenTask, className }: { onOpenTask: (task: Task
                 Why this?
                 <ChevronDownIcon aria-hidden className={cn("size-4 transition-transform", whyOpen && "rotate-180")} />
               </button>
+              )}
+              <AskAssistantLink taskId={answer.task.id} className="min-h-8 focus-visible:ring-primary-foreground/50" />
+            </div>
               {whyOpen && (
                 <ul id="now-why" className="mt-1 space-y-0.5 text-sm text-primary-foreground/90">
                   {answer.reasons.map((reason) => (
@@ -89,8 +94,7 @@ export function WhatNowCard({ onOpenTask, className }: { onOpenTask: (task: Task
                   ))}
                 </ul>
               )}
-            </div>
-          )}
+          </div>
         </div>
       ) : (
         <div className="mt-2 flex items-start gap-3">
@@ -98,6 +102,7 @@ export function WhatNowCard({ onOpenTask, className }: { onOpenTask: (task: Task
           <div>
             <p className="text-xl font-semibold leading-snug">{restHeading(answer, today)}</p>
             <p className="mt-1 text-sm text-primary-foreground/85">{restDetail(answer, today)}</p>
+            <AskAssistantLink className="mt-2 min-h-8 focus-visible:ring-primary-foreground/50" />
           </div>
         </div>
       )}

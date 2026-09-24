@@ -209,8 +209,10 @@ function DayColumn({
                   {event.commitmentId && <RepeatMark />}
                   {event.title}
                 </p>
-                <p className="mt-0.5 truncate opacity-75">{time}</p>
-                {sourceName && <p className="mt-0.5 truncate text-[10px] font-medium tracking-wide uppercase opacity-60">{sourceName}</p>}
+                <p className="mt-0.5 truncate opacity-75">
+                  {time}
+                  {sourceName && <span className="font-medium"> · {sourceName}</span>}
+                </p>
               </>
             )}
           </button>

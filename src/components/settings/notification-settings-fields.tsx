@@ -22,7 +22,7 @@ const timingLabel: Record<(typeof reminderMinuteOptions)[number], string> = {
 const kinds: { key: keyof NotificationPreferences; label: string; hint: string }[] = [
   { key: "taskReminders", label: "Task due reminders", hint: "Before a task is due (and a day ahead for high-priority work)." },
   { key: "studySessionReminders", label: "Study session reminders", hint: "Before a planned study session, and if one is missed." },
-  { key: "eventReminders", label: "Calendar event reminders", hint: "Your events, weekly commitments, and Canvas or Blackboard events." },
+  { key: "eventReminders", label: "Calendar event reminders", hint: "Your events, recurring commitments, and Canvas or Blackboard events." },
   { key: "overdueReminders", label: "Overdue task reminders", hint: "Once, when a task passes its due time." },
   { key: "dailyPlanReminder", label: "Daily plan reminder", hint: "Once a day, when your study window starts." },
 ]

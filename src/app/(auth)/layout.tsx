@@ -15,7 +15,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <span className="text-lg font-semibold tracking-tight">Student OS</span>
       </div>
       <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
-        Student OS helps you figure out what to work on today, from your deadlines, classes and commitments.
+        You don&apos;t organize college. Student OS does: it plans your study time around your classes and deadlines.
       </p>
       <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-sm ring-1 ring-foreground/10 sm:p-8">
         {!supabaseEnv() && (

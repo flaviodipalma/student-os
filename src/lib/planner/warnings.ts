@@ -8,7 +8,9 @@ import type { DailyPlan, PlannerWarning } from "./types"
 // settings.maxWarnings of them:
 //
 // 1. Overdue tasks (planning today only).
-// 2. Work that couldn't fit into the day.
+// 2. Work due soon (within 2 days, or overdue) that couldn't fit into the day. Work
+//    due later that didn't fit is normal: it's planned on later days, so it isn't
+//    reported (useful awareness, not anxiety).
 // 3. Important work (major work or critical priority) due the next day; more
 //    urgent if the student removed it from this day's plan.
 // 4. Work that won't fit before its deadline (remaining work > study time the
@@ -52,15 +54,19 @@ export function buildWarnings({ plan, today, openTasks, settings }: WarningConte
     }
   }
 
-  // 2. Work that didn't fit.
-  if (plan.unscheduled.length > 0) {
-    const count = plan.unscheduled.length
+  // 2. Work due soon that didn't fit.
+  const atRisk = plan.unscheduled.filter((item) => item.atRisk)
+  if (atRisk.length > 0) {
+    const count = atRisk.length
     warnings.push({
       id: "unscheduled",
       kind: "unscheduled",
-      severity: plan.unscheduled.some((item) => item.atRisk) ? "high" : "medium",
-      message: `${plural(count, "task")} could not fit into ${isToday ? "today's" : "this day's"} plan.`,
-      taskIds: plan.unscheduled.map((item) => item.taskId),
+      severity: "high",
+      message:
+        count === 1
+          ? `${openTasks.find((task) => task.id === atRisk[0].taskId)?.title ?? "A task"} is due soon and didn't fully fit into ${isToday ? "today's" : "this day's"} plan.`
+          : `${plural(count, "task")} due soon didn't fully fit into ${isToday ? "today's" : "this day's"} plan.`,
+      taskIds: atRisk.map((item) => item.taskId),
       action: "plan-next-day",
     })
   }

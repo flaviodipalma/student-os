@@ -155,6 +155,17 @@ describe("remaining work", () => {
     expect(during.existingSessions[0].status).toBe("scheduled")
   })
 
+  it("a missed session doesn't use up today's study limit (the time wasn't studied)", () => {
+    const project = task({ title: "Database Project", estimateMinutes: 60, dueDate: WED })
+    // Missed 5-6 PM; limit 60 minutes; it's 8 PM with two free hours left.
+    const plan = plannerFor(
+      { tasks: [project], sessions: [session(project, TUE, "17:00", "18:00")], preferences: { maxStudyMinutesPerDay: 60 } },
+      at(TUE, "20:00")
+    ).planFor(TUE)
+    expect(plan.studyMinutes).toBe(minutesPlanned(plan, project))
+    expect(minutesPlanned(plan, project)).toBe(60)
+  })
+
   it("a missed session yesterday: rescheduled today within the daily limit", () => {
     const project = task({ title: "Database Project", estimateMinutes: 60, dueDate: FRI })
     const plan = plannerFor(

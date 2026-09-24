@@ -121,6 +121,10 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Section links (e.g. Settings) land below the sticky mobile header. */
+  :target {
+    scroll-margin-top: 5rem;
+  }
   body {
     @apply bg-background text-foreground;
   }

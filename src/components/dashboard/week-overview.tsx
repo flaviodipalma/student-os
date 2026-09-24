@@ -98,7 +98,7 @@ export function WeekOverview({ className }: { className?: string }) {
   const tiles = [
     { label: "Assignments due", value: String(stats.assignmentsDue) },
     { label: "Exams & quizzes", value: String(stats.examsAndQuizzes) },
-    { label: "Study planned", value: hours(stats.studyHours) },
+    { label: "Study scheduled", value: hours(stats.studyHours) },
     { label: "Free time", value: hours(stats.freeHours) },
   ]
 

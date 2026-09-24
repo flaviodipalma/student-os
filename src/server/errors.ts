@@ -3,7 +3,7 @@
 
 export class AppError extends Error {
   constructor(
-    readonly code: "not-found" | "validation" | "duplicate" | "unauthorized" | "database",
+    readonly code: "not-found" | "validation" | "duplicate" | "unauthorized" | "database" | "unavailable",
     message: string
   ) {
     super(message)

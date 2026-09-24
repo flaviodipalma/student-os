@@ -108,3 +108,21 @@ export function upcomingDeadlines(tasks: Task[], today: string): Task[] {
 export function isImportant(task: Task): boolean {
   return task.priority === "high" || task.priority === "critical"
 }
+
+// A course's workload at a glance: overdue tasks, and the estimated work left on
+// its open tasks (minus study already done; tasks without an estimate aren't counted).
+export function courseWorkload(
+  courseTasks: Task[],
+  today: string,
+  doneMinutes: (taskId: string) => number
+): { overdue: number; minutesLeft: number; unestimated: number } {
+  const open = courseTasks.filter((task) => !isDone(task))
+  return {
+    overdue: open.filter((task) => isOverdue(task, today)).length,
+    minutesLeft: open.reduce(
+      (sum, task) => sum + (task.estimateMinutes ? Math.max(0, task.estimateMinutes - doneMinutes(task.id)) : 0),
+      0
+    ),
+    unestimated: open.filter((task) => !task.estimateMinutes).length,
+  }
+}

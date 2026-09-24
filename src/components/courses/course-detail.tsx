@@ -10,7 +10,10 @@ import { TaskList } from "@/components/tasks/task-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useCourses } from "@/lib/course-store"
 import { useTasks } from "@/lib/task-store"
-import { byDue, formatDue, isDone, tasksForCourse, upcomingDeadlines } from "@/lib/tasks"
+import { byDue, courseWorkload, formatDue, isDone, tasksForCourse, upcomingDeadlines } from "@/lib/tasks"
+import { useAppStore } from "@/lib/app-store"
+import { formatDuration } from "@/lib/format"
+import { completedMinutesFor } from "@/lib/planner"
 import type { Task, TaskType } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -24,12 +27,14 @@ const groups: { title: string; types: TaskType[]; empty: string }[] = [
 
 export function CourseDetail({ courseId }: { courseId: string }) {
   const { tasks, today } = useTasks()
+  const { calendarItems } = useAppStore()
   const course = useCourses().getCourse(courseId)
   if (!course) return <CourseNotFound />
   const courseTasks = tasksForCourse(tasks, course.id)
   const open = courseTasks.filter((task) => !isDone(task)).sort(byDue)
   const completed = courseTasks.filter(isDone).sort((a, b) => byDue(b, a))
   const next = upcomingDeadlines(courseTasks, today)[0]
+  const workload = courseWorkload(courseTasks, today, (taskId) => completedMinutesFor(taskId, calendarItems))
 
   return (
     <div className="space-y-6">
@@ -64,6 +69,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           {course.description && <p className="mt-4 max-w-2xl text-sm leading-relaxed">{course.description}</p>}
           <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-4 border-t pt-5 text-sm">
             <Stat label="Open tasks" value={String(open.length)} />
+            {workload.overdue > 0 && <Stat label="Overdue" value={String(workload.overdue)} />}
+            {workload.minutesLeft > 0 && <Stat label="Work left" value={`~${formatDuration(workload.minutesLeft)}`} />}
             <Stat label="Completed" value={String(completed.length)} />
             <div className="min-w-0">
               <dt className="text-muted-foreground">Next deadline</dt>
@@ -85,15 +92,20 @@ export function CourseDetail({ courseId }: { courseId: string }) {
         </div>
       </header>
 
-      {groups.map((group) => (
-        <TaskGroup
-          key={group.title}
-          title={group.title}
-          tasks={open.filter((task) => group.types.includes(task.type))}
-          empty={group.empty}
-        />
-      ))}
-      <TaskGroup title="Completed" tasks={completed} empty="Nothing completed yet." />
+      {/* Only groups with work in them; one friendly line when nothing is open. */}
+      {open.length === 0 ? (
+        <p className="rounded-xl border border-dashed px-6 py-8 text-center text-sm text-muted-foreground">
+          {courseTasks.length === 0
+            ? "No tasks for this course yet. Add one, or import the syllabus to add every deadline at once."
+            : "Nothing open for this course. You're all caught up."}
+        </p>
+      ) : (
+        groups.map((group) => {
+          const inGroup = open.filter((task) => group.types.includes(task.type))
+          return inGroup.length > 0 ? <TaskGroup key={group.title} title={group.title} tasks={inGroup} empty={group.empty} /> : null
+        })
+      )}
+      {completed.length > 0 && <TaskGroup title="Completed" tasks={completed} empty="Nothing completed yet." />}
     </div>
   )
 }

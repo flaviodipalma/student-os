@@ -9,7 +9,7 @@ import { useMediaQuery } from "@/lib/use-media-query"
 import { useEvents } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
-import { eventSourceNames, type CalendarEvent, type EventSource } from "@/lib/types"
+import { eventSourceNames, lmsProviderIds, type CalendarEvent, type EventSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EventFormDialog, type EventDraft } from "./event-form-dialog"
 import { ExternalEventDialog, HiddenEventsDialog } from "./external-event-dialog"
@@ -62,7 +62,8 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const [filter, setFilter] = useState<SourceFilter>("all")
   // Filters appear only once there's something to filter (an external calendar is connected).
-  const sources = [...new Set(externalEvents.map((event) => event.source))].sort()
+  // Same order as everywhere else (Canvas, then Blackboard).
+  const sources = lmsProviderIds.filter((source) => externalEvents.some((event) => event.source === source))
   const hiddenCount = externalEvents.filter((event) => event.hidden).length
 
   const days =
@@ -139,13 +140,20 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
           </Button>
         </div>
 
-        <ul aria-label="Event types" className="order-last flex w-full flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground sm:order-none sm:w-auto">
+        {/* The color key (hidden on phones, where every block says what it is). */}
+        <ul aria-label="Event types" className="hidden flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground sm:flex">
           {eventTypes.map((type) => (
             <li key={type} className="inline-flex items-center gap-1.5">
               <span aria-hidden className={cn("size-2.5 rounded-sm", eventStyle[type].swatch)} />
               {eventTypeLabel[type]}
             </li>
           ))}
+          {sources.length > 0 && (
+            <li className="inline-flex items-center gap-1.5">
+              <span aria-hidden className={cn("size-2.5 rounded-sm", eventStyle.other.swatch)} />
+              Canvas / Blackboard
+            </li>
+          )}
         </ul>
 
         <div role="group" aria-label="View" className="inline-flex rounded-lg bg-muted p-1">
@@ -176,7 +184,7 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
                 aria-pressed={filter === option}
                 onClick={() => setFilter(option)}
                 className={cn(
-                  "rounded-md px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:py-2",
+                  "rounded-md px-3 py-1 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:px-2 max-sm:py-2",
                   filter === option ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
