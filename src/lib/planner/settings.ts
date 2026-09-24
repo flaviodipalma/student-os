@@ -51,6 +51,8 @@ export type ScoringWeights = {
   competingDeadlines: number
   // A planned session for it was missed recently: its work is back in the plan.
   missedSession: number
+  // Today: it can be finished in the (short) free time starting now.
+  fitsNow?: number
 }
 
 export const DEFAULT_SCORING: ScoringWeights = {
@@ -66,6 +68,7 @@ export const DEFAULT_SCORING: ScoringWeights = {
   tightOnTime: 15,
   competingDeadlines: 8,
   missedSession: 8,
+  fitsNow: 10,
 }
 
 // ---- Scheduling ------------------------------------------------------------

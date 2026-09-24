@@ -2,6 +2,7 @@ import "server-only"
 
 import { z } from "zod"
 import type { PlannedBlock } from "@/lib/assistant"
+import { planningModes as planningModesAll, studyPeriods } from "@/lib/types"
 import { addDays, formatDuration } from "@/lib/format"
 import { createPlanner } from "@/lib/planner"
 import { plannerInputFor } from "@/lib/planner-input"
@@ -325,7 +326,8 @@ function plannedWork(ctx: ToolContext, date: string): PlannedBlock[] {
 }
 
 function emptyResolved(): ResolvedIntent {
-  return { mode: "balanced", focusTaskIds: [], focusCourseIds: [], avoid: [], unavailable: [], dayLimits: {}, finishBy: [], whatIf: [] }
+  // No mode: the student's saved planning mode applies.
+  return { mode: undefined, focusTaskIds: [], focusCourseIds: [], avoid: [], unavailable: [], dayLimits: {}, finishBy: [], whatIf: [] }
 }
 
 // What changed between the current plan and the scenario, per day and per goal.
@@ -339,10 +341,34 @@ function compare(current: PlanningScenario, next: PlanningScenario) {
     })
     .filter((d) => d.changed)
     .map(({ day, before: b, after }) => ({ day, study: `${b} → ${after}` }))
+  // Per task, today and tomorrow: which work moves, and where it goes.
+  const minutesOn = (s: PlanningScenario, index: number) => {
+    const out = new Map<string, { task: string; minutes: number }>()
+    for (const x of s.days[index]?.sessions ?? []) out.set(x.taskId, { task: x.task, minutes: (out.get(x.taskId)?.minutes ?? 0) + x.minutes })
+    return out
+  }
+  const [todayBefore, todayAfter, tomorrowBefore, tomorrowAfter] = [minutesOn(current, 0), minutesOn(next, 0), minutesOn(current, 1), minutesOn(next, 1)]
+  const tasksThatMove = [...new Set([...todayBefore.keys(), ...todayAfter.keys()])]
+    .map((id) => {
+      const before = todayBefore.get(id)?.minutes ?? 0
+      const after = todayAfter.get(id)?.minutes ?? 0
+      const tomorrow = (tomorrowAfter.get(id)?.minutes ?? 0) - (tomorrowBefore.get(id)?.minutes ?? 0)
+      return { taskId: id, task: (todayBefore.get(id) ?? todayAfter.get(id))!.task, today: `${formatDuration(before)} → ${formatDuration(after)}`, change: after - before, tomorrowChange: tomorrow }
+    })
+    .filter((t) => t.change !== 0)
+    .map(({ change, tomorrowChange, ...t }) => ({ ...t, ...(tomorrowChange !== 0 ? { tomorrow: `${tomorrowChange > 0 ? "+" : "−"}${formatDuration(Math.abs(tomorrowChange))}` } : {}), ...(change < 0 ? {} : { more: true }) }))
+  const movedFromToday = [...todayBefore.entries()].reduce((sum, [id, b]) => sum + Math.max(0, b.minutes - (todayAfter.get(id)?.minutes ?? 0)), 0)
+  const sum = (m: Map<string, { minutes: number }>) => [...m.values()].reduce((total, x) => total + x.minutes, 0)
+  const goalsAtRisk = next.goals.filter((g) => !g.fits && !current.goals.some((c) => c.taskId === g.taskId && !c.fits)).map((g) => g.task)
   return {
     feasibility: `${current.status} → ${next.status}`,
     daysThatChange: days,
     totalStudy: `${formatDuration(current.totals.plannedStudyMinutes)} → ${formatDuration(next.totals.plannedStudyMinutes)}`,
+    tasksThatMove,
+    todayStudy: `${formatDuration(sum(todayBefore))} → ${formatDuration(sum(todayAfter))}`,
+    workMovedOffToday: formatDuration(movedFromToday),
+    tomorrowStudy: `${formatDuration(sum(tomorrowBefore))} → ${formatDuration(sum(tomorrowAfter))}`,
+    goalsThatNoLongerFit: goalsAtRisk,
     newWarnings: next.warnings.filter((w) => !current.warnings.includes(w)),
   }
 }
@@ -351,5 +377,52 @@ function sessionsKey(day: PlanningScenario["days"][number] | undefined) {
   return (day?.sessions ?? []).map((s) => `${s.taskId}@${s.startTime}`).join(",")
 }
 
-export const planningTools = [getPlanningContext, explainPlan, simulatePlanChange, generatePlanningScenarios, findAvailableTimes, applyConfirmedPlanChange]
-export const planningActionTools = [applyConfirmedPlanChange]
+// ---- Corrections to personalization (after Confirm).
+
+export const correctPersonalization = defineTool({
+  name: "correctPersonalization",
+  description:
+    "Propose a correction to how Student OS personalizes planning, when the student asks: their preferred study times (\"I actually prefer studying at night\": explicit, beats anything learned), their planning mode, switching learned estimates / study times / pacing on or off (\"stop adapting my task durations\"), turning off one learned pattern (\"don't use this pattern\": an insight id from getLearnedPatterns) or turning it back on, or always using their own estimate for a task (\"this estimate is wrong\"). The student confirms before it's saved. Only include what they asked for.",
+  input: z
+    .object({
+      preferredPeriods: z.array(z.enum(studyPeriods)).max(4).optional().describe("The full list of times the student prefers (empty = no preference)."),
+      planningMode: z.enum(planningModesAll).optional(),
+      useEstimates: z.boolean().optional(),
+      useStudyTimes: z.boolean().optional(),
+      useWorkload: z.boolean().optional(),
+      dismissPattern: z.string().max(80).optional().describe("An insight id from getLearnedPatterns (e.g. avoid:night)."),
+      restorePattern: z.string().max(80).optional(),
+      useOwnEstimateFor: taskRefInput.optional(),
+    })
+    .strict(),
+  run(ctx, input) {
+    const { useOwnEstimateFor: ref, ...rest } = input
+    let taskId: string | undefined
+    if (ref) {
+      const found = resolveTask(ctx.data.tasks, ref)
+      if ("ambiguous" in found) {
+        return { result: { status: "ambiguous", instruction: "Ask which task. Change nothing.", options: found.ambiguous.map((t) => taskBrief(ctx, t)) } }
+      }
+      if ("notFound" in found) return { result: { status: "not_found", problem: "No open task matches that in Student OS." } }
+      taskId = found.found.id
+    }
+    const pattern = /^[a-z]+(:[a-z0-9-]+){0,3}$/i
+    if ((rest.dismissPattern && !pattern.test(rest.dismissPattern)) || (rest.restorePattern && !pattern.test(rest.restorePattern))) {
+      return { result: { status: "not_possible", problem: "Student OS hasn't learned that pattern." } }
+    }
+    const check = prepareAction(ctx, { kind: "update-personalization", changes: { ...rest, ...(taskId ? { useOwnEstimateFor: taskId } : {}) } })
+    if (!check.ok) return { result: { status: "not_possible", problem: check.problem } }
+    return {
+      focusTaskId: taskId,
+      pending: check.pending,
+      result: {
+        status: "needs_confirmation",
+        summary: check.pending.summary,
+        instruction: "Nothing is saved yet. The student sees Confirm / Cancel buttons. Say in one short sentence what will change and ask them to confirm.",
+      },
+    }
+  },
+})
+
+export const planningTools = [getPlanningContext, explainPlan, simulatePlanChange, generatePlanningScenarios, findAvailableTimes, applyConfirmedPlanChange, correctPersonalization]
+export const planningActionTools = [applyConfirmedPlanChange, correctPersonalization]

@@ -1,5 +1,8 @@
 # Adaptive planning
 
+> Extended by long-term personalization (profile, modes, preferred times, pacing,
+> corrections): see docs/personalization.md.
+
 Student OS learns from one student's own history and uses it as **soft**
 input to the deterministic Planner. The Planner stays the authority on what's
 possible.

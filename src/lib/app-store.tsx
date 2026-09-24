@@ -110,15 +110,16 @@ type AppStore = {
   replaceExternalEvents: (events: ExternalEventRecord[]) => void
   // After the server saved something for the student (e.g. a change confirmed in
   // the Assistant): the saved tasks and study sessions, added or replaced by id.
-  applySaved: (saved: { tasks: Task[]; studySessions: StudySessionRecord[] }) => void
+  applySaved: (saved: { tasks: Task[]; studySessions: StudySessionRecord[]; learning?: LearningSettings }) => void
   // Local only: the event stays in Canvas / Blackboard.
   setExternalEventHidden: (id: string, hidden: boolean) => void
   // Profile, preferences and weekly commitments. These return the result so
   // forms can show validation messages next to the fields.
   updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
   updatePreferences: (input: StudentPreferences) => Promise<ActionResult<StudentPreferences>>
-  // Adaptive planning: on/off, and "Reset learning" (tasks and sessions stay).
-  setLearningEnabled: (enabled: boolean) => Promise<ActionResult<LearningSettings>>
+  // Personalization: switches, mode, preferred times, corrections; and "Reset
+  // learning" (tasks and sessions stay). `message` confirms the change.
+  updateLearning: (changes: Partial<Omit<LearningSettings, "since">>, message?: string) => Promise<ActionResult<LearningSettings>>
   resetLearning: () => Promise<ActionResult<LearningSettings>>
   addCommitment: (input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
   // Replaces the whole rule, so the edit applies to every week.
@@ -392,11 +393,13 @@ export function AppStoreProvider({
       }
       return result
     },
-    setLearningEnabled: async (enabled) => {
-      const result = await call(updateLearningAction(enabled))
+    updateLearning: async (changes, message) => {
+      const result = await call(updateLearningAction(changes))
       if (result.ok) {
         setLearning(result.data)
-        showSuccess(enabled ? "Adaptive planning is on." : "Adaptive planning is off. Your plan uses only your own estimates.")
+        if (message) showSuccess(message)
+      } else {
+        showError(result.error)
       }
       return result
     },
@@ -471,6 +474,7 @@ export function AppStoreProvider({
       }
       if (saved.tasks.length) setTasks((prev) => upsert(prev, saved.tasks))
       if (saved.studySessions.length) setStudySessions((prev) => upsert(prev, saved.studySessions))
+      if (saved.learning) setLearning(saved.learning)
     },
     setExternalEventHidden: (id, hidden) => {
       const before = externalEvents.find((event) => event.id === id)

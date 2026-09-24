@@ -120,7 +120,9 @@ describe("Planning Intent: the AI's output is validated, never trusted", () => {
     expect(planningIntentSchema.safeParse({ unavailable: [{ date: "next friday" }] }).success).toBe(false)
     expect(planningIntentSchema.safeParse({ maxStudyMinutes: [{ date: TODAY, minutes: 5000 }] }).success).toBe(false)
     expect(planningIntentSchema.safeParse({ whatIf: [{ task: "x", userId: bob }] }).success).toBe(false)
-    expect(planningIntentSchema.parse({})).toMatchObject({ mode: "balanced", focusTasks: [], unavailable: [] })
+    expect(planningIntentSchema.parse({})).toMatchObject({ focusTasks: [], unavailable: [] })
+    // No mode unless the student asked for one: their saved planning mode applies.
+    expect(planningIntentSchema.parse({}).mode).toBeUndefined()
   })
 
   it("every task and course must be the student's own; unclear ones are asked about", async () => {

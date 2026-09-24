@@ -172,10 +172,43 @@ export type StudySessionRecord = {
   firstStartTime?: string | null
 }
 
-// Adaptive planning settings (Settings > Planning). `since`: only history on or
-// after this date counts ("Reset learning"); null = all of it.
-export type LearningSettings = { enabled: boolean; since: string | null }
-export const DEFAULT_LEARNING_SETTINGS: LearningSettings = { enabled: true, since: null }
+// Personalization settings (Settings > Personalization; docs/personalization.md).
+// Explicit choices (mode, preferred times) are the student's own and always win
+// over anything learned; learned signals can be switched off one by one.
+export const planningModes = ["balanced", "deadline-focus", "exam-focus", "light-day", "custom"] as const
+export type PlanningMode = (typeof planningModes)[number]
+export const studyPeriods = ["morning", "afternoon", "evening", "night"] as const
+export type StudyPeriod = (typeof studyPeriods)[number]
+
+export type LearningSettings = {
+  // Learn from my planning history at all.
+  enabled: boolean
+  // Only history on or after this date counts ("Reset learning"); null = all of it.
+  since: string | null
+  // Which learned signals the Planner may use.
+  useEstimates: boolean
+  useStudyTimes: boolean
+  useWorkload: boolean
+  // The student's planning mode ("custom" = only my own settings, nothing learned).
+  planningMode: PlanningMode
+  // Times the student says they prefer (explicit: overrides learned times).
+  preferredPeriods: StudyPeriod[]
+  // Learned patterns the student turned off ("Don't use this").
+  dismissedPatterns: string[]
+  // Tasks where the student's own estimate is always used ("This estimate is wrong").
+  ownEstimateTaskIds: string[]
+}
+export const DEFAULT_LEARNING_SETTINGS: LearningSettings = {
+  enabled: true,
+  since: null,
+  useEstimates: true,
+  useStudyTimes: true,
+  useWorkload: true,
+  planningMode: "balanced",
+  preferredPeriods: [],
+  dismissedPatterns: [],
+  ownEstimateTaskIds: [],
+}
 
 // The signed-in student's profile.
 export const academicYears = ["freshman", "sophomore", "junior", "senior", "graduate", "other"] as const

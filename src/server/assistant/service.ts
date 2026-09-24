@@ -5,10 +5,12 @@ import type { AssistantPageContext, AssistantReply, ChatTurn, ConfirmedChange, P
 import { ASSISTANT_ERROR_MESSAGE } from "@/lib/assistant"
 import { toMinutes } from "@/lib/events"
 import { formatDuration } from "@/lib/format"
+import { planningModes, studyPeriods } from "@/lib/types"
 import { dateKeySchema, firstIssue, idSchema } from "@/lib/validation"
 import type { Database } from "../db/types"
 import { AppError, ValidationError } from "../errors"
 import { loadAppData } from "../services/app-data"
+import { saveLearningSettings } from "../services/preferences"
 import { createStudySession, updateStudySession } from "../services/study-sessions"
 import { createTask, updateTask } from "../services/tasks"
 import { actionTools, dueText, MAX_BLOCKS, prepareAction } from "./action-tools"
@@ -142,6 +144,20 @@ const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid time.")
 const priority = z.enum(["low", "medium", "high", "critical"])
 const plannedBlock = z.object({ taskId: idSchema, startTime: time, endTime: time })
 
+export const personalizationChangeSchema = z
+  .object({
+    preferredPeriods: z.array(z.enum(studyPeriods)).max(4),
+    planningMode: z.enum(planningModes),
+    useEstimates: z.boolean(),
+    useStudyTimes: z.boolean(),
+    useWorkload: z.boolean(),
+    dismissPattern: z.string().regex(/^[a-z]+(:[a-z0-9-]+){0,3}$/i).max(80),
+    restorePattern: z.string().regex(/^[a-z]+(:[a-z0-9-]+){0,3}$/i).max(80),
+    useOwnEstimateFor: idSchema,
+  })
+  .partial()
+  .strict()
+
 export const proposedActionSchema: z.ZodType<ProposedAction> = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("complete-task"), taskId: idSchema }),
   z.object({
@@ -185,6 +201,7 @@ export const proposedActionSchema: z.ZodType<ProposedAction> = z.discriminatedUn
   }),
   z.object({ kind: z.literal("accept-sessions"), date: dateKeySchema, sessions: z.array(plannedBlock).min(1).max(MAX_BLOCKS) }),
   z.object({ kind: z.literal("skip-day"), date: dateKeySchema, sessions: z.array(plannedBlock).min(1).max(MAX_BLOCKS) }),
+  z.object({ kind: z.literal("update-personalization"), changes: personalizationChangeSchema }),
 ])
 
 // Saves a change the student confirmed. The proposal came back from the browser,
@@ -225,6 +242,22 @@ export async function confirmAssistantChange(deps: AssistantDeps, action: Propos
         tasks: [],
         studySessions: [session],
       }
+    }
+    case "update-personalization": {
+      const current = data.learning
+      const c = action.changes
+      const saved = await saveLearningSettings(db, userId, {
+        ...(c.preferredPeriods ? { preferredPeriods: c.preferredPeriods } : {}),
+        ...(c.planningMode ? { planningMode: c.planningMode } : {}),
+        ...(c.useEstimates !== undefined ? { useEstimates: c.useEstimates } : {}),
+        ...(c.useStudyTimes !== undefined ? { useStudyTimes: c.useStudyTimes } : {}),
+        ...(c.useWorkload !== undefined ? { useWorkload: c.useWorkload } : {}),
+        ...(c.dismissPattern || c.restorePattern
+          ? { dismissedPatterns: [...current.dismissedPatterns.filter((id) => id !== c.restorePattern), ...(c.dismissPattern ? [c.dismissPattern] : [])] }
+          : {}),
+        ...(c.useOwnEstimateFor ? { ownEstimateTaskIds: [...current.ownEstimateTaskIds, c.useOwnEstimateFor] } : {}),
+      })
+      return { message: "Done. Your planning now uses that.", tasks: [], studySessions: [], learning: saved }
     }
     case "accept-sessions":
     case "skip-day": {

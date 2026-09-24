@@ -116,6 +116,11 @@ export function createPlanner(input: PlannerInput): Planner {
       warnings: [],
     }
 
+    // Today: a short free window starting now ("What should I do now?"): work
+    // that fits in it gets a small bonus. Long windows don't need it.
+    const nowSlot = date === today ? day.slots.find((s) => s.start <= nowMinutes + 15 && s.end - s.start >= settings.minBlockMinutes) : undefined
+    const freeNow = nowSlot && nowSlot.end - nowSlot.start <= 180 ? roundDown(Math.min(nowSlot.end, toMinutes(settings.dayEnd)) - nowSlot.start, 5) : undefined
+
     // 3-4. Open tasks that need time on this day, scored and sorted.
     //      Overdue work is only planned for today; skipped tasks wait for another day.
     plan.ranked = openTasks
@@ -135,6 +140,7 @@ export function createPlanner(input: PlannerInput): Planner {
             competingMinutes: competingMinutes(task, remaining),
             missedSessions: missedSessionsFor(task.id, events, today, nowMinutes),
             boost: input.strategy?.boosts?.[task.id],
+            freeNowMinutes: freeNow,
           },
           settings.scoring
         )
@@ -160,6 +166,10 @@ export function createPlanner(input: PlannerInput): Planner {
   function placeSessions(plan: DailyPlan, day: DayAvailability, remaining: Map<string, number>) {
     const dayEnd = toMinutes(settings.dayEnd)
     let budget = day.budget
+    // Pacing (a soft target below the hard limit): non-urgent work stops there.
+    const pacing = input.learned?.pacing
+    const soft = pacing && pacing.softMinutes < settingsOn(plan.date).maxStudyMinutesPerDay ? pacing.softMinutes : undefined
+    const used = () => day.bookedStudyMinutes + (day.budget - budget)
 
     for (const scored of plan.ranked) {
       const { task } = scored
@@ -178,20 +188,28 @@ export function createPlanner(input: PlannerInput): Planner {
       let left = target
       let scheduled = 0
       let hitLimit = false
+      let paced = false
+      // Urgent work (due today or tomorrow, overdue, or tight on time) isn't paced.
+      const urgent = scored.daysLeft <= 1 || scored.factors.some((f) => f.key === "tight-on-time")
       while (left > 0) {
         // The shortest block worth placing: a full minimum block, or what's left if less.
         const smallest = Math.min(settings.minBlockMinutes, roundUp(left, 5))
         const ideal = idealBlock(left, settings)
-        const wanted = Math.min(ideal, roundDown(budget, 5))
+        const cap = soft !== undefined && !urgent ? Math.min(budget, soft - used()) : budget
+        const wanted = Math.min(ideal, roundDown(cap, 5))
+        if (wanted < smallest && cap < budget) {
+          paced = true
+          break
+        }
         if (wanted < smallest) {
           hitLimit = true
           break
         }
         // The earliest free block with room for at least the smallest useful block
         // (outside times the student usually misses, if there's another choice).
-        const pick = pickSlot(day.slots, smallest, cutoff, avoidOn(plan.date))
+        const pick = pickSlot(day.slots, smallest, cutoff, avoidOn(plan.date), preferOn(plan.date))
         if (!pick) break
-        const { slot, start, avoided } = pick
+        const { slot, start, avoided, preferred } = pick
         const space = roundDown(pick.end - start, 5)
         // Adapt to the real gap: a 45-minute gap gets a 45-minute session.
         const length = Math.min(wanted, space)
@@ -208,7 +226,7 @@ export function createPlanner(input: PlannerInput): Planner {
           endTime: fromMinutes(start + length),
           status: "suggested",
           score: scored.score,
-          reasons: [...reasons, ...(avoided ? [avoided] : []), placementReason(length, ideal, space)],
+          reasons: [...reasons, ...(preferred ? [preferred] : []), ...(avoided ? [avoided] : []), placementReason(length, ideal, space)],
         })
         // Use up the block, plus a break before any next study block.
         slot.start = Math.min(slot.end, start + length + settings.breakMinutes)
@@ -218,7 +236,9 @@ export function createPlanner(input: PlannerInput): Planner {
       }
 
       remaining.set(task.id, left0 - scheduled)
-      if (left > 0) plan.unscheduled.push(unscheduledEntry(task, left, scheduled, hitLimit, day, cutoff, scored))
+      // Held back by pacing: it goes to later days, as planned; not a problem to report.
+      if (paced && pacing) plan.pacing = pacing
+      else if (left > 0) plan.unscheduled.push(unscheduledEntry(task, left, scheduled, hitLimit, day, cutoff, scored))
     }
 
     plan.suggestions.sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -237,6 +257,14 @@ export function createPlanner(input: PlannerInput): Planner {
         { ...a, start: Math.max(a.start, here.end) },
       ].filter((part) => part.end > part.start)
     )
+  }
+
+  // Times the student prefers on a date (explicit). On today, the next hour
+  // counts too when there are any: the student is here now.
+  function preferOn(date: string): { start: number; end: number; reason: string }[] {
+    const prefer = input.learned?.preferTimes ?? []
+    if (prefer.length === 0 || date !== today) return prefer
+    return [{ start: nowMinutes, end: nowMinutes + 60, reason: "" }, ...prefer]
   }
 
   function unscheduledEntry(
@@ -338,42 +366,55 @@ function existingSessionsOn(items: CalendarEvent[], date: string, today: string,
 }
 
 // Where to put the next session: the earliest free block with room for
-// `smallest` minutes. With times to avoid, the earliest room OUTSIDE them wins
-// if there is any (it may be later in a block); otherwise the earliest room at
-// all, so avoided times are used last, never blocked. `avoided` is the reason
-// when avoiding changed the choice.
+// `smallest` minutes. Preferred times (the student's own choice) come first,
+// then anything outside the times to avoid (learned), then the earliest room at
+// all, so avoided times are used last, never blocked. `preferred` / `avoided`
+// are the reasons when that changed the choice.
 export function pickSlot(
   slots: { start: number; end: number }[],
   smallest: number,
   cutoff: number,
-  avoid: { start: number; end: number; reason: string }[]
-): { slot: { start: number; end: number }; start: number; end: number; avoided?: string } | null {
+  avoid: { start: number; end: number; reason: string }[],
+  prefer: { start: number; end: number; reason: string }[] = []
+): { slot: { start: number; end: number }; start: number; end: number; avoided?: string; preferred?: string } | null {
   const fits = (from: number, to: number) => roundDown(to - from, 5) >= smallest
   const earliest = slots.find((s) => fits(s.start, Math.min(s.end, cutoff)))
   if (!earliest) return null
   const plain = { slot: earliest, start: earliest.start, end: Math.min(earliest.end, cutoff) }
-  if (avoid.length === 0) return plain
-  const inAvoided = (from: number, to: number) => avoid.find((a) => from < a.end && a.start < to)
+  if (avoid.length === 0 && prefer.length === 0) return plain
+  const minus = (parts: { start: number; end: number }[], cut: { start: number; end: number }) =>
+    parts.flatMap((p) =>
+      p.end <= cut.start || cut.end <= p.start
+        ? [p]
+        : [
+            { start: p.start, end: cut.start },
+            { start: cut.end, end: p.end },
+          ].filter((x) => x.end > x.start)
+    )
+  const outsideAvoided = (slot: { start: number; end: number }) =>
+    avoid.reduce((parts, a) => minus(parts, a), [{ start: slot.start, end: Math.min(slot.end, cutoff) }]).sort((a, b) => a.start - b.start)
+  const changed = (slot: { start: number; end: number }, start: number) => slot !== plain.slot || start !== plain.start
+
+  // 1. Inside a preferred time (and not an avoided one).
   for (const slot of slots) {
-    // The block minus the avoided times, in order.
-    let parts = [{ start: slot.start, end: Math.min(slot.end, cutoff) }]
-    for (const a of avoid) {
-      parts = parts.flatMap((p) =>
-        p.end <= a.start || a.end <= p.start
-          ? [p]
-          : [
-              { start: p.start, end: a.start },
-              { start: a.end, end: p.end },
-            ].filter((x) => x.end > x.start)
-      )
+    for (const part of outsideAvoided(slot)) {
+      for (const p of prefer) {
+        const start = Math.max(part.start, p.start)
+        const end = Math.min(part.end, p.end)
+        if (end > start && fits(start, end)) {
+          return { slot, start, end, ...(changed(slot, start) && p.reason ? { preferred: p.reason } : {}) }
+        }
+      }
     }
-    parts.sort((a, b) => a.start - b.start)
-    const part = parts.find((p) => fits(p.start, p.end))
+  }
+  // 2. Outside the avoided times.
+  for (const slot of slots) {
+    const part = outsideAvoided(slot).find((p) => fits(p.start, p.end))
     if (!part) continue
-    const changed = slot !== plain.slot || part.start !== plain.start
-    const skippedOver = changed ? inAvoided(plain.start, plain.start + smallest) : undefined
+    const skippedOver = changed(slot, part.start) ? avoid.find((a) => plain.start < a.end && a.start < plain.start + smallest) : undefined
     return { slot, start: part.start, end: part.end, ...(skippedOver ? { avoided: skippedOver.reason } : {}) }
   }
+  // 3. The earliest room at all.
   return plain
 }
 

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { eq } from "drizzle-orm"
-import type { Task } from "@/lib/types"
+import { DEFAULT_LEARNING_SETTINGS, type Task } from "@/lib/types"
 import { studentPreferences, studySessions as sessionsTable, tasks as tasksTable } from "../db/schema"
 import { createTestDb } from "../test-utils/test-db"
 import { MockAssistantService } from "../assistant/mock-assistant-service"
@@ -61,7 +61,7 @@ const call = (ctx: ToolContext, name: string, input: unknown = {}) => JSON.parse
 describe("learning from real history", () => {
   it("a brand-new student has adaptive planning on, with nothing learned", async () => {
     const carol = await t.addUser("Carol")
-    expect(await getLearningSettings(t.db, carol)).toEqual({ enabled: true, since: null })
+    expect(await getLearningSettings(t.db, carol)).toEqual(DEFAULT_LEARNING_SETTINGS)
     const ctx = await contextFor(carol)
     expect(ctx.adaptive).toMatchObject({ enabled: true, observations: 0, estimates: {}, insights: [] })
     expect(call(ctx, "getLearnedPatterns")).toMatchObject({ enabled: true, finishedTasksLearnedFrom: 0, note: expect.stringMatching(/Not enough history/) })
@@ -130,7 +130,7 @@ describe("the student's controls", () => {
     const bobBefore = await t.db.select().from(sessionsTable).where(eq(sessionsTable.userId, bob))
     const [tasksBefore, sessionsBefore] = [(await loadAppData(t.db, alex)).tasks.length, (await loadAppData(t.db, alex)).studySessions.length]
 
-    expect(await resetLearning(t.db, alex, TODAY)).toEqual({ enabled: true, since: TODAY })
+    expect(await resetLearning(t.db, alex, TODAY)).toMatchObject({ enabled: true, since: TODAY })
     const data = await loadAppData(t.db, alex)
     expect(data.tasks).toHaveLength(tasksBefore)
     expect(data.studySessions).toHaveLength(sessionsBefore)
@@ -174,12 +174,15 @@ describe("the Assistant explains only what was learned", () => {
     const text = JSON.stringify(result)
     // Labels use the course code only; the course name (with the injection) isn't in learned data.
     expect(text).not.toContain("3 AM")
-    expect(result.insights).toEqual([{ text: "CSC215 lab reports usually take you longer than you estimate (about 1.5×, from 5 tasks).", confidence: "medium" }])
-    expect(result.timesOfDay).toEqual([{ period: "afternoon", sessions: 5, completed: 5, missed: 0, skipped: 0, moved: 0, completionRate: 1 }])
+    expect(result.insights).toEqual([
+      expect.objectContaining({ text: "CSC215 lab reports usually take you longer than you estimate (about 1.5×, from 5 tasks).", confidence: "medium", affectsPlanning: true, turnedOff: false }),
+    ])
+    expect(result.timesOfDay).toEqual([{ period: "afternoon", sessions: 5, completed: 5, missed: 0, skipped: 0, moved: 0, recentCompletionRate: 1 }])
   })
 
   it("the rules tell the model to use only learned data, with its confidence", () => {
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Never infer or invent a pattern that the tools don't return/)
-    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Low confidence = say it's still learning/)
+    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Student OS is still learning your pattern/)
+    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Never change the planning mode or any setting on your own/)
   })
 })

@@ -100,6 +100,8 @@ export const getWhatShouldIDoNow = defineTool({
             ...(answer.kind === "work" ? { availableMinutes: answer.availableMinutes, freeUntil: answer.nextCommitment ? { event: untrusted(answer.nextCommitment.title), at: timeLabel(answer.nextCommitment.startTime) } : "end of your study window" } : { until: timeLabel(answer.until) }),
             remainingMinutes: answer.details.remainingMinutes,
             estimateMissing: answer.details.estimateMissing,
+            // Why the Planner expects this much work (adaptive planning), if it learned it.
+            learnedEstimate: ctx.adaptive?.estimates[answer.task.id] ? untrusted(ctx.adaptive.estimates[answer.task.id].explanation, 300) : null,
             why: answer.reasons,
           },
         }
@@ -499,31 +501,58 @@ function estimateView(ctx: ToolContext, task: Task) {
 export const getLearnedPatterns = defineTool({
   name: "getLearnedPatterns",
   description:
-    "What adaptive planning learned from this student's own history, as computed by Student OS: whether it's on, how many finished tasks it learns from, the insights (only shown with enough history), completion by time of day, typical planned vs completed study per day, and learned estimates for open tasks with their explanation and confidence. Use for \"why is this session longer?\", \"when do I study best?\", \"why do you plan less at night?\". Only explain what this returns; never infer other patterns.",
+    "The student's planning profile, as computed by Student OS from their own history, in three separate parts: explicit (what they chose: planning mode, preferred study times), observed (each value with confidence, number of observations, the date of the newest evidence and its source) and inferred (what the Planner does because of it). Also the insights (each with an id for correctPersonalization, whether it affects planning and whether the student turned it off) and learned estimates for open tasks. Use for \"why is this session longer?\", \"when do I study best?\", \"why afternoon sessions?\". Only explain what this returns; never infer other patterns.",
   input: z.object({}),
   run(ctx) {
     const a = ctx.adaptive
+    const settings = ctx.data.learning
     if (!a || !a.enabled) {
-      return { result: { enabled: false, note: "Adaptive planning is off (Settings > Planning): the Planner uses the student's own estimates and times only." } }
+      return {
+        result: {
+          enabled: false,
+          explicit: { planningMode: settings.planningMode, preferredStudyTimes: settings.preferredPeriods },
+          note: "Learning from history is off (Settings > Personalization): the Planner uses the student's own estimates, settings and planning mode only.",
+        },
+      }
     }
     const open = ctx.data.tasks.filter((t) => t.status !== "completed")
+    const text = (value: string) => untrusted(value, 300)
+    const entry = <T,>(e: { value: T; confidence: string; observations: number; updatedAt: string; source: string; explanation: string } | undefined) =>
+      e ? { value: e.value, confidence: e.confidence, observations: e.observations, newestEvidence: e.updatedAt, source: e.source, explanation: text(e.explanation) } : undefined
+    const o = a.profile.observed
     return {
       result: {
         enabled: true,
         historySince: a.since,
+        switches: { learnedEstimates: settings.useEstimates, learnedStudyTimes: settings.useStudyTimes, learnedPacing: settings.useWorkload },
+        explicit: { planningMode: settings.planningMode, preferredStudyTimes: settings.preferredPeriods, tasksUsingOwnEstimate: settings.ownEstimateTaskIds.length },
+        observed: {
+          sessionCompletionRate: entry(o.sessionCompletionRate),
+          rescheduleRate: entry(o.rescheduleRate),
+          typicalSessionMinutes: entry(o.typicalSessionMinutes),
+          typicalStudyMinutesPerDay: entry(o.typicalStudyMinutesPerDay),
+          typicalStudyDays: entry(o.typicalStudyDays),
+          bestStudyTime: entry(o.bestStudyTime),
+          oftenMissedTimes: entry(o.oftenMissedTimes),
+          estimateAccuracy: entry(o.estimateAccuracy),
+          estimatesByKind: o.estimatesByKind.map((e) => entry(e)),
+          unfinishedDayRate: entry(o.unfinishedDayRate),
+          oftenPostponedTypes: entry(o.oftenPostponedTypes),
+          sessionsPerLargeTask: entry(o.sessionsPerLargeTask),
+        },
+        inferred: a.profile.inferred.map((i) => ({ text: text(i.text), confidence: i.confidence })),
+        insights: a.insights.map((i) => ({ id: i.id, text: text(i.text), confidence: i.confidence, observations: i.observations, affectsPlanning: i.affectsPlanning, turnedOff: i.dismissed })),
         finishedTasksLearnedFrom: a.observations,
-        insights: a.insights.map((i) => ({ text: untrusted(i.text, 300), confidence: i.confidence })),
         timesOfDay: a.periods
           .filter((p) => p.sessions > 0)
-          .map((p) => ({ period: p.label, sessions: p.sessions, completed: p.completed, missed: p.missed, skipped: p.skipped, moved: p.moved, completionRate: p.completionRate })),
-        usedLast: a.avoid.map((x) => ({ period: x.period, reason: x.reason, confidence: x.confidence })),
-        workload: a.workload,
+          .map((p) => ({ period: p.label, sessions: p.sessions, completed: p.completed, missed: p.missed, skipped: p.skipped, moved: p.moved, recentCompletionRate: p.completionRate })),
+        pacing: a.pacing ? { softMinutes: a.pacing.softMinutes, confidence: a.pacing.confidence, reason: a.pacing.reason } : null,
         learnedEstimates: open
           .filter((t) => a.estimates[t.id])
           .slice(0, 10)
           .map((t) => {
             const e = a.estimates[t.id]
-            return { ...taskBrief(ctx, t), yoursMinutes: e.userMinutes, plannerUsesMinutes: e.minutes, confidence: e.confidence, explanation: untrusted(e.explanation, 300) }
+            return { ...taskBrief(ctx, t), yoursMinutes: e.userMinutes, plannerUsesMinutes: e.minutes, confidence: e.confidence, explanation: text(e.explanation) }
           }),
         ...(a.observations === 0 && a.insights.length === 0 ? { note: "Not enough history yet: plans use the student's own estimates and preferences." } : {}),
       },

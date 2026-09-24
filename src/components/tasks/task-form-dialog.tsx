@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SourceBadge } from "@/components/tasks/task-badges"
 import { useCourses } from "@/lib/course-store"
 import { addDays } from "@/lib/format"
+import { useAppStore } from "@/lib/app-store"
 import { useAdaptiveContext } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
 import { priorities, priorityLabel, statusLabel, typeLabel } from "@/lib/tasks"
@@ -84,6 +85,8 @@ function TaskForm({
   const adaptive = useAdaptiveContext()
   const savedEstimate = task ? (task.estimateMinutes === null ? "" : String(task.estimateMinutes)) : null
   const learned = task && estimate === savedEstimate ? adaptive?.estimates[task.id] : undefined
+  const { learning, updateLearning } = useAppStore()
+  const usesOwn = Boolean(task && learning.ownEstimateTaskIds.includes(task.id))
   const [notes, setNotes] = useState(task?.notes ?? "")
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "not_started")
   const [error, setError] = useState<string | null>(null)
@@ -207,7 +210,26 @@ function TaskForm({
           {learned && (
             <p id="task-estimate-learned" className="text-xs text-muted-foreground">
               {learned.explanation}
-              {learned.confidence === "low" ? " Low confidence: still learning your pattern." : ""}
+              {learned.confidence === "low" ? " Student OS is still learning your pattern." : ""}{" "}
+              <button
+                type="button"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                onClick={() => updateLearning({ ownEstimateTaskIds: [...learning.ownEstimateTaskIds, task!.id] }, "The Planner uses your estimate for this task.")}
+              >
+                Use my estimate instead
+              </button>
+            </p>
+          )}
+          {task && usesOwn && (
+            <p className="text-xs text-muted-foreground">
+              The Planner uses your estimate for this task (you chose this).{" "}
+              <button
+                type="button"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                onClick={() => updateLearning({ ownEstimateTaskIds: learning.ownEstimateTaskIds.filter((id) => id !== task.id) }, "The Planner may adjust this task's duration again.")}
+              >
+                Let it learn again
+              </button>
             </p>
           )}
         </Field>

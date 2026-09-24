@@ -46,3 +46,4 @@ export type {
   StudySessionStatus,
   UnscheduledTask,
 } from "./types"
+export { MODE_LABELS, modeStrategy, type Pacing } from "./modes"

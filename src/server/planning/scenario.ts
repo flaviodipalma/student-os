@@ -2,7 +2,7 @@ import "server-only"
 
 import { fromMinutes, toMinutes } from "@/lib/events"
 import { addDays } from "@/lib/format"
-import { createPlanner, dayAvailability, type DailyPlan, type PlanningStrategy } from "@/lib/planner"
+import { createPlanner, dayAvailability, modeStrategy, type DailyPlan, type PlanningStrategy } from "@/lib/planner"
 import { plannerInputFor } from "@/lib/planner-input"
 import type { CalendarEvent, Task } from "@/lib/types"
 import { availabilityOn, courseCodeOf, dayLabel, relativeDay, remainingMinutes, timeLabel, untrusted, type ToolContext } from "../assistant/context"
@@ -44,20 +44,18 @@ export type PlanningScenario = {
   warnings: string[]
 }
 
-const BOOST = { focus: 40, course: 25, exam: 30, deadline: 25, finishBy: 20 }
+const BOOST = { focus: 40, course: 25, finishBy: 20 }
 
+// The scenario's priorities: the mode (the one asked for, else the student's
+// saved one), then focus courses, finish-by goals and focus tasks on top.
 export function strategyFor(ctx: ToolContext, intent: ResolvedIntent, tasks: Task[]): PlanningStrategy {
-  const boosts: NonNullable<PlanningStrategy["boosts"]> = {}
+  const saved = ctx.data.learning?.planningMode
+  const mode = intent.mode ?? (saved === "custom" ? undefined : saved)
+  const { boosts } = modeStrategy(mode, tasks, ctx.today, ctx.data.preferences.maxStudyMinutesPerDay, intent.mode ? "request" : "mode")
   const give = (taskId: string, points: number, label: string) => {
     if ((boosts[taskId]?.points ?? 0) < points) boosts[taskId] = { points, label }
   }
   const open = tasks.filter((task) => task.status !== "completed")
-  if (intent.mode === "exam-focus") {
-    for (const task of open) if ((task.type === "exam" || task.type === "quiz") && task.dueDate <= addDays(ctx.today, 10)) give(task.id, BOOST.exam, "Exam focus (your choice)")
-  }
-  if (intent.mode === "deadline-focus") {
-    for (const task of open) if (task.dueDate <= addDays(ctx.today, 3)) give(task.id, BOOST.deadline, "Deadline focus (your choice)")
-  }
   for (const courseId of intent.focusCourseIds) {
     for (const task of open.filter((t) => t.courseId === courseId)) give(task.id, BOOST.course, `Your focus: ${courseCodeOf(ctx, courseId) ?? "this course"}`)
   }
@@ -120,7 +118,7 @@ export function buildScenario(ctx: ToolContext, intent: ResolvedIntent, options:
   input.skipped = skipped
   input.strategy = strategyFor(ctx, intent, tasks)
   for (const [date, minutes] of Object.entries(intent.dayLimits)) assumptions.push(`At most ${minutes} minutes of study ${relativeDay(ctx, date).toLowerCase()}`)
-  if (intent.mode !== "balanced") assumptions.push(`Mode: ${intent.mode}`)
+  if (intent.mode) assumptions.push(`Mode: ${intent.mode}`)
   if (intent.focusTaskIds.length) assumptions.push(`Focus: ${intent.focusTaskIds.map((id) => `"${title(id)}"`).join(", ")}`)
 
   const planner = createPlanner(input)

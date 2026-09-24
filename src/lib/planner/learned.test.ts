@@ -3,7 +3,7 @@ import { toMinutes } from "@/lib/events"
 import { addDays } from "@/lib/format"
 import { plannerInputFor } from "@/lib/planner-input"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import type { CalendarEvent, Course, RecurringCommitment, StudySessionRecord, Task } from "@/lib/types"
+import { DEFAULT_LEARNING_SETTINGS, type CalendarEvent, type Course, type RecurringCommitment, type StudySessionRecord, type Task } from "@/lib/types"
 import { createPlanner, pickSlot } from "./generate-plan"
 import type { PlannerInput } from "./types"
 import { whatNow } from "./what-now"
@@ -137,20 +137,20 @@ describe("from saved data (plannerInputFor)", () => {
     const { done, sessions } = history()
     const open = task({ dueDate: WED })
     const input = plannerInputFor(
-      { tasks: [...done, open], courses, events: [], studySessions: sessions, recurringCommitments: [], preferences: DEFAULT_STUDENT_PREFERENCES, learning },
+      { tasks: [...done, open], courses, events: [], studySessions: sessions, recurringCommitments: [], preferences: DEFAULT_STUDENT_PREFERENCES, learning: learning && { ...DEFAULT_LEARNING_SETTINGS, ...learning } },
       at(TUE, "08:00")
     )
     return { input, open }
   }
 
   it("on: learned estimates reach the Planner", () => {
-    const { input, open } = base({ enabled: true, since: null })
+    const { input, open } = base({ ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null })
     expect(input.learned?.estimates?.[open.id]?.minutes).toBe(80)
   })
 
   it("off, reset, or no learning settings: the Planner plans exactly as before", () => {
-    expect(base({ enabled: false, since: null }).input.learned).toBeUndefined()
-    expect(base({ enabled: true, since: TUE }).input.learned).toBeUndefined()
+    expect(base({ ...DEFAULT_LEARNING_SETTINGS, enabled: false, since: null }).input.learned).toBeUndefined()
+    expect(base({ ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: TUE }).input.learned).toBeUndefined()
     expect(base(undefined).input.learned).toBeUndefined()
   })
 })

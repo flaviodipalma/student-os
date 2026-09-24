@@ -1,10 +1,11 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { ThemePreference } from "@/lib/theme"
 import { DEFAULT_LEARNING_SETTINGS, type LearningSettings, type NotificationPreferences, type StudentPreferences } from "@/lib/types"
-import { studentPreferences, studySessions } from "../db/schema"
+import { studentPreferences, studySessions, tasks } from "../db/schema"
+import { NotFoundError } from "../errors"
 import type { Database } from "../db/types"
 
 const hhmm = (time: string) => time.slice(0, 5)
@@ -92,34 +93,72 @@ export async function saveThemePreference(db: Database, userId: string, theme: T
   return theme
 }
 
-// ---- Adaptive planning (same row) ---------------------------------------------
+// ---- Personalization (same row) ----------------------------------------------
 
-export async function getLearningSettings(db: Database, userId: string): Promise<LearningSettings> {
-  const [row] = await db
-    .select({ enabled: studentPreferences.adaptivePlanning, since: studentPreferences.adaptiveSince })
-    .from(studentPreferences)
-    .where(eq(studentPreferences.userId, userId))
-  return row ?? DEFAULT_LEARNING_SETTINGS
+const learningColumns = {
+  enabled: studentPreferences.adaptivePlanning,
+  since: studentPreferences.adaptiveSince,
+  useEstimates: studentPreferences.learnEstimates,
+  useStudyTimes: studentPreferences.learnStudyTimes,
+  useWorkload: studentPreferences.learnWorkload,
+  planningMode: studentPreferences.planningMode,
+  preferredPeriods: studentPreferences.preferredPeriods,
+  dismissedPatterns: studentPreferences.dismissedPatterns,
+  ownEstimateTaskIds: studentPreferences.ownEstimateTaskIds,
 }
 
-// On/off. Off: the Planner uses the student's own estimates and times only.
-export async function saveLearningEnabled(db: Database, userId: string, enabled: boolean): Promise<LearningSettings> {
-  await db
-    .insert(studentPreferences)
-    .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, adaptivePlanning: enabled })
-    .onConflictDoUpdate({ target: studentPreferences.userId, set: { adaptivePlanning: enabled, updatedAt: new Date() } })
+export async function getLearningSettings(db: Database, userId: string): Promise<LearningSettings> {
+  const [row] = await db.select(learningColumns).from(studentPreferences).where(eq(studentPreferences.userId, userId))
+  return row ? (row as LearningSettings) : DEFAULT_LEARNING_SETTINGS
+}
+
+// The student's own choices (validated by the caller). Tasks named in
+// ownEstimateTaskIds must be theirs (checked here).
+export type LearningChanges = Partial<Omit<LearningSettings, "since">>
+
+export async function saveLearningSettings(db: Database, userId: string, changes: LearningChanges): Promise<LearningSettings> {
+  const values: Partial<typeof studentPreferences.$inferInsert> = {}
+  if (changes.enabled !== undefined) values.adaptivePlanning = changes.enabled
+  if (changes.useEstimates !== undefined) values.learnEstimates = changes.useEstimates
+  if (changes.useStudyTimes !== undefined) values.learnStudyTimes = changes.useStudyTimes
+  if (changes.useWorkload !== undefined) values.learnWorkload = changes.useWorkload
+  if (changes.planningMode !== undefined) values.planningMode = changes.planningMode
+  if (changes.preferredPeriods !== undefined) values.preferredPeriods = [...new Set(changes.preferredPeriods)]
+  if (changes.dismissedPatterns !== undefined) values.dismissedPatterns = [...new Set(changes.dismissedPatterns)].slice(0, 50)
+  if (changes.ownEstimateTaskIds !== undefined) {
+    const ids = [...new Set(changes.ownEstimateTaskIds)]
+    const own = ids.length
+      ? await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.userId, userId), inArray(tasks.id, ids)))
+      : []
+    if (own.length !== ids.length) throw new NotFoundError("task")
+    values.ownEstimateTaskIds = ids.slice(0, 500)
+  }
+  if (Object.keys(values).length > 0) {
+    await db
+      .insert(studentPreferences)
+      .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, ...values })
+      .onConflictDoUpdate({ target: studentPreferences.userId, set: { ...values, updatedAt: new Date() } })
+  }
   return getLearningSettings(db, userId)
 }
 
+// On/off (kept for callers that only switch learning).
+export async function saveLearningEnabled(db: Database, userId: string, enabled: boolean): Promise<LearningSettings> {
+  return saveLearningSettings(db, userId, { enabled })
+}
+
 // "Reset learning": history before `today` (the student's date) no longer counts,
-// and the recorded moves of study sessions are cleared. Tasks, sessions and
-// everything else stay as they are.
+// the recorded moves of study sessions are cleared, and turned-off patterns and
+// per-task estimate choices are forgotten (they were about the old history).
+// The student's explicit choices (mode, preferred times, switches) stay, and so
+// do tasks, sessions and everything else.
 export async function resetLearning(db: Database, userId: string, today: string): Promise<LearningSettings> {
   await db.transaction(async (tx) => {
+    const reset = { adaptiveSince: today, dismissedPatterns: [], ownEstimateTaskIds: [] }
     await tx
       .insert(studentPreferences)
-      .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, adaptiveSince: today })
-      .onConflictDoUpdate({ target: studentPreferences.userId, set: { adaptiveSince: today, updatedAt: new Date() } })
+      .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, ...reset })
+      .onConflictDoUpdate({ target: studentPreferences.userId, set: { ...reset, updatedAt: new Date() } })
     await tx.update(studySessions).set({ rescheduleCount: 0, firstDate: null, firstStartTime: null }).where(eq(studySessions.userId, userId))
   })
   return getLearningSettings(db, userId)

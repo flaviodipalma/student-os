@@ -398,6 +398,7 @@ function PlanSummary({ plan, dayWord, commitmentMinutes }: { plan: DailyPlan; da
             {title}
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">{detail}</p>
+          {plan.pacing && <p className="mt-1 text-xs text-muted-foreground">{plan.pacing.reason}. The rest goes to later days.</p>}
         </div>
       </div>
       {plan.status !== "past" && (

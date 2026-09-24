@@ -1,5 +1,5 @@
 import { durationMinutes, toMinutes } from "@/lib/events"
-import { addDays, daysBetween, fromDateKey } from "@/lib/format"
+import { addDays, daysBetween, formatDuration, fromDateKey } from "@/lib/format"
 import { typeLabel } from "@/lib/tasks"
 import type { CalendarEvent, Task } from "@/lib/types"
 import { DEFAULT_PLANNER_SETTINGS, DEFAULT_SCORING, type PlannerSettings, type ScoringWeights } from "./settings"
@@ -90,6 +90,9 @@ export type ScoringContext = {
   missedSessions?: number
   // The student's own emphasis on this task (PlanningStrategy.boosts).
   boost?: { points: number; label: string }
+  // Today only: the free time starting now, in minutes, when it's short (the
+  // task's remaining work fitting in it gets a small bonus).
+  freeNowMinutes?: number
 }
 
 // Points come from the days left on the planned day; the label says when it's due from today.
@@ -156,6 +159,12 @@ export function scoreTask(task: Task, context: ScoringContext, weights: ScoringW
   // 9. The student asked to put this first (e.g. "focus on my exam").
   if (context.boost && context.boost.points > 0) {
     factors.push({ key: "focus", label: context.boost.label, points: context.boost.points })
+  }
+  // 10. It can be finished in the free time right now (a short window): a
+  //     small nudge, so a 30-minute reading goes in a 75-minute gap before a
+  //     90-minute assignment that wouldn't fit. Deadlines still weigh more.
+  if (context.freeNowMinutes !== undefined && context.remainingMinutes > 0 && context.remainingMinutes <= context.freeNowMinutes) {
+    factors.push({ key: "fits-now", label: `Fits in the ${formatDuration(context.freeNowMinutes)} you have free now`, points: weights.fitsNow ?? 10 })
   }
 
   return {

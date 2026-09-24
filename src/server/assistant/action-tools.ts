@@ -6,6 +6,7 @@ import { fromMinutes, toMinutes } from "@/lib/events"
 import { formatDuration } from "@/lib/format"
 import { priorityLabel, typeLabel } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
+import { MODE_LABELS } from "@/lib/planner"
 import { taskFields } from "@/lib/validation"
 import { availabilityOn, dayLabel, lengthOf, relativeDay, remainingMinutes, taskBrief, timeLabel, untrusted, type ToolContext } from "./context"
 import { resolveCourse, resolveTask } from "./resolve"
@@ -180,6 +181,41 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
           ...(check.note ? { note: check.note } : {}),
           confirmLabel: action.sessions.length === 1 ? "Add session" : `Add ${action.sessions.length} sessions`,
         },
+      }
+    }
+
+    case "update-personalization": {
+      const c = action.changes
+      const parts: string[] = []
+      const periodName = { morning: "in the morning", afternoon: "in the afternoon", evening: "in the evening", night: "late at night" } as const
+      if (c.preferredPeriods) {
+        parts.push(c.preferredPeriods.length ? `plan your study ${c.preferredPeriods.map((p) => periodName[p]).join(" and ")} first (your preference)` : "forget your preferred study times")
+      }
+      if (c.planningMode) parts.push(`switch your planning mode to ${MODE_LABELS[c.planningMode]}`)
+      const onOff = (on: boolean | undefined, what: string) => on !== undefined && parts.push(`${on ? "use" : "stop using"} ${what}`)
+      onOff(c.useEstimates, "learned task estimates")
+      onOff(c.useStudyTimes, "learned study times")
+      onOff(c.useWorkload, "learned daily pacing")
+      const insights = ctx.adaptive?.insights ?? []
+      if (c.dismissPattern) {
+        // Only patterns the Planner can act on (estimates, times used last, pacing).
+        const insight = insights.find((i) => i.id === c.dismissPattern && /^(estimate|avoid):|^workload$/.test(i.id))
+        if (!insight) return { ok: false, problem: "Student OS hasn't learned that pattern." }
+        parts.push(`stop using this pattern: “${untrusted(insight.text, 160)}”`)
+      }
+      if (c.restorePattern) {
+        if (!ctx.data.learning.dismissedPatterns.includes(c.restorePattern)) return { ok: false, problem: "That pattern isn't turned off." }
+        parts.push("use that pattern again")
+      }
+      if (c.useOwnEstimateFor) {
+        const task = taskOf(c.useOwnEstimateFor)
+        if (!task || task.status === "completed") return { ok: false, problem: "That task doesn't exist in Student OS." }
+        parts.push(`always use your own estimate for ${quote(task.title)}${task.estimateMinutes ? ` (${formatDuration(task.estimateMinutes)})` : ""}`)
+      }
+      if (parts.length === 0) return { ok: false, problem: "That wouldn't change anything." }
+      return {
+        ok: true,
+        pending: { action, summary: `Personalization: ${parts.join("; ")}.`, note: "You can change this any time in Settings > Personalization.", confirmLabel: "Save" },
       }
     }
 

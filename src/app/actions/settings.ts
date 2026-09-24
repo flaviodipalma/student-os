@@ -4,7 +4,7 @@ import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import { themePreferences, type ThemePreference } from "@/lib/theme"
 import { toDateKey } from "@/lib/format"
-import type { LearningSettings, RecurringCommitment, Student, StudentPreferences } from "@/lib/types"
+import { planningModes, studyPeriods, type LearningSettings, type RecurringCommitment, type Student, type StudentPreferences } from "@/lib/types"
 import {
   createCommitmentSchema,
   idSchema,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/validation"
 import { parse, runAction } from "@/server/actions"
 import { saveOnboardingDetails, type OnboardingSaved } from "@/server/services/onboarding"
-import { resetLearning, saveLearningEnabled, savePreferences, saveThemePreference } from "@/server/services/preferences"
+import { resetLearning, saveLearningSettings, savePreferences, saveThemePreference } from "@/server/services/preferences"
 import { getStudentClock } from "@/server/student-clock"
 import { completeOnboarding, updateProfile } from "@/server/services/profiles"
 import {
@@ -70,9 +70,24 @@ export async function updateThemeAction(theme: unknown): Promise<ActionResult<Th
   return runAction(({ db, userId }) => saveThemePreference(db, userId, parse(z.enum(themePreferences, { error: "Choose Light, Dark or System." }), theme)))
 }
 
-// Settings > Planning: learn from my planning history (on/off).
-export async function updateLearningAction(enabled: unknown): Promise<ActionResult<LearningSettings>> {
-  return runAction(({ db, userId }) => saveLearningEnabled(db, userId, parse(z.boolean(), enabled)))
+// Settings > Personalization: switches, planning mode, preferred times, turned-off
+// patterns and "use my estimate" tasks (only the fields sent change).
+const learningChangesSchema = z
+  .object({
+    enabled: z.boolean(),
+    useEstimates: z.boolean(),
+    useStudyTimes: z.boolean(),
+    useWorkload: z.boolean(),
+    planningMode: z.enum(planningModes),
+    preferredPeriods: z.array(z.enum(studyPeriods)).max(4),
+    dismissedPatterns: z.array(z.string().regex(/^[a-z]+(:[a-z0-9-]+){0,3}$/i).max(80)).max(50),
+    ownEstimateTaskIds: z.array(idSchema).max(500),
+  })
+  .partial()
+  .strict()
+
+export async function updateLearningAction(changes: unknown): Promise<ActionResult<LearningSettings>> {
+  return runAction(({ db, userId }) => saveLearningSettings(db, userId, parse(learningChangesSchema, changes)))
 }
 
 // Settings > Planning: reset what Student OS learned (history from today on counts).

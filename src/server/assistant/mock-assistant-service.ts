@@ -45,6 +45,31 @@ export class MockAssistantService implements StudentAssistantAIService {
     const proposal = (result: Json) =>
       result.status === "needs_confirmation" ? `${result.summary} Confirm below.` : String(result.problem ?? "I couldn't plan that.")
 
+    // Personalization (Prompt 32).
+    const prefer = /i (?:actually )?prefer studying (?:in the |at )?(morning|afternoon|evening|night)/.exec(question)
+    if (prefer) {
+      return proposal(await call("correctPersonalization", { preferredPeriods: [prefer[1]] }))
+    }
+    if (/why did you (?:give|pick|choose) me this/.test(question)) {
+      const answer = await call("getWhatShouldIDoNow")
+      const task = answer.task as Brief | undefined
+      if (!task) return `Right now: ${answer.answer}.`
+      const why = (answer.why as string[]).join("; ")
+      return `${task.title}: ${why}.${answer.learnedEstimate ? ` ${answer.learnedEstimate}` : ""}`
+    }
+    const hoursToday = /only want to study (one|two|three|\d+) hours? today/.exec(question)
+    if (hoursToday) {
+      const hours = { one: 1, two: 2, three: 3 }[hoursToday[1] as "one"] ?? Number(hoursToday[1])
+      const result = await call("simulatePlanChange", { intent: { maxStudyMinutes: [{ date: today, minutes: hours * 60 }] }, days: 3 })
+      if (result.status !== "simulated") return String(result.problem ?? "I couldn't plan that.")
+      const c = result.comparedWithCurrentPlan as { tasksThatMove: { task: string; today: string }[]; todayStudy: string; workMovedOffToday: string; tomorrowStudy: string }
+      if (c.workMovedOffToday === "0m") {
+        return `Today's plan (${c.todayStudy.split(" → ")[0]}) is already within ${hours}h, so nothing would change. This is only a what-if; nothing was saved.`
+      }
+      const moves = c.tasksThatMove.map((t) => `${t.task} (${t.today})`).join(", ")
+      return `With at most ${hours}h today, ${c.workMovedOffToday} moves off today${moves ? `: ${moves}` : ""}. Tomorrow: ${c.tomorrowStudy}. This is only a what-if; nothing was saved.`
+    }
+
     // Adaptive planning: what was learned (see getLearnedPatterns).
     if (/longer (study )?sessions|learned|study best|my patterns?/.test(question)) {
       const learned = await call("getLearnedPatterns")

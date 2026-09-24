@@ -1,4 +1,4 @@
-import type { Priority, StudySessionRecord, Task, TaskType } from "@/lib/types"
+import type { LearningSettings, PlanningMode, Priority, StudyPeriod, StudySessionRecord, Task, TaskType } from "@/lib/types"
 
 // Shapes shared by the Assistant page (browser) and the Assistant service (server).
 // See src/server/assistant/README.md for how the pieces fit together.
@@ -52,7 +52,24 @@ export type ProposedAction =
   // skipped sessions, the same as Skip on the Planner page).
   | { kind: "skip-day"; date: string; sessions: PlannedBlock[] }
 
+  // A correction to personalization ("I actually prefer studying at night",
+  // "this estimate is wrong", "don't use this pattern"). Saved only on Confirm.
+  | { kind: "update-personalization"; changes: PersonalizationChange }
+
 export type PlannedBlock = { taskId: string; startTime: string; endTime: string }
+
+export type PersonalizationChange = {
+  preferredPeriods?: StudyPeriod[]
+  planningMode?: PlanningMode
+  useEstimates?: boolean
+  useStudyTimes?: boolean
+  useWorkload?: boolean
+  // A learned pattern to stop using / use again (an insight id, e.g. "avoid:night").
+  dismissPattern?: string
+  restorePattern?: string
+  // A task whose own estimate should always be used.
+  useOwnEstimateFor?: string
+}
 
 export type PendingAction = {
   action: ProposedAction
@@ -77,6 +94,8 @@ export type ConfirmedChange = {
   message: string
   tasks: Task[]
   studySessions: StudySessionRecord[]
+  // Saved personalization settings, when those changed.
+  learning?: LearningSettings
 }
 
 // Shown for any failure the student can't act on (provider down, timeout, ...).

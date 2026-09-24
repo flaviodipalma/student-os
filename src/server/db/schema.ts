@@ -140,11 +140,25 @@ export const studentPreferences = pgTable(
     // Only history on or after `adaptive_since` counts (set by "Reset learning").
     adaptivePlanning: boolean("adaptive_planning").notNull().default(true),
     adaptiveSince: date("adaptive_since"),
+    // Personalization (docs/personalization.md). Which learned signals the Planner
+    // may use; the student's saved planning mode; times they SAY they prefer
+    // (explicit, overrides learned); learned patterns they turned off; and tasks
+    // where their own estimate is always used.
+    learnEstimates: boolean("learn_estimates").notNull().default(true),
+    learnStudyTimes: boolean("learn_study_times").notNull().default(true),
+    learnWorkload: boolean("learn_workload").notNull().default(true),
+    planningMode: text("planning_mode").notNull().default("balanced"),
+    preferredPeriods: text("preferred_periods").array().notNull().default(sql`'{}'::text[]`),
+    dismissedPatterns: text("dismissed_patterns").array().notNull().default(sql`'{}'::text[]`),
+    ownEstimateTaskIds: uuid("own_estimate_task_ids").array().notNull().default(sql`'{}'::uuid[]`),
     ...timestamps,
   },
   (t) => [
     check("student_preferences_window", sql`${t.studyEnd} > ${t.studyStart}`),
     check("student_preferences_reminder_minutes", sql`${t.reminderMinutes} in (5, 15, 30, 60, 1440)`),
+    check("student_preferences_planning_mode", sql`${t.planningMode} in ('balanced', 'deadline-focus', 'exam-focus', 'light-day', 'custom')`),
+    check("student_preferences_preferred_periods", sql`${t.preferredPeriods} <@ array['morning', 'afternoon', 'evening', 'night']::text[]`),
+    check("student_preferences_personalization_sizes", sql`cardinality(${t.dismissedPatterns}) <= 50 and cardinality(${t.ownEstimateTaskIds}) <= 500`),
     check("student_preferences_max_study", sql`${t.maxStudyMinutesPerDay} between 15 and 720`),
     check("student_preferences_block", sql`${t.preferredBlockMinutes} in (30, 45, 60, 90)`),
     check("student_preferences_break", sql`${t.breakMinutes} between 0 and 60`),

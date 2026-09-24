@@ -43,8 +43,9 @@ reasons for a day), `simulatePlanChange` and `generatePlanningScenarios`
 
 Actions (proposals only): `completeTask`, `createTask`, `updateTask`,
 `rescheduleStudySession`, `createStudySession`, `logStudyProgress`,
-`applyConfirmedPlanChange` (accept a day's plan / take a day off). Nothing can be
-deleted.
+`applyConfirmedPlanChange` (accept a day's plan / take a day off),
+`correctPersonalization` (preferred times, mode, learned-signal switches, turn off
+a pattern, use my estimate; docs/personalization.md). Nothing can be deleted.
 
 ## Changes need the student's Confirm
 

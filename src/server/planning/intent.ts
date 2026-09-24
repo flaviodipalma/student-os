@@ -27,8 +27,10 @@ export const planningIntentSchema = z
   .object({
     mode: z
       .enum(planningModes)
-      .default("balanced")
-      .describe("balanced (normal), deadline-focus (what's due soonest), exam-focus (exams and quizzes), light-day (less study on the dates in lightDays, default today)."),
+      .optional()
+      .describe(
+        "Only if the student asked for one: balanced (normal), deadline-focus (what's due soonest), exam-focus (exams and quizzes), light-day (less study on the dates in lightDays, default today). Omit to keep the student's saved planning mode."
+      ),
     focusTasks: z.array(ref).max(5).default([]).describe("Tasks the student wants to prioritize (taskId or title words)."),
     focusCourses: z.array(ref).max(5).default([]).describe("Courses the student wants to prioritize (code or name)."),
     avoid: z

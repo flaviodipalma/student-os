@@ -36,6 +36,11 @@ export type LearnedPlanning = {
   estimates?: Record<string, { minutes: number; reason: string }>
   // Times of day (minutes since midnight) the Planner uses last, with why.
   avoidTimes?: { start: number; end: number; reason: string }[]
+  // Times the student SAYS they prefer (explicit): used first, never avoided.
+  preferTimes?: { start: number; end: number; reason: string }[]
+  // A soft daily study target (learned workload or Light day mode): non-urgent
+  // work stops there; urgent work can still use the full daily limit.
+  pacing?: { softMinutes: number; reason: string }
 }
 
 export type PlanningStrategy = {
@@ -64,6 +69,7 @@ export type ScoreFactor = {
     | "competing-deadlines"
     | "missed-session"
     | "focus"
+    | "fits-now"
   label: string | null
   points: number
 }
@@ -163,6 +169,8 @@ export type DailyPlan = {
   // Study minutes on this date (existing + suggested) and the cap.
   studyMinutes: number
   studyLimit: number
+  // The day's soft target, if pacing applied (learned workload or Light day).
+  pacing?: { softMinutes: number; reason: string }
   // Usable free minutes on this date before the planner added anything.
   freeMinutes: number
   warnings: PlannerWarning[]

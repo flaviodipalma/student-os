@@ -26,7 +26,7 @@ const sections = [
   { id: "study-preferences", label: "Study preferences" },
   { id: "recurring-commitments", label: "Recurring commitments" },
   { id: "notifications", label: "Notifications" },
-  { id: "adaptive-planning", label: "Adaptive planning" },
+  { id: "personalization", label: "Personalization" },
   { id: "appearance", label: "Appearance" },
   { id: "integrations", label: "Integrations" },
   { id: "account", label: "Account" },

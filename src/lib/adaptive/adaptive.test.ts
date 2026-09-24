@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { addDays } from "@/lib/format"
-import type { Course, StudySessionRecord, Task, TaskType } from "@/lib/types"
+import { DEFAULT_LEARNING_SETTINGS, type Course, type StudySessionRecord, type Task, type TaskType } from "@/lib/types"
 import { ADAPTIVE_RULES, analyzeHistory, confidenceOf, learnedPlanning, periodOf, type BehaviorHistory } from "./index"
 import { robustSummary } from "./stats"
 
@@ -47,7 +47,7 @@ function finished(actual: number, over: Partial<Task> = {}, daysAgo = 3) {
   return { task: t, sessions: [session(t.id, addDays(TODAY, -daysAgo), "15:00", actual)] }
 }
 function history(items: { task: Task; sessions: StudySessionRecord[] }[], extra: Partial<BehaviorHistory> = {}): BehaviorHistory {
-  return { tasks: items.map((i) => i.task), courses, studySessions: items.flatMap((i) => i.sessions), learning: { enabled: true, since: null }, ...extra }
+  return { tasks: items.map((i) => i.task), courses, studySessions: items.flatMap((i) => i.sessions), learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null }, ...extra }
 }
 const open = (over: Partial<Task> = {}) => ({ task: task(over), sessions: [] })
 
@@ -199,20 +199,23 @@ describe("confidence", () => {
 
 describe("times of day", () => {
   const day = (i: number) => addDays(TODAY, -1 - i)
+  // Sessions only count for tasks that exist.
+  const known: Task[] = []
   function sessions(time: string, count: number, status: StudySessionRecord["status"]) {
     const t = task()
+    known.push(t)
     return Array.from({ length: count }, (_, i) => session(t.id, day(i), time, 60, { status }))
   }
 
   it("often-missed late-night sessions are used last; the afternoon is where work gets done", () => {
     const s = [...sessions("22:00", 5, "scheduled"), ...sessions("21:30", 2, "completed"), ...sessions("15:00", 9, "completed"), ...sessions("16:00", 1, "skipped")]
-    const context = analyzeHistory({ tasks: [], courses, studySessions: s, learning: { enabled: true, since: null } }, TODAY)
+    const context = analyzeHistory({ tasks: known, courses, studySessions: s, learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null } }, TODAY)
     const night = context.periods.find((p) => p.period === "night")!
     expect(night).toMatchObject({ sessions: 7, completed: 2, missed: 5 })
     expect(context.avoid).toEqual([{ period: "night", start: 21 * 60, end: 24 * 60, reason: "Not in the late night: you often miss or move sessions then", confidence: "low" }])
     expect(context.insights.filter((i) => i.kind === "time-of-day").map((i) => i.text)).toEqual([
-      "You finish most study sessions in the afternoon (9 of 10).",
-      "Late night sessions are often missed or moved (5 of 7), so the Planner uses other free time first when it can.",
+      "You finish most study sessions in the afternoon (9 of 10 recently).",
+      "Late night sessions are often missed or moved lately (5 of 7), so the Planner uses other free time first when it can.",
     ])
     expect(learnedPlanning(context)?.avoidTimes).toEqual([{ start: 1260, end: 1440, reason: "Not in the late night: you often miss or move sessions then" }])
   })
@@ -220,15 +223,16 @@ describe("times of day", () => {
   it("moved sessions count against where they were first planned", () => {
     const t = task()
     const moved = Array.from({ length: 6 }, (_, i) => session(t.id, day(i), "15:00", 60, { rescheduleCount: 1, firstDate: day(i), firstStartTime: "08:00" }))
-    const context = analyzeHistory({ tasks: [t], courses, studySessions: [...moved, ...sessions("09:00", 1, "completed")], learning: { enabled: true, since: null } }, TODAY)
+    const morning = sessions("09:00", 1, "completed")
+    const context = analyzeHistory({ tasks: [t, ...known], courses, studySessions: [...moved, ...morning], learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null } }, TODAY)
     expect(context.periods.find((p) => p.period === "morning")).toMatchObject({ moved: 6, completed: 1, sessions: 7 })
     expect(context.avoid.map((a) => a.period)).toEqual(["morning"])
   })
 
   it("not enough sessions, or no better time: nothing is avoided", () => {
-    const few = analyzeHistory({ tasks: [], courses, studySessions: sessions("22:00", 4, "scheduled"), learning: { enabled: true, since: null } }, TODAY)
+    const few = analyzeHistory({ tasks: known, courses, studySessions: sessions("22:00", 4, "scheduled"), learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null } }, TODAY)
     expect(few.avoid).toEqual([])
-    const allBad = analyzeHistory({ tasks: [], courses, studySessions: [...sessions("22:00", 6, "scheduled"), ...sessions("15:00", 6, "scheduled")], learning: { enabled: true, since: null } }, TODAY)
+    const allBad = analyzeHistory({ tasks: known, courses, studySessions: [...sessions("22:00", 6, "scheduled"), ...sessions("15:00", 6, "scheduled")], learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null } }, TODAY)
     expect(allBad.avoid).toEqual([])
   })
 
@@ -251,7 +255,7 @@ describe("workload tolerance: an insight, never a changed limit", () => {
       session(t.id, addDays(TODAY, -1 - i), "14:00", 150),
       session(t.id, addDays(TODAY, -1 - i), "17:00", 90, { status: "scheduled" }),
     ]).flat()
-    const context = analyzeHistory({ tasks: [t], courses, studySessions: s, learning: { enabled: true, since: null } }, TODAY)
+    const context = analyzeHistory({ tasks: [t], courses, studySessions: s, learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: null } }, TODAY)
     expect(context.workload).toEqual({ days: 6, typicalPlannedMinutes: 240, typicalCompletedMinutes: 150 })
     expect(context.insights.find((i) => i.kind === "workload")?.text).toBe(
       "On days with study on your calendar, you usually finish about 2h 30m of 4h planned. Your daily limit is yours to change in Settings."
@@ -266,14 +270,14 @@ describe("user control", () => {
 
   it("off: nothing is learned or used", () => {
     const target = open()
-    const context = analyzeHistory(history([...past, target], { learning: { enabled: false, since: null } }), TODAY)
+    const context = analyzeHistory(history([...past, target], { learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: false, since: null } }), TODAY)
     expect(context).toMatchObject({ enabled: false, estimates: {}, insights: [] })
     expect(learnedPlanning(context)).toBeUndefined()
   })
 
   it("reset: history before the reset date doesn't count", () => {
     const target = open()
-    const context = analyzeHistory(history([...past, target], { learning: { enabled: true, since: addDays(TODAY, -1) } }), TODAY)
+    const context = analyzeHistory(history([...past, target], { learning: { ...DEFAULT_LEARNING_SETTINGS, enabled: true, since: addDays(TODAY, -1) } }), TODAY)
     expect(context.estimates).toEqual({})
     expect(context.observations).toBe(0)
   })
