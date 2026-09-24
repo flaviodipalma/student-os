@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, asc, eq } from "drizzle-orm"
 import type { CalendarEvent, EventInput } from "@/lib/types"
 import { toEvent } from "../db/mappers"

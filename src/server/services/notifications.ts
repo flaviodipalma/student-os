@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, desc, eq, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm"
 import { generateNotifications } from "@/lib/notifications/generate"
 import { createPlanner } from "@/lib/planner"
@@ -6,6 +8,7 @@ import { dateFromWallClock, instantAt, wallClockIn } from "@/lib/time-zone"
 import { toDateKey } from "@/lib/format"
 import { scheduleBetween } from "@/lib/recurring"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
+import { safeNextPath } from "@/lib/auth-providers"
 import type { AppNotification } from "@/lib/types"
 import { notifications } from "../db/schema"
 import type { Database } from "../db/types"
@@ -43,7 +46,8 @@ function toNotification(row: Row): AppNotification {
     type: row.type,
     title: row.title,
     message: row.message,
-    link: row.link,
+    // Only ever an in-app path (never another site), whatever is stored.
+    link: safeNextPath(row.link) ?? "/dashboard",
     scheduledFor: row.scheduledFor.toISOString(),
     createdAt: row.createdAt.toISOString(),
     readAt: row.readAt?.toISOString() ?? null,

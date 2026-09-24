@@ -1,3 +1,5 @@
+import "server-only"
+
 import { addDays, fromDateKey } from "@/lib/format"
 import { timeLabel, untrusted, type ToolContext } from "./context"
 

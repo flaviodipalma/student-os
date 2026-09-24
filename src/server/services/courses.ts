@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, asc, eq } from "drizzle-orm"
 import { pickCourseColor } from "@/lib/course-colors"
 import type { Course } from "@/lib/types"

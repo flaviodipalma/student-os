@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, asc, eq } from "drizzle-orm"
 import type { StudySessionRecord } from "@/lib/types"
 import { toStudySession } from "../db/mappers"

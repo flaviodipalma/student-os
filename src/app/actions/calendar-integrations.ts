@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import { calendarProviderIds, calendarProviderNames, type ExternalEventRecord } from "@/lib/types"
-import { parse, runAction } from "@/server/actions"
+import { limitRate, parse, runAction } from "@/server/actions"
 import { getCurrentUser } from "@/server/auth"
 import type { CalendarSyncResult } from "@/server/integrations/calendar/calendar-sync"
 import {
@@ -25,6 +25,7 @@ import {
   oauthStateCookieName,
   pkceChallenge,
 } from "@/server/integrations/lms/oauth-state"
+import { RATE_LIMITS } from "@/server/rate-limit"
 import { deleteExternalEventsFrom, listExternalEvents } from "@/server/services/external-events"
 
 // Settings > Integrations > Calendars: connect, sync and disconnect Google
@@ -81,6 +82,7 @@ export type CalendarSyncOutcome = {
 export async function syncCalendarAction(provider: unknown): Promise<ActionResult<CalendarSyncOutcome>> {
   return runAction(async ({ db, userId }) => {
     const id = parse(providerSchema, provider)
+    limitRate(userId, "sync", RATE_LIMITS.sync)
     const keys = vault()
     const result = await syncCalendarConnection(db, userId, getCalendarProvider(id), keys)
     const [externalEvents, status] = await Promise.all([listExternalEvents(db, userId), getCalendarIntegrationStatus(db, userId, true)])

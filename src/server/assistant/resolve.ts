@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { Course, Task } from "@/lib/types"
 
 // Finds the task or course the student means from what the model passed: an id,

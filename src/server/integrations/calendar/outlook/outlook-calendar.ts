@@ -1,3 +1,5 @@
+import "server-only"
+
 import { normalizeExternalEvent, type ExternalCalendarEvent } from "@/lib/calendar/external-events"
 import { getJson, postTokenForm, safeProviderLink } from "../http"
 import { CalendarProviderError, type CalendarProvider, type FetchedCalendar } from "../provider"

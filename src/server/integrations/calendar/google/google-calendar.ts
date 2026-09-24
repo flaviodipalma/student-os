@@ -1,3 +1,5 @@
+import "server-only"
+
 import { normalizeExternalEvent, type ExternalCalendarEvent } from "@/lib/calendar/external-events"
 import { htmlToText } from "../../lms/normalize"
 import { getJson, postTokenForm, safeProviderLink } from "../http"

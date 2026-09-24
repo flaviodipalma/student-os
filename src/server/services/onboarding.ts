@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { ProfileInput, RecurringCommitment, RecurringCommitmentInput, Student, StudentPreferences } from "@/lib/types"
 import type { Database } from "../db/types"
 import { savePreferences } from "./preferences"

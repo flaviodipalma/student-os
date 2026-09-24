@@ -1,5 +1,6 @@
 import { getSyllabusAIService } from "@/lib/ai"
 import { getCurrentUser } from "@/server/auth"
+import { RATE_LIMITS, takeRateLimit } from "@/server/rate-limit"
 import { daysBetween, fromDateKey, toDateKey } from "@/lib/format"
 import { SyllabusImportError } from "@/lib/syllabus/errors"
 import { processSyllabus } from "@/lib/syllabus/importer"
@@ -18,6 +19,34 @@ import type { ExtractMessage } from "@/lib/syllabus/protocol"
 
 export const maxDuration = 300
 
+// Room for the multipart wrapper and the "today" field around the PDF.
+const FORM_OVERHEAD_BYTES = 64 * 1024
+
+// The request body, read up to `limit` bytes (then abandoned).
+async function readLimited(request: Request, limit: number): Promise<Uint8Array<ArrayBuffer> | "too-large"> {
+  if (!request.body) return new Uint8Array(new ArrayBuffer(0))
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel().catch(() => {})
+      return "too-large"
+    }
+    chunks.push(value)
+  }
+  const body = new Uint8Array(new ArrayBuffer(total))
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return body
+}
+
 function errorResponse(error: SyllabusImportError, status: number) {
   const body: ExtractMessage = { type: "error", code: error.code, message: error.userMessage }
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } })
@@ -33,16 +62,24 @@ function studentToday(value: FormDataEntryValue | null): string {
 
 export async function POST(request: Request) {
   // Only signed-in students can use the importer (and the AI budget).
-  if (!(await getCurrentUser())) return errorResponse(new SyllabusImportError("unauthorized"), 401)
+  const user = await getCurrentUser()
+  if (!user) return errorResponse(new SyllabusImportError("unauthorized"), 401)
+  // Each import is a paid AI request.
+  if (!takeRateLimit(`syllabus:${user.id}`, RATE_LIMITS.syllabus).ok) return errorResponse(new SyllabusImportError("rate-limited"), 429)
 
-  // Reject oversized uploads before reading them (with room for the form wrapper).
+  // Reject oversized uploads: by the declared size, and by counting the bytes as
+  // they arrive (a request without Content-Length can't make the server buffer
+  // more than the limit).
+  const limit = MAX_FILE_BYTES + FORM_OVERHEAD_BYTES
   const declaredSize = Number(request.headers.get("content-length") ?? 0)
-  if (declaredSize > MAX_FILE_BYTES + 64 * 1024) return errorResponse(new SyllabusImportError("file-too-large"), 413)
+  if (declaredSize > limit) return errorResponse(new SyllabusImportError("file-too-large"), 413)
+  const body = await readLimited(request, limit)
+  if (body === "too-large") return errorResponse(new SyllabusImportError("file-too-large"), 413)
 
   let file: File
   let today: string
   try {
-    const form = await request.formData()
+    const form = await new Response(body, { headers: { "Content-Type": request.headers.get("content-type") ?? "" } }).formData()
     const entry = form.get("file")
     if (!(entry instanceof File)) return errorResponse(new SyllabusImportError("invalid-file-type"), 400)
     file = entry

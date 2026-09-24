@@ -1,3 +1,5 @@
+import "server-only"
+
 import { CalendarProviderError, type CalendarAccess, type CalendarTokens } from "./provider"
 
 // HTTP for the calendar providers: only HTTPS to the provider's own hosts, no

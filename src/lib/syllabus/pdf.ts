@@ -1,6 +1,6 @@
 import { extractText, getDocumentProxy } from "unpdf"
 import { SyllabusImportError } from "./errors"
-import { MAX_FILE_BYTES, MAX_TEXT_CHARS } from "./limits"
+import { MAX_FILE_BYTES, MAX_PDF_PAGES, MAX_TEXT_CHARS } from "./limits"
 
 // Step 1 of the pipeline: check the upload and pull the text out of the PDF.
 // Runs on the server. The file is only held in memory and never stored.
@@ -25,9 +25,15 @@ export type PdfText = { text: string; pageCount: number }
 export async function extractPdfText(bytes: Uint8Array): Promise<PdfText> {
   let pages: string[]
   let pageCount: number
+  let pdf: Awaited<ReturnType<typeof getDocumentProxy>>
   try {
     // pdf.js may take ownership of the buffer, so give it a copy.
-    const pdf = await getDocumentProxy(new Uint8Array(bytes))
+    pdf = await getDocumentProxy(new Uint8Array(bytes))
+  } catch (error) {
+    throw new SyllabusImportError("pdf-unreadable", { cause: error })
+  }
+  if (pdf.numPages > MAX_PDF_PAGES) throw new SyllabusImportError("too-long")
+  try {
     const result = await extractText(pdf, { mergePages: false })
     pages = result.text
     pageCount = result.totalPages

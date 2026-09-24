@@ -1,3 +1,5 @@
+import "server-only"
+
 import { z } from "zod"
 import type { PendingAction } from "@/lib/assistant"
 import { dateKeySchema } from "@/lib/validation"

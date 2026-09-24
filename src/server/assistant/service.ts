@@ -1,3 +1,5 @@
+import "server-only"
+
 import { z } from "zod"
 import type { AssistantPageContext, AssistantReply, ChatTurn, ConfirmedChange, PendingAction, ProposedAction } from "@/lib/assistant"
 import { ASSISTANT_ERROR_MESSAGE } from "@/lib/assistant"

@@ -37,6 +37,13 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+// Too many expensive requests (AI, external syncs) in a short time.
+export class RateLimitedError extends AppError {
+  constructor() {
+    super("unavailable", "You're doing that a lot right now. Please wait a few minutes and try again.")
+  }
+}
+
 export class DatabaseUnavailableError extends AppError {
   constructor() {
     super("database", "We couldn't reach the database. Please try again in a moment.")

@@ -53,3 +53,8 @@ export function makeTextPdf(lines: string[]): Uint8Array {
 export function makeBlankPdf(pages = 2): Uint8Array {
   return buildPdf(Array.from({ length: pages }, () => ""))
 }
+
+// A PDF with `pages` pages, each with one line of text (for page-limit tests).
+export function makeManyPagesPdf(pages: number): Uint8Array {
+  return buildPdf(Array.from({ length: pages }, (_, i) => `BT /F1 11 Tf 50 750 Td (Page ${i + 1} of a very long document) Tj ET`))
+}

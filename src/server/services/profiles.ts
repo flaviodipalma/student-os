@@ -1,3 +1,5 @@
+import "server-only"
+
 import { eq } from "drizzle-orm"
 import type { ProfileInput, Student } from "@/lib/types"
 import { profiles } from "../db/schema"

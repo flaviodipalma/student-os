@@ -1,3 +1,5 @@
+import "server-only"
+
 import { z } from "zod"
 import { toMinutes } from "@/lib/events"
 import { addDays } from "@/lib/format"

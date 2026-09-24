@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, eq, inArray } from "drizzle-orm"
 import type { Course, Task, TaskInput } from "@/lib/types"
 import { toTask } from "../db/mappers"

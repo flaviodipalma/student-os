@@ -6,7 +6,7 @@ import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import type { LmsSyncResult } from "@/lib/lms/types"
 import { lmsProviderIds, type Course, type ExternalEventRecord, type LmsProviderId, type Task } from "@/lib/types"
-import { parse, runAction } from "@/server/actions"
+import { limitRate, parse, runAction } from "@/server/actions"
 import { getCurrentUser } from "@/server/auth"
 import { blackboardAllowedHosts, parseBlackboardBaseUrl } from "@/server/integrations/lms/blackboard/config"
 import { fetchBlackboardFeed, parseBlackboardFeedUrl } from "@/server/integrations/lms/blackboard/feed"
@@ -33,6 +33,7 @@ import { syncLms } from "@/server/integrations/lms/sync"
 import { listCourses } from "@/server/services/courses"
 import { listExternalEvents, removeExternalEventsFrom, setExternalEventHidden } from "@/server/services/external-events"
 import { listTasks } from "@/server/services/tasks"
+import { RATE_LIMITS } from "@/server/rate-limit"
 import { getStudentTimeZone } from "@/server/student-clock"
 
 // Server actions for LMS integrations (Settings > Integrations). The student is
@@ -146,6 +147,7 @@ export type LmsSyncOutcome = {
 export async function syncLmsAction(provider: unknown): Promise<ActionResult<LmsSyncOutcome>> {
   return runAction(async ({ db, userId }) => {
     const id = parse(providerSchema, provider)
+    limitRate(userId, "sync", RATE_LIMITS.sync)
     const options = { timeZone: await getStudentTimeZone() }
     // The student's own connection decides how to read: calendar feed or OAuth.
     const method = await getLmsConnectionMethod(db, userId, id)

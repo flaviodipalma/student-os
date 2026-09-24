@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, asc, eq, isNull } from "drizzle-orm"
 import type { ExternalCalendarSource, ExternalEventRecord } from "@/lib/types"
 import { externalCalendarEvents } from "../db/schema"

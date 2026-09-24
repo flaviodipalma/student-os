@@ -1,3 +1,5 @@
+import "server-only"
+
 import { z } from "zod"
 import type { PendingAction, ProposedAction } from "@/lib/assistant"
 import { fromMinutes, toMinutes } from "@/lib/events"

@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { ExternalCalendarEvent } from "@/lib/calendar/external-events"
 import type { CalendarProviderId } from "@/lib/types"
 import { AppError } from "../../errors"

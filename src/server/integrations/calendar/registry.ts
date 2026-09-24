@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { CalendarProviderId } from "@/lib/types"
 import { googleCalendarProvider } from "./google/google-calendar"
 import { outlookCalendarProvider } from "./outlook/outlook-calendar"

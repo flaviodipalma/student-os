@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { ChatTurn } from "@/lib/assistant"
 
 // The contract every Assistant AI provider implements (Claude today; a mock for

@@ -1,3 +1,5 @@
+import "server-only"
+
 import { eq } from "drizzle-orm"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { ThemePreference } from "@/lib/theme"

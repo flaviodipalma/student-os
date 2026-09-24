@@ -1,3 +1,5 @@
+import "server-only"
+
 import { fromMinutes, toMinutes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
 import { completedMinutesFor, createPlanner, dayAvailability, type Planner } from "@/lib/planner"

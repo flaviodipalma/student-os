@@ -1,3 +1,5 @@
+import "server-only"
+
 import { and, asc, eq } from "drizzle-orm"
 import type { RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
 import { recurringCommitments } from "../db/schema"

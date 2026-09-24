@@ -1,3 +1,5 @@
+import "server-only"
+
 import type { AssistantAIRequest, StudentAssistantAIService } from "./ai-service"
 
 // A stand-in for local testing without an AI provider (ASSISTANT_AI_PROVIDER=mock).
