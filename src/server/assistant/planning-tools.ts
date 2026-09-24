@@ -309,7 +309,7 @@ export const applyConfirmedPlanChange = defineTool({
 // All the study the Planner would put on a day, found by skipping what it
 // plans until nothing is left (skipping one task can make room for another).
 function plannedWork(ctx: ToolContext, date: string): PlannedBlock[] {
-  const input = plannerInputFor({ ...ctx.data, timeZone: ctx.timeZone }, ctx.now)
+  const input = plannerInputFor({ ...ctx.data, timeZone: ctx.timeZone }, ctx.now, ctx.adaptive)
   const skipped = [...(input.skipped?.[date] ?? [])]
   const blocks: PlannedBlock[] = []
   for (let round = 0; round < 8; round++) {

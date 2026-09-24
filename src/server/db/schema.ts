@@ -136,6 +136,10 @@ export const studentPreferences = pgTable(
     browserNotifications: boolean("browser_notifications").notNull().default(false),
     // Appearance: Light / Dark / System. Null = never chosen (the device's cookie decides).
     theme: themePreference("theme"),
+    // Adaptive planning: learn from the student's own history (on by default).
+    // Only history on or after `adaptive_since` counts (set by "Reset learning").
+    adaptivePlanning: boolean("adaptive_planning").notNull().default(true),
+    adaptiveSince: date("adaptive_since"),
     ...timestamps,
   },
   (t) => [
@@ -296,6 +300,11 @@ export const studySessions = pgTable(
     // Minutes actually worked, for a session done only partly ("45 of 90 minutes").
     // Null = the whole session. Only meaningful when completed.
     completedMinutes: integer("completed_minutes"),
+    // Adaptive planning (src/lib/adaptive): how often the session was moved, and
+    // where it was first planned (null = never moved). Nothing else is recorded.
+    rescheduleCount: integer("reschedule_count").notNull().default(0),
+    firstDate: date("first_date"),
+    firstStartTime: time("first_start_time"),
     ...timestamps,
   },
   (t) => [

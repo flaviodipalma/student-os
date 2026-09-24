@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 import type { StudySessionRecord } from "@/lib/types"
 import { toStudySession } from "../db/mappers"
 import { studySessions } from "../db/schema"
@@ -9,7 +9,7 @@ import { NotFoundError } from "../errors"
 import { getTaskForUser } from "./tasks"
 import { hasChanges } from "./util"
 
-export type SessionInput = Omit<StudySessionRecord, "id">
+export type SessionInput = Omit<StudySessionRecord, "id" | "rescheduleCount" | "firstDate" | "firstStartTime">
 export type SessionChanges = Partial<Omit<SessionInput, "taskId">>
 
 export async function listStudySessions(db: Database, userId: string): Promise<StudySessionRecord[]> {
@@ -49,9 +49,20 @@ export async function updateStudySession(
     if (!existing) throw new NotFoundError("study session")
     return toStudySession(existing)
   }
+  // A scheduled session moved to another time counts as rescheduled (for adaptive
+  // planning): one more move, and where it was first planned is kept.
+  const moved = sql`${studySessions.status} = 'scheduled' and (${studySessions.date} <> ${changes.date ?? null}::date or ${studySessions.startTime} <> ${changes.startTime ?? null}::time)`
+  const tracking =
+    changes.date !== undefined || changes.startTime !== undefined
+      ? {
+          rescheduleCount: sql`case when ${moved} then ${studySessions.rescheduleCount} + 1 else ${studySessions.rescheduleCount} end`,
+          firstDate: sql`case when ${moved} then coalesce(${studySessions.firstDate}, ${studySessions.date}) else ${studySessions.firstDate} end`,
+          firstStartTime: sql`case when ${moved} then coalesce(${studySessions.firstStartTime}, ${studySessions.startTime}) else ${studySessions.firstStartTime} end`,
+        }
+      : {}
   const [row] = await db
     .update(studySessions)
-    .set(changes)
+    .set({ ...changes, ...tracking })
     .where(and(eq(studySessions.id, sessionId), eq(studySessions.userId, userId)))
     .returning()
   if (!row) throw new NotFoundError("study session")

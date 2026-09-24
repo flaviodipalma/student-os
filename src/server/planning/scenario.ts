@@ -97,7 +97,7 @@ export function buildScenario(ctx: ToolContext, intent: ResolvedIntent, options:
     return copy
   })
 
-  const input = plannerInputFor({ ...ctx.data, tasks, timeZone: ctx.timeZone }, ctx.now)
+  const input = plannerInputFor({ ...ctx.data, tasks, timeZone: ctx.timeZone }, ctx.now, ctx.adaptive)
   // Temporary unavailable time: busy blocks in this simulation only (not events).
   const blocked: CalendarEvent[] = intent.unavailable.map((u, i) => ({
     id: `unavailable:${i}`,

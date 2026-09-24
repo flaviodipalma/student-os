@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SourceBadge } from "@/components/tasks/task-badges"
 import { useCourses } from "@/lib/course-store"
 import { addDays } from "@/lib/format"
+import { useAdaptiveContext } from "@/lib/planner-store"
 import { useTasks } from "@/lib/task-store"
 import { priorities, priorityLabel, statusLabel, typeLabel } from "@/lib/tasks"
 import type { Priority, Task, TaskInput, TaskStatus, TaskType } from "@/lib/types"
@@ -79,6 +80,10 @@ function TaskForm({
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "medium")
   // Blank = not estimated (the Planner then uses a fallback and asks for one).
   const [estimate, setEstimate] = useState(task ? (task.estimateMinutes === null ? "" : String(task.estimateMinutes)) : "60")
+  // Adaptive planning's estimate for this task, while the field still shows the saved one.
+  const adaptive = useAdaptiveContext()
+  const savedEstimate = task ? (task.estimateMinutes === null ? "" : String(task.estimateMinutes)) : null
+  const learned = task && estimate === savedEstimate ? adaptive?.estimates[task.id] : undefined
   const [notes, setNotes] = useState(task?.notes ?? "")
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "not_started")
   const [error, setError] = useState<string | null>(null)
@@ -197,7 +202,14 @@ function TaskForm({
             step={5}
             value={estimate}
             onChange={(e) => edit(setEstimate, "estimateMinutes")(e.target.value)}
+            aria-describedby={learned ? "task-estimate-learned" : undefined}
           />
+          {learned && (
+            <p id="task-estimate-learned" className="text-xs text-muted-foreground">
+              {learned.explanation}
+              {learned.confidence === "low" ? " Low confidence: still learning your pattern." : ""}
+            </p>
+          )}
         </Field>
         <Field label="Status" htmlFor="task-status">
           <SimpleSelect id="task-status" value={status} onChange={setStatus} options={statusOptions} />

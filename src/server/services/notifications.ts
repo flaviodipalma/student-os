@@ -16,7 +16,7 @@ import { NotFoundError } from "../errors"
 import { listCourses } from "./courses"
 import { listEvents } from "./events"
 import { listExternalEvents } from "./external-events"
-import { getNotificationPreferences, getPreferences } from "./preferences"
+import { getLearningSettings, getNotificationPreferences, getPreferences } from "./preferences"
 import { listRecurringCommitments } from "./recurring-commitments"
 import { listStudySessions } from "./study-sessions"
 import { listTasks } from "./tasks"
@@ -137,8 +137,9 @@ export async function syncNotifications(
     (await db.select({ id: notifications.id }).from(notifications).where(and(mine(userId), eq(notifications.dedupeKey, `daily_plan_ready:${today}`))).limit(1))
       .length === 0
   if (planReminderDue) {
+    const learning = await getLearningSettings(db, userId)
     const daily = createPlanner(
-      plannerInputFor({ tasks, courses, events, studySessions, recurringCommitments: commitments, preferences: study, externalEvents, timeZone }, localNow)
+      plannerInputFor({ tasks, courses, events, studySessions, recurringCommitments: commitments, preferences: study, externalEvents, timeZone, learning }, localNow)
     ).planFor(today)
     const dayEvents = scheduleBetween([...events, ...externalEventsAsCalendarItems(externalEvents, timeZone)], commitments, today, today)
     plan = { studySessions: daily.suggestions.length + daily.existingSessions.length, events: dayEvents.length }

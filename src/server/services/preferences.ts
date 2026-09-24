@@ -3,8 +3,8 @@ import "server-only"
 import { eq } from "drizzle-orm"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { ThemePreference } from "@/lib/theme"
-import type { NotificationPreferences, StudentPreferences } from "@/lib/types"
-import { studentPreferences } from "../db/schema"
+import { DEFAULT_LEARNING_SETTINGS, type LearningSettings, type NotificationPreferences, type StudentPreferences } from "@/lib/types"
+import { studentPreferences, studySessions } from "../db/schema"
 import type { Database } from "../db/types"
 
 const hhmm = (time: string) => time.slice(0, 5)
@@ -90,4 +90,37 @@ export async function saveThemePreference(db: Database, userId: string, theme: T
     .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, theme })
     .onConflictDoUpdate({ target: studentPreferences.userId, set: { theme, updatedAt: new Date() } })
   return theme
+}
+
+// ---- Adaptive planning (same row) ---------------------------------------------
+
+export async function getLearningSettings(db: Database, userId: string): Promise<LearningSettings> {
+  const [row] = await db
+    .select({ enabled: studentPreferences.adaptivePlanning, since: studentPreferences.adaptiveSince })
+    .from(studentPreferences)
+    .where(eq(studentPreferences.userId, userId))
+  return row ?? DEFAULT_LEARNING_SETTINGS
+}
+
+// On/off. Off: the Planner uses the student's own estimates and times only.
+export async function saveLearningEnabled(db: Database, userId: string, enabled: boolean): Promise<LearningSettings> {
+  await db
+    .insert(studentPreferences)
+    .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, adaptivePlanning: enabled })
+    .onConflictDoUpdate({ target: studentPreferences.userId, set: { adaptivePlanning: enabled, updatedAt: new Date() } })
+  return getLearningSettings(db, userId)
+}
+
+// "Reset learning": history before `today` (the student's date) no longer counts,
+// and the recorded moves of study sessions are cleared. Tasks, sessions and
+// everything else stay as they are.
+export async function resetLearning(db: Database, userId: string, today: string): Promise<LearningSettings> {
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(studentPreferences)
+      .values({ userId, ...DEFAULT_STUDENT_PREFERENCES, adaptiveSince: today })
+      .onConflictDoUpdate({ target: studentPreferences.userId, set: { adaptiveSince: today, updatedAt: new Date() } })
+    await tx.update(studySessions).set({ rescheduleCount: 0, firstDate: null, firstStartTime: null }).where(eq(studySessions.userId, userId))
+  })
+  return getLearningSettings(db, userId)
 }

@@ -45,6 +45,17 @@ export class MockAssistantService implements StudentAssistantAIService {
     const proposal = (result: Json) =>
       result.status === "needs_confirmation" ? `${result.summary} Confirm below.` : String(result.problem ?? "I couldn't plan that.")
 
+    // Adaptive planning: what was learned (see getLearnedPatterns).
+    if (/longer (study )?sessions|learned|study best|my patterns?/.test(question)) {
+      const learned = await call("getLearnedPatterns")
+      if (!learned.enabled) return String(learned.note)
+      const estimates = learned.learnedEstimates as { title: string; explanation: string; confidence: string }[]
+      const insights = learned.insights as { text: string }[]
+      const first = estimates[0]
+      if (first) return `${first.title}: ${first.explanation}${first.confidence === "low" ? " (Still learning your pattern.)" : ""}`
+      return insights[0]?.text ?? String(learned.note ?? "I haven't learned any patterns yet.")
+    }
+
     // Planning conversations (see planning-tools.ts).
     if (/take (today|the day) off|skip today/.test(question)) {
       return proposal(await call("applyConfirmedPlanChange", { change: "skip-day", date: today }))

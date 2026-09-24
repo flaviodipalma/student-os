@@ -5,6 +5,7 @@ import type {
   CalendarEvent,
   Course,
   ExternalEventRecord,
+  LearningSettings,
   NotificationPreferences,
   RecurringCommitment,
   StudentPreferences,
@@ -17,7 +18,7 @@ import { listCourses } from "./courses"
 import { listEvents } from "./events"
 import { listExternalEvents } from "./external-events"
 import { listNotifications } from "./notifications"
-import { getNotificationPreferences, getPreferences } from "./preferences"
+import { getLearningSettings, getNotificationPreferences, getPreferences } from "./preferences"
 import { getProfile } from "./profiles"
 import { listRecurringCommitments } from "./recurring-commitments"
 import { listStudySessions } from "./study-sessions"
@@ -36,6 +37,8 @@ export type AppData = {
   // Delivered reminders (not dismissed), newest first, and the student's reminder settings.
   notifications: AppNotification[]
   notificationPreferences: NotificationPreferences
+  // Adaptive planning on/off, and since when history counts.
+  learning: LearningSettings
 }
 
 // Everything the app shows for one user, loaded once per page load. The
@@ -52,6 +55,7 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     externalEvents,
     notifications,
     notificationPreferences,
+    learning,
   ] = await Promise.all([
     getProfile(db, userId),
     listCourses(db, userId),
@@ -63,6 +67,7 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     listExternalEvents(db, userId),
     listNotifications(db, userId),
     getNotificationPreferences(db, userId),
+    getLearningSettings(db, userId),
   ])
   return {
     student,
@@ -75,5 +80,6 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     externalEvents,
     notifications,
     notificationPreferences,
+    learning,
   }
 }

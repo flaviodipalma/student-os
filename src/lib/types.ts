@@ -166,7 +166,16 @@ export type StudySessionRecord = {
   status: StudySessionStatus
   // Partly done: the minutes actually worked (unset/null = the whole session).
   completedMinutes?: number | null
+  // Adaptive planning: times moved, and where it was first planned (null = never moved).
+  rescheduleCount?: number
+  firstDate?: string | null
+  firstStartTime?: string | null
 }
+
+// Adaptive planning settings (Settings > Planning). `since`: only history on or
+// after this date counts ("Reset learning"); null = all of it.
+export type LearningSettings = { enabled: boolean; since: string | null }
+export const DEFAULT_LEARNING_SETTINGS: LearningSettings = { enabled: true, since: null }
 
 // The signed-in student's profile.
 export const academicYears = ["freshman", "sophomore", "junior", "senior", "graduate", "other"] as const

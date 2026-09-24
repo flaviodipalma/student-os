@@ -20,8 +20,10 @@ import {
   completeOnboardingAction,
   createCommitmentAction,
   deleteCommitmentAction,
+  resetLearningAction,
   saveOnboardingAction,
   updateCommitmentAction,
+  updateLearningAction,
   updatePreferencesAction,
   updateProfileAction,
 } from "@/app/actions/settings"
@@ -35,21 +37,23 @@ import { useNow } from "@/lib/clock"
 import { useFeedback } from "@/lib/feedback"
 import { toDateKey } from "@/lib/format"
 import { scheduleBetween } from "@/lib/recurring"
-import type {
-  CalendarEvent,
-  Course,
-  CourseInput,
-  EventInput,
-  ExternalEventRecord,
-  ProfileInput,
-  RecurringCommitment,
-  RecurringCommitmentInput,
-  StudentPreferences,
-  StudySessionRecord,
-  Student,
-  Task,
-  TaskInput,
-  TaskStatus,
+import {
+  DEFAULT_LEARNING_SETTINGS,
+  type CalendarEvent,
+  type Course,
+  type CourseInput,
+  type EventInput,
+  type ExternalEventRecord,
+  type LearningSettings,
+  type ProfileInput,
+  type RecurringCommitment,
+  type RecurringCommitmentInput,
+  type StudentPreferences,
+  type StudySessionRecord,
+  type Student,
+  type Task,
+  type TaskInput,
+  type TaskStatus,
 } from "@/lib/types"
 import type { AppData } from "@/server/services/app-data"
 import type { OnboardingDetails, OnboardingSaved } from "@/server/services/onboarding"
@@ -73,6 +77,8 @@ type AppStore = {
   events: CalendarEvent[]
   studySessions: StudySessionRecord[]
   preferences: StudentPreferences
+  // Adaptive planning on/off, and since when history counts.
+  learning: LearningSettings
   recurringCommitments: RecurringCommitment[]
   // Read-only copies of Canvas / Blackboard calendar events (hidden ones included).
   externalEvents: ExternalEventRecord[]
@@ -111,6 +117,9 @@ type AppStore = {
   // forms can show validation messages next to the fields.
   updateProfile: (input: ProfileInput) => Promise<ActionResult<Student>>
   updatePreferences: (input: StudentPreferences) => Promise<ActionResult<StudentPreferences>>
+  // Adaptive planning: on/off, and "Reset learning" (tasks and sessions stay).
+  setLearningEnabled: (enabled: boolean) => Promise<ActionResult<LearningSettings>>
+  resetLearning: () => Promise<ActionResult<LearningSettings>>
   addCommitment: (input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
   // Replaces the whole rule, so the edit applies to every week.
   updateCommitment: (id: string, input: RecurringCommitmentInput) => Promise<ActionResult<RecurringCommitment>>
@@ -164,6 +173,7 @@ export function AppStoreProvider({
   const [studySessions, setStudySessions] = useState(initial.studySessions)
   const [student, setStudent] = useState(initial.student)
   const [preferences, setPreferences] = useState(initial.preferences)
+  const [learning, setLearning] = useState(initial.learning ?? DEFAULT_LEARNING_SETTINGS)
   const [recurringCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
   const [externalEvents, setExternalEvents] = useState(initial.externalEvents ?? [])
 
@@ -205,6 +215,7 @@ export function AppStoreProvider({
     today,
     student,
     preferences,
+    learning,
     recurringCommitments,
     courses,
     tasks,
@@ -378,6 +389,24 @@ export function AppStoreProvider({
       if (result.ok) {
         setPreferences(result.data)
         showSuccess("Preferences updated. Your plan uses them now.")
+      }
+      return result
+    },
+    setLearningEnabled: async (enabled) => {
+      const result = await call(updateLearningAction(enabled))
+      if (result.ok) {
+        setLearning(result.data)
+        showSuccess(enabled ? "Adaptive planning is on." : "Adaptive planning is off. Your plan uses only your own estimates.")
+      }
+      return result
+    },
+    resetLearning: async () => {
+      const result = await call(resetLearningAction())
+      if (result.ok) {
+        setLearning(result.data)
+        // The recorded moves were cleared on the server too.
+        setStudySessions((prev) => prev.map((s) => ({ ...s, rescheduleCount: 0, firstDate: null, firstStartTime: null })))
+        showSuccess("Learning reset. Your tasks and sessions are unchanged.")
       }
       return result
     },

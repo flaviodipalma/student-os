@@ -79,6 +79,15 @@ shown in "Why this?"; `dayLimits` lower a day's study limit (a lighter day) and
 can never raise it. Neither can move study into busy time, outside the study
 window or past the daily limit.
 
+## Learned planning (optional input: `learned`)
+
+From adaptive planning (src/lib/adaptive, docs/adaptive-planning.md): a learned
+estimate per task (the task keeps the student's own; `planner.estimateOf` gives
+the one in use, and "Why this?" says why), and times of day to use last
+(`pickSlot`: the earliest room outside them, else the earliest room, so they're
+never blocked; the next hour of today is never avoided). Nothing learned
+changes free time, commitments, the study window or the daily limit.
+
 ## Multi-day planning and study sessions (generate-plan.ts)
 
 Days are simulated in order from today (14 days ahead); each day assumes the

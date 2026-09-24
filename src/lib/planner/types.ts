@@ -25,6 +25,17 @@ export type PlannerInput = {
   // never what's possible: free time, commitments and the study window stay hard
   // rules. Usually temporary (a what-if); see src/server/planning.
   strategy?: PlanningStrategy
+  // What adaptive planning learned from the student's own history
+  // (src/lib/adaptive). Soft only: it changes how long the Planner expects a task
+  // to take and which free time it uses first, never what's possible.
+  learned?: LearnedPlanning
+}
+
+export type LearnedPlanning = {
+  // A learned estimate per task (the task keeps the student's own), with why.
+  estimates?: Record<string, { minutes: number; reason: string }>
+  // Times of day (minutes since midnight) the Planner uses last, with why.
+  avoidTimes?: { start: number; end: number; reason: string }[]
 }
 
 export type PlanningStrategy = {

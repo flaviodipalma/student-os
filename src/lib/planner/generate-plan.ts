@@ -38,6 +38,8 @@ import { buildWarnings } from "./warnings"
 
 export type Planner = {
   settings: PlannerSettings
+  // The estimate the Planner uses for a task (learned, if adaptive planning has one).
+  estimateOf: (task: Task) => ReturnType<typeof estimateOf>
   // The plan for one date. Plans are computed once per planner and cached.
   planFor: (date: string) => DailyPlan
 }
@@ -60,7 +62,8 @@ export function createPlanner(input: PlannerInput): Planner {
   const openTasks = input.tasks.filter((task) => !isDone(task))
 
   // Per task: its estimate, whether work has started, and the work still to plan.
-  const estimates = new Map(openTasks.map((task) => [task.id, estimateOf(task, settings)]))
+  const learnedEstimate = (task: Task) => estimateOf(task, settings, input.learned?.estimates?.[task.id])
+  const estimates = new Map(openTasks.map((task) => [task.id, learnedEstimate(task)]))
   const started = new Map(
     openTasks.map((task) => [task.id, task.status === "in_progress" || completedMinutesFor(task.id, events) > 0])
   )
@@ -169,6 +172,8 @@ export function createPlanner(input: PlannerInput): Planner {
       const target = dailyTarget(left0, daysLeft, laterCapacity, settings)
       const reasons = reasonsOf(scored)
       if (target < left0) reasons.push(`Spread over several days (${formatDuration(left0)} left)`)
+      const learned = estimates.get(task.id)?.learned
+      if (learned) reasons.push(learned.reason)
 
       let left = target
       let scheduled = 0
@@ -182,13 +187,19 @@ export function createPlanner(input: PlannerInput): Planner {
           hitLimit = true
           break
         }
-        // The earliest free block with room for at least the smallest useful block.
-        const slot = day.slots.find((s) => roundDown(Math.min(s.end, cutoff) - s.start, 5) >= smallest)
-        if (!slot) break
-        const space = roundDown(Math.min(slot.end, cutoff) - slot.start, 5)
+        // The earliest free block with room for at least the smallest useful block
+        // (outside times the student usually misses, if there's another choice).
+        const pick = pickSlot(day.slots, smallest, cutoff, avoidOn(plan.date))
+        if (!pick) break
+        const { slot, start, avoided } = pick
+        const space = roundDown(pick.end - start, 5)
         // Adapt to the real gap: a 45-minute gap gets a 45-minute session.
         const length = Math.min(wanted, space)
-        const start = slot.start
+        if (start > slot.start) {
+          // Placed later in the block: the free time before it stays usable.
+          const before = start - settings.breakMinutes
+          if (before > slot.start) day.slots.splice(day.slots.indexOf(slot), 0, { start: slot.start, end: before })
+        }
         plan.suggestions.push({
           id: `${task.id}@${plan.date}T${fromMinutes(start)}`,
           taskId: task.id,
@@ -197,7 +208,7 @@ export function createPlanner(input: PlannerInput): Planner {
           endTime: fromMinutes(start + length),
           status: "suggested",
           score: scored.score,
-          reasons: [...reasons, placementReason(length, ideal, space)],
+          reasons: [...reasons, ...(avoided ? [avoided] : []), placementReason(length, ideal, space)],
         })
         // Use up the block, plus a break before any next study block.
         slot.start = Math.min(slot.end, start + length + settings.breakMinutes)
@@ -212,6 +223,20 @@ export function createPlanner(input: PlannerInput): Planner {
 
     plan.suggestions.sort((a, b) => a.startTime.localeCompare(b.startTime))
     plan.studyMinutes = day.bookedStudyMinutes + (day.budget - budget)
+  }
+
+  // Times to use last on a date. On today, the next hour is never avoided: the
+  // student is here now, and "What should I do now?" should use it.
+  function avoidOn(date: string): { start: number; end: number; reason: string }[] {
+    const avoid = input.learned?.avoidTimes ?? []
+    if (date !== today) return avoid
+    const here = { start: nowMinutes, end: nowMinutes + 60 }
+    return avoid.flatMap((a) =>
+      [
+        { ...a, end: Math.min(a.end, here.start) },
+        { ...a, start: Math.max(a.start, here.end) },
+      ].filter((part) => part.end > part.start)
+    )
   }
 
   function unscheduledEntry(
@@ -280,7 +305,7 @@ export function createPlanner(input: PlannerInput): Planner {
     }
   }
 
-  return { settings, planFor }
+  return { settings, planFor, estimateOf: learnedEstimate }
 }
 
 // One-date convenience (tests, and anywhere only a single day is needed).
@@ -310,6 +335,46 @@ function existingSessionsOn(items: CalendarEvent[], date: string, today: string,
       status: e.completed ? "completed" : isMissed(e, today, nowMinutes) ? "missed" : "scheduled",
       ...(e.completed && e.completedMinutes ? { completedMinutes: workedMinutes(e) } : {}),
     }))
+}
+
+// Where to put the next session: the earliest free block with room for
+// `smallest` minutes. With times to avoid, the earliest room OUTSIDE them wins
+// if there is any (it may be later in a block); otherwise the earliest room at
+// all, so avoided times are used last, never blocked. `avoided` is the reason
+// when avoiding changed the choice.
+export function pickSlot(
+  slots: { start: number; end: number }[],
+  smallest: number,
+  cutoff: number,
+  avoid: { start: number; end: number; reason: string }[]
+): { slot: { start: number; end: number }; start: number; end: number; avoided?: string } | null {
+  const fits = (from: number, to: number) => roundDown(to - from, 5) >= smallest
+  const earliest = slots.find((s) => fits(s.start, Math.min(s.end, cutoff)))
+  if (!earliest) return null
+  const plain = { slot: earliest, start: earliest.start, end: Math.min(earliest.end, cutoff) }
+  if (avoid.length === 0) return plain
+  const inAvoided = (from: number, to: number) => avoid.find((a) => from < a.end && a.start < to)
+  for (const slot of slots) {
+    // The block minus the avoided times, in order.
+    let parts = [{ start: slot.start, end: Math.min(slot.end, cutoff) }]
+    for (const a of avoid) {
+      parts = parts.flatMap((p) =>
+        p.end <= a.start || a.end <= p.start
+          ? [p]
+          : [
+              { start: p.start, end: a.start },
+              { start: a.end, end: p.end },
+            ].filter((x) => x.end > x.start)
+      )
+    }
+    parts.sort((a, b) => a.start - b.start)
+    const part = parts.find((p) => fits(p.start, p.end))
+    if (!part) continue
+    const changed = slot !== plain.slot || part.start !== plain.start
+    const skippedOver = changed ? inAvoided(plain.start, plain.start + smallest) : undefined
+    return { slot, start: part.start, end: part.end, ...(skippedOver ? { avoided: skippedOver.reason } : {}) }
+  }
+  return plain
 }
 
 // Why the session has the length it has (the last "Why this?" reason).

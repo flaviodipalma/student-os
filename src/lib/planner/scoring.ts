@@ -28,13 +28,18 @@ export function isMissed(event: CalendarEvent, today: string, nowMinutes: number
 }
 
 // The estimate the planner works with. Tasks without a usable estimate get the
-// fallback (and the student is asked to add one).
-export function estimateOf(task: Task, settings: Pick<PlannerSettings, "fallbackEstimateMinutes">) {
+// fallback (and the student is asked to add one). A learned estimate (adaptive
+// planning) is used instead when there is one; `missing` still says whether the
+// student gave an estimate.
+export function estimateOf(
+  task: Task,
+  settings: Pick<PlannerSettings, "fallbackEstimateMinutes">,
+  learned?: { minutes: number; reason: string }
+): { minutes: number; missing: boolean; learned?: { minutes: number; reason: string } } {
   const minutes = task.estimateMinutes
-  if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) {
-    return { minutes: settings.fallbackEstimateMinutes, missing: true }
-  }
-  return { minutes, missing: false }
+  const missing = minutes === null || !Number.isFinite(minutes) || minutes <= 0
+  if (learned && Number.isFinite(learned.minutes) && learned.minutes > 0) return { minutes: Math.round(learned.minutes), missing, learned }
+  return missing ? { minutes: settings.fallbackEstimateMinutes, missing: true } : { minutes: minutes!, missing: false }
 }
 
 // Minutes of a task already covered by study sessions: work done, plus booked

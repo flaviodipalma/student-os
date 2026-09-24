@@ -3,7 +3,8 @@
 import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import { themePreferences, type ThemePreference } from "@/lib/theme"
-import type { RecurringCommitment, Student, StudentPreferences } from "@/lib/types"
+import { toDateKey } from "@/lib/format"
+import type { LearningSettings, RecurringCommitment, Student, StudentPreferences } from "@/lib/types"
 import {
   createCommitmentSchema,
   idSchema,
@@ -14,7 +15,8 @@ import {
 } from "@/lib/validation"
 import { parse, runAction } from "@/server/actions"
 import { saveOnboardingDetails, type OnboardingSaved } from "@/server/services/onboarding"
-import { savePreferences, saveThemePreference } from "@/server/services/preferences"
+import { resetLearning, saveLearningEnabled, savePreferences, saveThemePreference } from "@/server/services/preferences"
+import { getStudentClock } from "@/server/student-clock"
 import { completeOnboarding, updateProfile } from "@/server/services/profiles"
 import {
   createRecurringCommitment,
@@ -66,4 +68,17 @@ export async function completeOnboardingAction(): Promise<ActionResult<null>> {
 // Settings > Appearance: Light / Dark / System, saved for the signed-in student.
 export async function updateThemeAction(theme: unknown): Promise<ActionResult<ThemePreference>> {
   return runAction(({ db, userId }) => saveThemePreference(db, userId, parse(z.enum(themePreferences, { error: "Choose Light, Dark or System." }), theme)))
+}
+
+// Settings > Planning: learn from my planning history (on/off).
+export async function updateLearningAction(enabled: unknown): Promise<ActionResult<LearningSettings>> {
+  return runAction(({ db, userId }) => saveLearningEnabled(db, userId, parse(z.boolean(), enabled)))
+}
+
+// Settings > Planning: reset what Student OS learned (history from today on counts).
+export async function resetLearningAction(): Promise<ActionResult<LearningSettings>> {
+  return runAction(async ({ db, userId }) => {
+    const { now } = await getStudentClock()
+    return resetLearning(db, userId, toDateKey(now))
+  })
 }

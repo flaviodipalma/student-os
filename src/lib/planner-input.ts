@@ -1,11 +1,14 @@
+import { analyzeHistory, learnedPlanning, type AdaptivePlanningContext } from "@/lib/adaptive"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
-import type { PlannerInput } from "@/lib/planner"
+import { DEFAULT_PLANNER_SETTINGS, type PlannerInput } from "@/lib/planner"
+import { toDateKey } from "@/lib/format"
 import { plannerSettingsFor } from "@/lib/preferences"
 import type {
   CalendarEvent,
   Course,
   ExternalEventRecord,
+  LearningSettings,
   RecurringCommitment,
   StudentPreferences,
   StudySessionRecord,
@@ -24,9 +27,21 @@ export type PlannerSource = {
   // Canvas / Blackboard calendar events, and the zone to place them in.
   externalEvents?: ExternalEventRecord[]
   timeZone?: string
+  // Adaptive planning settings. Without them, nothing learned is used.
+  learning?: LearningSettings
 }
 
-export function plannerInputFor(data: PlannerSource, now: Date): PlannerInput {
+// What adaptive planning learned (src/lib/adaptive), for this data. It changes
+// only with the data or the date, so callers can compute it once and pass it in.
+export function adaptiveContextFor(data: PlannerSource, now: Date): AdaptivePlanningContext | undefined {
+  if (!data.learning) return undefined
+  return analyzeHistory(
+    { tasks: data.tasks, courses: data.courses, studySessions: data.studySessions, learning: data.learning, fallbackEstimateMinutes: DEFAULT_PLANNER_SETTINGS.fallbackEstimateMinutes },
+    toDateKey(now)
+  )
+}
+
+export function plannerInputFor(data: PlannerSource, now: Date, adaptive = adaptiveContextFor(data, now)): PlannerInput {
   // Tasks removed from a day's plan, by date.
   const skipped: Record<string, string[]> = {}
   for (const session of data.studySessions) {
@@ -47,5 +62,6 @@ export function plannerInputFor(data: PlannerSource, now: Date): PlannerInput {
     now,
     skipped,
     settings: plannerSettingsFor(data.preferences),
+    ...(adaptive ? { learned: learnedPlanning(adaptive) } : {}),
   }
 }

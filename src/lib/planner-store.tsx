@@ -5,7 +5,9 @@ import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
 import { toDateKey } from "@/lib/format"
 import { createPlanner, whatNow, type DailyPlan, type Planner, type StudySession, type WhatNow } from "@/lib/planner"
-import { plannerInputFor } from "@/lib/planner-input"
+import { adaptiveContextFor, plannerInputFor } from "@/lib/planner-input"
+import type { AdaptivePlanningContext } from "@/lib/adaptive"
+import { fromDateKey } from "@/lib/format"
 
 // Connects the planner (pure logic in src/lib/planner) to the student's saved data.
 //
@@ -22,20 +24,25 @@ import { plannerInputFor } from "@/lib/planner-input"
 const PlannerContext = createContext<Planner | null>(null)
 
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
-  const { tasks, courses, events, studySessions, preferences, recurringCommitments, externalEvents, timeZone } = useAppStore()
+  const { tasks, courses, events, studySessions, preferences, learning, recurringCommitments, externalEvents, timeZone } = useAppStore()
   const now = useNow()
   // The clock ticks every 30 seconds; the plan only needs to move on each minute.
   const minute = Math.floor(now.getTime() / 60_000)
+
+  // What adaptive planning learned: only recomputed when the history, the
+  // settings or the date change (not every minute).
+  const adaptive = useAdaptiveContext()
 
   const planner = useMemo(
     () =>
       createPlanner(
         plannerInputFor(
-          { tasks, courses, events, studySessions, preferences, recurringCommitments, externalEvents, timeZone },
-          new Date(minute * 60_000)
+          { tasks, courses, events, studySessions, preferences, recurringCommitments, externalEvents, timeZone, learning },
+          new Date(minute * 60_000),
+          adaptive
         )
       ),
-    [tasks, courses, events, studySessions, recurringCommitments, preferences, externalEvents, timeZone, minute]
+    [tasks, courses, events, studySessions, recurringCommitments, preferences, externalEvents, timeZone, learning, minute, adaptive]
   )
 
   return <PlannerContext value={planner}>{children}</PlannerContext>
@@ -122,4 +129,14 @@ export function usePlanActions() {
       }
     },
   }
+}
+
+// What adaptive planning learned from the student's history (Settings, task
+// details). Recomputed only when the history, the settings or the date change.
+export function useAdaptiveContext(): AdaptivePlanningContext | undefined {
+  const { today, tasks, courses, studySessions, preferences, learning } = useAppStore()
+  return useMemo(
+    () => adaptiveContextFor({ tasks, courses, studySessions, preferences, learning, events: [], recurringCommitments: [] }, fromDateKey(today)),
+    [tasks, courses, studySessions, preferences, learning, today]
+  )
 }

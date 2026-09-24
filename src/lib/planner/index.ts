@@ -34,6 +34,7 @@ export {
 export type {
   AvailableTimeBlock,
   DailyPlan,
+  LearnedPlanning,
   PlannerInput,
   PlannerWarning,
   PlanStatus,

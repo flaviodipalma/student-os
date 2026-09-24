@@ -257,6 +257,7 @@ export const getTaskDetails = defineTool({
           description: untrusted(task.description, 300) || null,
           notes: untrusted(task.notes, 300) || null,
           source: task.source ? { from: task.source.provider, submission: task.source.submissionStatus ?? "unknown" } : null,
+          estimate: estimateView(ctx, task),
         },
         studySessions: sessions.map((item) => ({
           sessionId: item.sessionId,
@@ -483,6 +484,53 @@ export const getNotifications = defineTool({
   },
 })
 
+// The student's own estimate next to what the Planner uses, and why (adaptive planning).
+function estimateView(ctx: ToolContext, task: Task) {
+  const learned = task.status === "completed" ? undefined : ctx.adaptive?.estimates[task.id]
+  return {
+    yoursMinutes: task.estimateMinutes,
+    plannerUsesMinutes: task.status === "completed" ? null : ctx.planner.estimateOf(task).minutes,
+    learned: learned
+      ? { explanation: untrusted(learned.explanation, 300), confidence: learned.confidence, basedOnTasks: learned.basis.tasks }
+      : null,
+  }
+}
+
+export const getLearnedPatterns = defineTool({
+  name: "getLearnedPatterns",
+  description:
+    "What adaptive planning learned from this student's own history, as computed by Student OS: whether it's on, how many finished tasks it learns from, the insights (only shown with enough history), completion by time of day, typical planned vs completed study per day, and learned estimates for open tasks with their explanation and confidence. Use for \"why is this session longer?\", \"when do I study best?\", \"why do you plan less at night?\". Only explain what this returns; never infer other patterns.",
+  input: z.object({}),
+  run(ctx) {
+    const a = ctx.adaptive
+    if (!a || !a.enabled) {
+      return { result: { enabled: false, note: "Adaptive planning is off (Settings > Planning): the Planner uses the student's own estimates and times only." } }
+    }
+    const open = ctx.data.tasks.filter((t) => t.status !== "completed")
+    return {
+      result: {
+        enabled: true,
+        historySince: a.since,
+        finishedTasksLearnedFrom: a.observations,
+        insights: a.insights.map((i) => ({ text: untrusted(i.text, 300), confidence: i.confidence })),
+        timesOfDay: a.periods
+          .filter((p) => p.sessions > 0)
+          .map((p) => ({ period: p.label, sessions: p.sessions, completed: p.completed, missed: p.missed, skipped: p.skipped, moved: p.moved, completionRate: p.completionRate })),
+        usedLast: a.avoid.map((x) => ({ period: x.period, reason: x.reason, confidence: x.confidence })),
+        workload: a.workload,
+        learnedEstimates: open
+          .filter((t) => a.estimates[t.id])
+          .slice(0, 10)
+          .map((t) => {
+            const e = a.estimates[t.id]
+            return { ...taskBrief(ctx, t), yoursMinutes: e.userMinutes, plannerUsesMinutes: e.minutes, confidence: e.confidence, explanation: untrusted(e.explanation, 300) }
+          }),
+        ...(a.observations === 0 && a.insights.length === 0 ? { note: "Not enough history yet: plans use the student's own estimates and preferences." } : {}),
+      },
+    }
+  },
+})
+
 export const readTools = [
   getWhatShouldIDoNow,
   getTodaysPlan,
@@ -496,4 +544,5 @@ export const readTools = [
   getStudySessions,
   getStudentPreferences,
   getNotifications,
+  getLearnedPatterns,
 ]

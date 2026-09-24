@@ -3,7 +3,8 @@ import "server-only"
 import { fromMinutes, toMinutes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
 import { completedMinutesFor, createPlanner, dayAvailability, type Planner } from "@/lib/planner"
-import { plannerInputFor } from "@/lib/planner-input"
+import type { AdaptivePlanningContext } from "@/lib/adaptive"
+import { adaptiveContextFor, plannerInputFor } from "@/lib/planner-input"
 import { eventSourceNames, type CalendarEvent, type Task } from "@/lib/types"
 import type { AppData } from "../services/app-data"
 
@@ -22,11 +23,14 @@ export type ToolContext = {
   // events (not hidden) and study sessions, as calendar items.
   items: CalendarEvent[]
   planner: Planner
+  // What adaptive planning learned from this student's history (undefined = off / no data).
+  adaptive?: AdaptivePlanningContext
 }
 
 export function createToolContext(data: AppData, now: Date, timeZone: string | undefined): ToolContext {
-  const input = plannerInputFor({ ...data, timeZone }, now)
-  return { data, now, today: toDateKey(now), timeZone, items: input.events, planner: createPlanner(input) }
+  const adaptive = adaptiveContextFor({ ...data, timeZone }, now)
+  const input = plannerInputFor({ ...data, timeZone }, now, adaptive)
+  return { data, now, today: toDateKey(now), timeZone, items: input.events, planner: createPlanner(input), adaptive }
 }
 
 // The same availability the Planner uses, for one day. `withoutSessionId` leaves
@@ -79,11 +83,13 @@ export function courseCodeOf(ctx: ToolContext, courseId: string | undefined): st
   return course ? untrusted(course.code, 40) : null
 }
 
-// Work still to do on a task (estimate − work done); null when there's no estimate.
+// Work still to do on a task (the Planner's estimate − work done; the estimate
+// is a learned one when adaptive planning has one); null when there's no estimate.
 export function remainingMinutes(ctx: ToolContext, task: Task): number | null {
-  if (task.estimateMinutes === null) return null
   if (task.status === "completed") return 0
-  return Math.max(0, task.estimateMinutes - completedMinutesFor(task.id, ctx.items))
+  const estimate = ctx.planner.estimateOf(task)
+  if (estimate.missing && !estimate.learned) return null
+  return Math.max(0, estimate.minutes - completedMinutesFor(task.id, ctx.items))
 }
 
 // A task, compact: what most answers need.

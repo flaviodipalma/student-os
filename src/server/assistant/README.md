@@ -31,7 +31,9 @@ Planner's `DailyPlan`: schedule, sessions, priorities and reasons, warnings),
 `getUpcomingDeadlines`, `getWorkloadSummary`, `getTasks`, `getTaskDetails`,
 `getCourses`, `getCalendarEvents` (own, weekly, Canvas/Blackboard: read-only),
 `getAvailableTime` (the Planner's `dayAvailability`), `getStudySessions`,
-`getStudentPreferences`, `getNotifications` (with the rule that sent each one).
+`getStudentPreferences`, `getNotifications` (with the rule that sent each one),
+`getLearnedPatterns` (adaptive planning: insights, times of day, learned
+estimates with explanation and confidence; see docs/adaptive-planning.md).
 
 Planning (the AI planning layer, see docs/ai-planning.md): `getPlanningContext`
 (work left vs realistic study time), `explainPlan` (the Planner's ranking and

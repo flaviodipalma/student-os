@@ -4,6 +4,7 @@ import { AccountCard } from "@/components/settings/account-card"
 import { AppearanceCard } from "@/components/settings/appearance-card"
 import type { CalendarOutcomes } from "@/components/settings/calendar-connections"
 import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
+import { LearningCard } from "@/components/settings/learning-card"
 import { SettingsView } from "@/components/settings/settings-view"
 import { getNavItem } from "@/lib/navigation"
 import { calendarProviderIds, lmsProviderIds } from "@/lib/types"
@@ -25,6 +26,7 @@ const sections = [
   { id: "study-preferences", label: "Study preferences" },
   { id: "recurring-commitments", label: "Recurring commitments" },
   { id: "notifications", label: "Notifications" },
+  { id: "adaptive-planning", label: "Adaptive planning" },
   { id: "appearance", label: "Appearance" },
   { id: "integrations", label: "Integrations" },
   { id: "account", label: "Account" },
@@ -84,6 +86,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </nav>
       <div className="space-y-6">
         <SettingsView />
+        <LearningCard />
         <AppearanceCard />
         <IntegrationsCard
           integrations={integrations}

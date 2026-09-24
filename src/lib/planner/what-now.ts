@@ -3,7 +3,7 @@ import { addDays, formatDuration } from "@/lib/format"
 import { isDone } from "@/lib/tasks"
 import type { CalendarEvent, Task } from "@/lib/types"
 import type { Planner } from "./generate-plan"
-import { completedMinutesFor, estimateOf, reasonsOf } from "./scoring"
+import { completedMinutesFor, reasonsOf } from "./scoring"
 import type { ScoredTask, StudySession } from "./types"
 
 // "What should I do now?" — the most useful thing the student can realistically do
@@ -67,7 +67,7 @@ export function whatNow(input: {
   const scoredById = new Map(plan.ranked.map((scored) => [scored.task.id, scored]))
 
   const details = (task: Task): TaskDetails => {
-    const estimate = estimateOf(task, planner.settings)
+    const estimate = planner.estimateOf(task)
     return {
       remainingMinutes: Math.max(0, estimate.minutes - completedMinutesFor(task.id, events)),
       estimateMissing: estimate.missing,
