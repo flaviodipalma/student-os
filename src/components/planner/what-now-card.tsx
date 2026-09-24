@@ -47,7 +47,7 @@ export function WhatNowCard({ onOpenTask, className }: { onOpenTask: (task: Task
               <p className="mt-1 text-sm text-muted-foreground">
                 {answer.kind === "studying"
                   ? `Your study session runs until ${time(today, answer.until)}.`
-                  : `You have ${formatDuration(answer.availableMinutes)} available right now · suggested ${time(today, answer.session.startTime)}–${time(today, answer.session.endTime)}.`}
+                  : `You have ${formatDuration(answer.availableMinutes)} free${answer.nextCommitment ? ` before ${answer.nextCommitment.title} (${time(today, answer.nextCommitment.startTime)})` : " right now"} · suggested ${time(today, answer.session.startTime)}–${time(today, answer.session.endTime)}.`}
               </p>
               <TaskLine task={answer.task} details={answer.details} today={today} />
             </div>

@@ -48,12 +48,13 @@ describe("What should I do now?", () => {
       task,
       session: suggestion,
       availableMinutes: 45,
+      nextCommitment: { title: "Soccer Practice", startTime: "17:00" },
       details: { remainingMinutes: 45, estimateMissing: false },
       reasons: ["Due in 3 days", "High priority", "You have 45m free right now"],
     }
     render(<WhatNowCard onOpenTask={onOpenTask} />)
     expect(screen.getByText("Work on Database Project")).toBeTruthy()
-    expect(screen.getByText(/You have 45m available right now/)).toBeTruthy()
+    expect(screen.getByText(/You have 45m free before Soccer Practice \(5:00 PM\)/)).toBeTruthy()
     expect(screen.getByText("CSC215 · Due Friday · High priority · ~45m remaining")).toBeTruthy()
 
     const user = userEvent.setup()

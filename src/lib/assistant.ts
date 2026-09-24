@@ -45,6 +45,14 @@ export type ProposedAction =
   // Work the student already did ("I worked 45 minutes on it"): saved as a
   // completed study session, so the Planner only plans what's left.
   | { kind: "log-progress"; taskId: string; date: string; startTime: string; endTime: string }
+  // A plan the student agreed to ("OK, put that on my calendar"): the Planner's
+  // sessions for one day, each checked again against free time on Confirm.
+  | { kind: "accept-sessions"; date: string; sessions: PlannedBlock[] }
+  // "I can't study today": the day's planned work moves to other days (saved as
+  // skipped sessions, the same as Skip on the Planner page).
+  | { kind: "skip-day"; date: string; sessions: PlannedBlock[] }
+
+export type PlannedBlock = { taskId: string; startTime: string; endTime: string }
 
 export type PendingAction = {
   action: ProposedAction

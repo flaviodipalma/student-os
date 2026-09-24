@@ -11,10 +11,11 @@ import { AppError, ValidationError } from "../errors"
 import { loadAppData } from "../services/app-data"
 import { createStudySession, updateStudySession } from "../services/study-sessions"
 import { createTask, updateTask } from "../services/tasks"
-import { actionTools, dueText, prepareAction } from "./action-tools"
+import { actionTools, dueText, MAX_BLOCKS, prepareAction } from "./action-tools"
 import { AssistantAIError, type AssistantToolSpec, type StudentAssistantAIService, type ToolCallResult } from "./ai-service"
 import { createToolContext, timeLabel, untrusted, type ToolContext } from "./context"
 import { ASSISTANT_SYSTEM_PROMPT, turnContext } from "./prompt"
+import { planningActionTools, planningTools } from "./planning-tools"
 import { readTools } from "./read-tools"
 import type { AssistantTool } from "./tool"
 import { logger } from "@/server/log"
@@ -32,9 +33,10 @@ import { logger } from "@/server/log"
 // tools read from data already loaded for the signed-in student, and changes
 // only happen when the student presses Confirm.
 
-export const assistantTools: AssistantTool[] = [...readTools, ...actionTools]
+export const assistantTools: AssistantTool[] = [...readTools, ...planningTools, ...actionTools]
 const toolsByName = new Map(assistantTools.map((tool) => [tool.name, tool]))
-const actionNames = new Set(actionTools.map((tool) => tool.name))
+// Tools that propose a change (one per reply).
+const actionNames = new Set([...actionTools, ...planningActionTools].map((tool) => tool.name))
 
 function jsonSchemaOf(schema: z.ZodType): Record<string, unknown> {
   const json = z.toJSONSchema(schema, { io: "input" }) as Record<string, unknown>
@@ -138,6 +140,8 @@ export async function askAssistant(
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid time.")
 const priority = z.enum(["low", "medium", "high", "critical"])
+const plannedBlock = z.object({ taskId: idSchema, startTime: time, endTime: time })
+
 export const proposedActionSchema: z.ZodType<ProposedAction> = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("complete-task"), taskId: idSchema }),
   z.object({
@@ -179,6 +183,8 @@ export const proposedActionSchema: z.ZodType<ProposedAction> = z.discriminatedUn
     startTime: time,
     endTime: time,
   }),
+  z.object({ kind: z.literal("accept-sessions"), date: dateKeySchema, sessions: z.array(plannedBlock).min(1).max(MAX_BLOCKS) }),
+  z.object({ kind: z.literal("skip-day"), date: dateKeySchema, sessions: z.array(plannedBlock).min(1).max(MAX_BLOCKS) }),
 ])
 
 // Saves a change the student confirmed. The proposal came back from the browser,
@@ -218,6 +224,23 @@ export async function confirmAssistantChange(deps: AssistantDeps, action: Propos
         message: `Done. ${formatDuration(toMinutes(action.endTime) - toMinutes(action.startTime))} of work on ${quote(data.tasks.find((task) => task.id === action.taskId)?.title)} is recorded; your plan now counts it.`,
         tasks: [],
         studySessions: [session],
+      }
+    }
+    case "accept-sessions":
+    case "skip-day": {
+      const status = action.kind === "accept-sessions" ? "scheduled" : "skipped"
+      // All or nothing.
+      const sessions = await db.transaction(async (tx) =>
+        Promise.all(action.sessions.map((block) => createStudySession(tx, userId, { id: crypto.randomUUID(), date: action.date, ...block, status })))
+      )
+      const day = dueText(ctx, action.date)
+      return {
+        message:
+          action.kind === "accept-sessions"
+            ? `Done. ${sessions.length === 1 ? "1 study session is" : `${sessions.length} study sessions are`} on your calendar for ${day}.`
+            : `Done. No study planned for ${day}; that work moves to your other days.`,
+        tasks: [],
+        studySessions: sessions,
       }
     }
     case "schedule-session": {

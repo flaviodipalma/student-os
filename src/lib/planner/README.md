@@ -70,6 +70,15 @@ always wins: a low-priority task due today (90 + 5) beats a critical one due in 
 week (35 + 40). Overdue work is urgent but still limited by the day's budget, so
 it can't take over the whole day.
 
+## Planning strategy (optional input: `strategy`)
+
+Used only by the AI planning layer's what-if scenarios (src/server/planning); the
+app's normal plan never sets it. `boosts` add points to a task's score with the
+student's own reason ("You said this is your focus", "Exam focus (your choice)"),
+shown in "Why this?"; `dayLimits` lower a day's study limit (a lighter day) and
+can never raise it. Neither can move study into busy time, outside the study
+window or past the daily limit.
+
 ## Multi-day planning and study sessions (generate-plan.ts)
 
 Days are simulated in order from today (14 days ahead); each day assumes the
@@ -98,8 +107,9 @@ From today's plan and the current minute, in this order:
 2. **busy**: a fixed event (own, weekly, Canvas, Blackboard) is happening now ->
    no study; when it ends and the next recommended session.
 3. **work**: the plan's next session starts now -> that task, the free time right
-   now, due / priority / remaining work, and "Why this?" (the score factors plus
-   "You have 45m free right now").
+   now and the fixed item that ends it (`nextCommitment`: "You have 3h free
+   before Soccer Practice (5:00 PM)"), due / priority / remaining work, and "Why
+   this?" (the score factors plus "You have 45m free right now").
 4. **no-time**: limit reached, outside study hours, or no usable gap -> the next
    realistic opportunity (later today, or tomorrow's plan).
 5. **done**: nothing needs doing.

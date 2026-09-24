@@ -83,6 +83,8 @@ export type ScoringContext = {
   competingMinutes?: number
   // Planned sessions for this task missed recently.
   missedSessions?: number
+  // The student's own emphasis on this task (PlanningStrategy.boosts).
+  boost?: { points: number; label: string }
 }
 
 // Points come from the days left on the planned day; the label says when it's due from today.
@@ -145,6 +147,10 @@ export function scoreTask(task: Task, context: ScoringContext, weights: ScoringW
   // 8. A planned session was missed: the work is back, a little more urgent.
   if ((context.missedSessions ?? 0) > 0) {
     factors.push({ key: "missed-session", label: "You missed a planned session for this", points: weights.missedSession })
+  }
+  // 9. The student asked to put this first (e.g. "focus on my exam").
+  if (context.boost && context.boost.points > 0) {
+    factors.push({ key: "focus", label: context.boost.label, points: context.boost.points })
   }
 
   return {

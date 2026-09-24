@@ -20,6 +20,18 @@ export type PlannerInput = {
   // Tasks the student removed from a date's plan, by date ("YYYY-MM-DD" -> task ids).
   skipped?: Record<string, string[]>
   settings?: Partial<PlannerSettings>
+  // The student's own strategy for this plan (e.g. from the Assistant: "focus on
+  // my exam", "keep today light"). It changes priorities and how much to study,
+  // never what's possible: free time, commitments and the study window stay hard
+  // rules. Usually temporary (a what-if); see src/server/planning.
+  strategy?: PlanningStrategy
+}
+
+export type PlanningStrategy = {
+  // Extra points for a task, with the reason shown under "Why this?".
+  boosts?: Record<string, { points: number; label: string }>
+  // A lower study limit for a date ("YYYY-MM-DD" -> minutes), e.g. a light day.
+  dayLimits?: Record<string, number>
 }
 
 // A stretch of free time on one day, in minutes since midnight.
@@ -40,6 +52,7 @@ export type ScoreFactor = {
     | "tight-on-time"
     | "competing-deadlines"
     | "missed-session"
+    | "focus"
   label: string | null
   points: number
 }

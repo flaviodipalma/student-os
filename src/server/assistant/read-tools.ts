@@ -97,7 +97,7 @@ export const getWhatShouldIDoNow = defineTool({
             answer: answer.kind === "work" ? "work on this task now" : "keep going with the session in progress",
             task: taskBrief(ctx, answer.task),
             session: sessionView(ctx, answer.session),
-            ...(answer.kind === "work" ? { availableMinutes: answer.availableMinutes } : { until: timeLabel(answer.until) }),
+            ...(answer.kind === "work" ? { availableMinutes: answer.availableMinutes, freeUntil: answer.nextCommitment ? { event: untrusted(answer.nextCommitment.title), at: timeLabel(answer.nextCommitment.startTime) } : "end of your study window" } : { until: timeLabel(answer.until) }),
             remainingMinutes: answer.details.remainingMinutes,
             estimateMissing: answer.details.estimateMissing,
             why: answer.reasons,

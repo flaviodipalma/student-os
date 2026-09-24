@@ -31,6 +31,8 @@ export type WhatNow =
       session: StudySession
       // Free minutes from now until the next fixed item (or the end of the study window).
       availableMinutes: number
+      // The fixed item that ends that free time, if one comes before the study window closes.
+      nextCommitment: { title: string; startTime: string } | null
       details: TaskDetails
       reasons: string[]
     }
@@ -114,18 +116,22 @@ export function whatNow(input: {
   )
   const task = startingNow && taskById.get(startingNow.taskId)
   if (startingNow && task) {
+    const nextEvent = [...schedule].sort(byStart).find((e) => e.type !== "study" && toMinutes(e.startTime) > nowMinutes)
     const nextBusy = [...schedule]
       .sort(byStart)
       .map((e) => toMinutes(e.startTime))
       .find((start) => start > nowMinutes)
     const windowEnd = toMinutes(planner.settings.dayEnd)
     const availableMinutes = Math.max(0, Math.min(nextBusy ?? windowEnd, windowEnd) - nowMinutes)
+    const nextCommitment =
+      nextEvent && toMinutes(nextEvent.startTime) < windowEnd ? { title: nextEvent.title, startTime: nextEvent.startTime } : null
     const sessionReasons = startingNow.status === "suggested" && "reasons" in startingNow ? (startingNow.reasons as string[]) : reasonsFor(scoredById.get(task.id))
     return {
       kind: "work",
       task,
       session: startingNow,
       availableMinutes,
+      nextCommitment,
       details: details(task),
       reasons: [...sessionReasons.filter((reason) => !/^Fits your available time$/.test(reason)), `You have ${formatDuration(availableMinutes)} free right now`],
     }

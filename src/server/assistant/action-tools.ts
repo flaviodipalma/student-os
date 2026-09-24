@@ -1,7 +1,7 @@
 import "server-only"
 
 import { z } from "zod"
-import type { PendingAction, ProposedAction } from "@/lib/assistant"
+import type { PendingAction, PlannedBlock, ProposedAction } from "@/lib/assistant"
 import { fromMinutes, toMinutes } from "@/lib/events"
 import { formatDuration } from "@/lib/format"
 import { priorityLabel, typeLabel } from "@/lib/tasks"
@@ -168,7 +168,68 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
         },
       }
     }
+
+    case "accept-sessions": {
+      const check = checkBlocks(ctx, action.date, action.sessions)
+      if (!check.ok) return check
+      return {
+        ok: true,
+        pending: {
+          action,
+          summary: `Put this plan on your calendar for ${dueText(ctx, action.date)}: ${check.lines.join("; ")}.`,
+          ...(check.note ? { note: check.note } : {}),
+          confirmLabel: action.sessions.length === 1 ? "Add session" : `Add ${action.sessions.length} sessions`,
+        },
+      }
+    }
+
+    case "skip-day": {
+      if (action.date < ctx.today) return { ok: false, problem: "That day has already passed." }
+      if (action.sessions.length > MAX_BLOCKS) return { ok: false, problem: "That's too many sessions for one day." }
+      const titles: string[] = []
+      for (const block of action.sessions) {
+        const task = taskOf(block.taskId)
+        if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+        if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
+        if (toMinutes(block.endTime) <= toMinutes(block.startTime)) return { ok: false, problem: "A session must end after it starts." }
+        titles.push(quote(task.title))
+      }
+      return {
+        ok: true,
+        pending: {
+          action,
+          summary: `Take ${dueText(ctx, action.date)} off: skip ${[...new Set(titles)].join(", ")} that day. The Planner moves that work to your other days.`,
+          confirmLabel: "Skip the day",
+        },
+      }
+    }
   }
+}
+
+// At most this many sessions in one plan change (a day has far fewer).
+export const MAX_BLOCKS = 8
+
+// A day's plan to put on the calendar: every session must be for one of the
+// student's open tasks, in free time (checked like a single session), and the
+// sessions mustn't overlap each other.
+function checkBlocks(ctx: ToolContext, date: string, blocks: PlannedBlock[]): { ok: true; lines: string[]; note?: string } | { ok: false; problem: string } {
+  if (blocks.length === 0) return { ok: false, problem: "There's nothing planned for that day." }
+  if (blocks.length > MAX_BLOCKS) return { ok: false, problem: "That's too many sessions for one day." }
+  const sorted = [...blocks].sort((a, b) => a.startTime.localeCompare(b.startTime))
+  const lines: string[] = []
+  let minutes = 0
+  for (const [i, block] of sorted.entries()) {
+    const task = ctx.data.tasks.find((t) => t.id === block.taskId)
+    if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+    if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
+    if (i > 0 && toMinutes(block.startTime) < toMinutes(sorted[i - 1].endTime)) return { ok: false, problem: "Two of those sessions overlap." }
+    const slot = checkSlot(ctx, date, block.startTime, block.endTime)
+    if (!slot.ok) return { ok: false, problem: `${timeLabel(block.startTime)}–${timeLabel(block.endTime)}: ${slot.problem}` }
+    minutes += toMinutes(block.endTime) - toMinutes(block.startTime)
+    lines.push(`${timeLabel(block.startTime)}–${timeLabel(block.endTime)} ${quote(task.title)}`)
+  }
+  const limitLeft = availabilityOn(ctx, date).limitLeft
+  return { ok: true, lines, ...(minutes > limitLeft ? { note: `This goes over your daily study limit (${formatDuration(ctx.data.preferences.maxStudyMinutesPerDay)}).` } : {}) }
 }
 
 const changesSchema = taskFields

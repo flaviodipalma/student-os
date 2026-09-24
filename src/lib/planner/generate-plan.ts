@@ -49,6 +49,11 @@ export function createPlanner(input: PlannerInput): Planner {
     scoring: input.settings?.scoring ?? DEFAULT_SCORING,
   }
   const { now, events } = input
+  // A day's settings: the usual ones, with a lower study limit if the student asked for one.
+  const settingsOn = (date: string): PlannerSettings => {
+    const limit = input.strategy?.dayLimits?.[date]
+    return limit === undefined ? settings : { ...settings, maxStudyMinutesPerDay: Math.max(0, Math.min(settings.maxStudyMinutesPerDay, limit)) }
+  }
   const today = toDateKey(now)
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const commitments = input.recurringCommitments ?? []
@@ -70,7 +75,7 @@ export function createPlanner(input: PlannerInput): Planner {
   // Each day's availability before the planner adds anything (for lookahead).
   const baseline = new Map<string, DayAvailability>()
   const availabilityOn = (date: string) => {
-    if (!baseline.has(date)) baseline.set(date, dayAvailability(date, events, commitments, now, settings))
+    if (!baseline.has(date)) baseline.set(date, dayAvailability(date, events, commitments, now, settingsOn(date)))
     return baseline.get(date)!
   }
   // Study time the planner could find from `from` to `to` (inclusive). Beyond
@@ -91,7 +96,7 @@ export function createPlanner(input: PlannerInput): Planner {
 
   function planDay(date: string, remaining: Map<string, number>): DailyPlan {
     // 1-2. The day's schedule and free time (a fresh copy: placing sessions uses it up).
-    const day = dayAvailability(date, events, commitments, now, settings)
+    const day = dayAvailability(date, events, commitments, now, settingsOn(date))
     const skipped = input.skipped?.[date] ?? []
     const plan: DailyPlan = {
       date,
@@ -103,7 +108,7 @@ export function createPlanner(input: PlannerInput): Planner {
       ranked: [],
       available: day.free,
       studyMinutes: day.bookedStudyMinutes,
-      studyLimit: settings.maxStudyMinutesPerDay,
+      studyLimit: settingsOn(date).maxStudyMinutesPerDay,
       freeMinutes: day.freeMinutes,
       warnings: [],
     }
@@ -126,6 +131,7 @@ export function createPlanner(input: PlannerInput): Planner {
             capacityBeforeDue: capacityBetween(date, task.dueDate <= date ? date : addDays(task.dueDate, -1)),
             competingMinutes: competingMinutes(task, remaining),
             missedSessions: missedSessionsFor(task.id, events, today, nowMinutes),
+            boost: input.strategy?.boosts?.[task.id],
           },
           settings.scoring
         )

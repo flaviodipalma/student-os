@@ -16,7 +16,7 @@ Assistant page (src/components/assistant: conversation, suggestions, Confirm / C
   -> StudentAssistantAIService (ai-service.ts)
        AnthropicAssistantService: Claude tool-use loop (max 6 rounds)
        MockAssistantService: set answers for local testing (not AI)
-  -> tools (read-tools.ts, action-tools.ts) -> structured JSON back to the model
+  -> tools (read-tools.ts, planning-tools.ts, action-tools.ts) -> structured JSON back to the model
 ```
 
 Provider settings (server environment only; the key never reaches the browser):
@@ -33,8 +33,16 @@ Planner's `DailyPlan`: schedule, sessions, priorities and reasons, warnings),
 `getAvailableTime` (the Planner's `dayAvailability`), `getStudySessions`,
 `getStudentPreferences`, `getNotifications` (with the rule that sent each one).
 
+Planning (the AI planning layer, see docs/ai-planning.md): `getPlanningContext`
+(work left vs realistic study time), `explainPlan` (the Planner's ranking and
+reasons for a day), `simulatePlanChange` and `generatePlanningScenarios`
+(what-ifs: the real Planner on a temporary copy, nothing saved),
+`findAvailableTimes` (alternatives for a busy time).
+
 Actions (proposals only): `completeTask`, `createTask`, `updateTask`,
-`rescheduleStudySession`, `createStudySession`. Nothing can be deleted.
+`rescheduleStudySession`, `createStudySession`, `logStudyProgress`,
+`applyConfirmedPlanChange` (accept a day's plan / take a day off). Nothing can be
+deleted.
 
 ## Changes need the student's Confirm
 

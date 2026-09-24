@@ -37,6 +37,7 @@ export type {
   PlannerInput,
   PlannerWarning,
   PlanStatus,
+  PlanningStrategy,
   RecommendedStudySession,
   ScoreFactor,
   ScoredTask,

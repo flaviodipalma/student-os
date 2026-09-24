@@ -12,16 +12,91 @@ type Brief = { title: string; due: string; dueTime: string | null; remainingMinu
 const minutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`)
 const due = (t: Brief) => `${t.due}${t.dueTime ? ` at ${t.dueTime}` : ""}`
 
+type Scenario = {
+  feasibility: string
+  goals: { task: string; target: string; needed: string; planned: string; fits: boolean }[]
+  days: { day: string; sessions: { task: string; start: string; end: string }[] }[]
+  totals: { plannedStudy: string; workDueInThisPeriod: string; realisticStudyTime: string }
+}
+
+// A few words of a scenario: the first days with study, and each goal.
+function scenarioText(s: Scenario): string {
+  const days = s.days.slice(0, 2).map((d) => `${d.day}: ${d.sessions.map((x) => `${x.task} ${x.start}–${x.end}`).join(", ")}`)
+  const goals = s.goals.map((g) => `${g.task}: ${g.planned} planned of ${g.needed} needed by ${g.target}${g.fits ? "" : " (doesn't fully fit)"}`)
+  return [...goals, ...days].join(". ")
+}
+
+// Dates from the turn context ("today (Thursday) = ...; tomorrow (Friday) = ...; Saturday = ...").
+function dateFor(context: string, name: string): string | undefined {
+  const entries = /Dates: (.*)\./.exec(context)?.[1].split("; ") ?? []
+  for (const entry of entries) {
+    const [label, date] = entry.split(" = ")
+    if (label.toLowerCase().split(/[ ()]+/).includes(name)) return date
+  }
+  return undefined
+}
+
 export class MockAssistantService implements StudentAssistantAIService {
-  async respond({ messages, callTool }: AssistantAIRequest): Promise<string> {
+  async respond({ messages, context, callTool }: AssistantAIRequest): Promise<string> {
     const question = messages.at(-1)?.content.toLowerCase() ?? ""
     const call = async (name: string, input: Json = {}) => JSON.parse((await callTool(name, input)).content) as Json
+    const today = /Now: (\d{4}-\d{2}-\d{2})/.exec(context)?.[1] ?? ""
+    const focusTaskId = /taskId (\S+),/.exec(context)?.[1]
+    const proposal = (result: Json) =>
+      result.status === "needs_confirmation" ? `${result.summary} Confirm below.` : String(result.problem ?? "I couldn't plan that.")
+
+    // Planning conversations (see planning-tools.ts).
+    if (/take (today|the day) off|skip today/.test(question)) {
+      return proposal(await call("applyConfirmedPlanChange", { change: "skip-day", date: today }))
+    }
+    if (/put (it|that|this) on my calendar|accept (the|this) plan/.test(question)) {
+      return proposal(await call("applyConfirmedPlanChange", { change: "accept-day", date: today }))
+    }
+    if (/can't study tonight|cannot study tonight/.test(question)) {
+      const result = await call("simulatePlanChange", { intent: { unavailable: [{ date: today, from: "17:00" }] }, days: 3 })
+      const s = result.scenario as Scenario
+      return `No problem, nothing needs to change: the Planner moves that work to your next free time. ${scenarioText(s) || "Nothing else is planned."}. (This is a possible plan; nothing was saved.)`
+    }
+    const whatIfMove = /what if i move (.+?) to tomorrow/.exec(question)
+    if (whatIfMove) {
+      const task = /^(this|that|it|this assignment|that assignment)$/.test(whatIfMove[1]) ? focusTaskId : whatIfMove[1]
+      if (!task) return "Which assignment do you mean?"
+      const result = await call("simulatePlanChange", { intent: { whatIf: [{ task, dueDate: dateFor(context, "tomorrow") }] } })
+      if (result.status !== "simulated") return String(result.problem ?? "Which one do you mean?")
+      const compared = result.comparedWithCurrentPlan as { feasibility: string; totalStudy: string }
+      return `If it were due tomorrow: ${scenarioText(result.scenario as Scenario)}. Plan: ${compared.feasibility}. This is only a what-if; nothing was saved.`
+    }
+    const finishBefore = /finish (?:my )?(.+?) (?:before|by) (monday|tuesday|wednesday|thursday|friday|saturday|sunday)/.exec(question)
+    if (finishBefore) {
+      const day = dateFor(context, finishBefore[2])
+      const date = day && day > today ? new Date(Date.parse(day) - 86_400_000).toISOString().slice(0, 10) : day
+      const result = await call("simulatePlanChange", { intent: { finishBy: [{ task: finishBefore[1], date }] } })
+      if (result.status !== "simulated") return String(result.problem ?? "Which one do you mean?")
+      const s = result.scenario as Scenario
+      return `${s.feasibility === "feasible" ? "That works." : "That's tight."} ${scenarioText(s)}. (A possible plan; nothing was saved.)`
+    }
+    if (/exam .*(behind|haven't started)/.test(question)) {
+      const numbers = await call("getPlanningContext", { until: dateFor(context, "friday") })
+      const result = await call("simulatePlanChange", { intent: { mode: "exam-focus" } })
+      return `Before Friday you have about ${numbers.workLeft} of work and about ${numbers.realisticStudyTime} of realistic study time. With exam focus: ${scenarioText(result.scenario as Scenario)}.`
+    }
+    if (/every afternoon|prepare/.test(question)) {
+      const numbers = await call("getPlanningContext", {})
+      const days = numbers.perDay as { day: string; realisticStudyMinutes: number; busyWith: string[] }[]
+      return `This week you have about ${numbers.workLeft} of work and about ${numbers.realisticStudyTime} of realistic study time around your commitments${
+        days[0]?.busyWith.length ? ` (today: ${days[0].busyWith.join(", ")})` : ""
+      }. ${numbers.enoughTime ? "It fits." : "It doesn't all fit."}`
+    }
 
     if (/right now|should i (do|work)|work on/.test(question)) {
       const answer = await call("getWhatShouldIDoNow")
       const task = answer.task as Brief | undefined
       if (task) {
-        const free = typeof answer.availableMinutes === "number" ? `You have ${minutes(answer.availableMinutes)} available. ` : ""
+        const until = answer.freeUntil as { event: string; at: string } | string | undefined
+        const free =
+          typeof answer.availableMinutes === "number"
+            ? `You have ${minutes(answer.availableMinutes)} free${typeof until === "object" ? ` before ${until.event} (${until.at})` : ""}. `
+            : ""
         return `${free}I'd work on ${task.title}: it's due ${due(task)}${
           typeof answer.remainingMinutes === "number" ? ` and about ${minutes(answer.remainingMinutes)} is left` : ""
         }.`
