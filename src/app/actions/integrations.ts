@@ -35,6 +35,7 @@ import { listExternalEvents, removeExternalEventsFrom, setExternalEventHidden } 
 import { listTasks } from "@/server/services/tasks"
 import { RATE_LIMITS } from "@/server/rate-limit"
 import { getStudentTimeZone } from "@/server/student-clock"
+import { logger } from "@/server/log"
 
 // Server actions for LMS integrations (Settings > Integrations). The student is
 // always the signed-in user from the session; no user id or token is ever
@@ -77,7 +78,7 @@ async function startOAuth(provider: LmsProviderId, parseBaseUrl: () => string): 
     authorizationUrl = lms.getAuthorizationUrl({ baseUrl, state, codeVerifier })
   } catch (error) {
     if (error instanceof LmsError) return { error: error.message }
-    console.error(`[${provider}] couldn't start connecting`, { name: error instanceof Error ? error.name : typeof error })
+    logger.error(`${provider}`, `couldn't start connecting`, { name: error instanceof Error ? error.name : typeof error })
     return { error: `We couldn't start connecting to ${lms.name}. Please try again.` }
   }
   // Outside the try: redirect() works by throwing.

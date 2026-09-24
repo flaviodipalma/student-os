@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { ensureProfile, getProfile } from "@/server/services/profiles"
 import { AUTH_INTENT_COOKIE, type AuthIntent } from "@/server/social-auth"
+import { logger } from "@/server/log"
 
 // Where Supabase sends the student back after:
 //   - Google / Microsoft / Apple sign-in (or sign-up),
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     userId = data.user.id
     firstName = firstNameFrom(data.user.user_metadata)
   } catch (error) {
-    console.error("[auth] callback failed", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "callback failed", { name: error instanceof Error ? error.name : typeof error })
     return fail("unavailable")
   }
 
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
     const profile = await getProfile(db, userId)
     if (!profile.onboardingCompleted) return to("/onboarding")
   } catch (error) {
-    console.error("[auth] couldn't prepare the profile", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "couldn't prepare the profile", { name: error instanceof Error ? error.name : typeof error })
     // Signed in anyway; the app shows its own database message.
   }
   return to(intent.next ?? "/dashboard")

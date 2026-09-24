@@ -1,3 +1,5 @@
+import { logger } from "@/server/log"
+
 // Errors the server can report to a student, and the safe message for each.
 // Database errors, SQL and stack traces are logged on the server only.
 
@@ -70,6 +72,6 @@ export function toAppError(error: unknown): AppError {
     return new ValidationError("Some of the details aren't valid. Please check them and try again.")
   }
   // Connection problems, timeouts and anything unexpected.
-  console.error("[db] unexpected error", { code: code ?? (error instanceof Error ? error.name : typeof error) })
+  logger.error("db", "unexpected error", { code: code ?? (error instanceof Error ? error.name : typeof error) })
   return new DatabaseUnavailableError()
 }

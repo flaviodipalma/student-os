@@ -11,6 +11,7 @@ import { eventSourceNames, type ExternalCalendarSource } from "@/lib/types"
 import { externalCalendarEvents } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { tryLock } from "../lms/sync"
+import { logger } from "@/server/log"
 
 // The calendar sync service: saves one provider's normalized events for one
 // student (from any ExternalCalendarProvider: today the Canvas and Blackboard
@@ -96,7 +97,7 @@ export async function syncExternalCalendar(
         else result.removed++
       } catch (error) {
         // Only the error's type is logged: event data stays out of the logs.
-        console.error(`[calendar:${source}] couldn't save an event`, { name: error instanceof Error ? error.name : typeof error })
+        logger.error(`calendar:${source}`, `couldn't save an event`, { name: error instanceof Error ? error.name : typeof error })
         result.failed++
       }
     }
@@ -122,7 +123,7 @@ export async function addCalendarToSync(
       calendar.failed > 0 ? [...result.errors, `${calendar.failed} ${eventSourceNames[source]} calendar event(s) couldn't be saved.`] : result.errors
     return { ...result, calendarEvents: calendar, errors }
   } catch (error) {
-    console.error(`[calendar:${source}] calendar sync failed`, { name: error instanceof Error ? error.name : typeof error })
+    logger.error(`calendar:${source}`, `calendar sync failed`, { name: error instanceof Error ? error.name : typeof error })
     return { ...result, errors: [...result.errors, `${eventSourceNames[source]} calendar events couldn't be updated this time. Please try again.`] }
   }
 }

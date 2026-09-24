@@ -15,6 +15,7 @@ import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
 import { getLmsIntegrationStatus, type LmsIntegrationStatus } from "@/server/integrations/lms/connections"
 import { enabledSocialProviders, getAccountDetails } from "@/server/social-auth"
 import { getStudentTimeZone } from "@/server/student-clock"
+import { logger } from "@/server/log"
 
 const section = getNavItem("/settings")
 
@@ -38,7 +39,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   try {
     integrations = await getLmsIntegrationStatus(getDb(), user.id)
   } catch (error) {
-    console.error("[settings] couldn't load integrations", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("settings", "couldn't load integrations", { name: error instanceof Error ? error.name : typeof error })
   }
   let calendars: CalendarIntegrationStatus[] | null = null
   try {
@@ -50,7 +51,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     }
     calendars = await getCalendarIntegrationStatus(getDb(), user.id, vaultReady)
   } catch (error) {
-    console.error("[settings] couldn't load calendar connections", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("settings", "couldn't load calendar connections", { name: error instanceof Error ? error.name : typeof error })
   }
 
   // Where an LMS sign-in sent the student back to (?canvas=connected, ?blackboard=denied):

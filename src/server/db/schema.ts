@@ -459,6 +459,10 @@ export const notifications = pgTable(
   (t) => [
     unique("notifications_user_dedupe_key").on(t.userId, t.dedupeKey),
     index("notifications_user_scheduled_idx").on(t.userId, t.scheduledFor),
+    // Deleting a task or study session removes its reminders (foreign keys): these
+    // keep that from scanning every reminder.
+    index("notifications_related_task_idx").on(t.relatedTaskId),
+    index("notifications_related_session_idx").on(t.relatedStudySessionId),
     // The related task must be the same student's.
     foreignKey({
       name: "notifications_task_owner_fk",

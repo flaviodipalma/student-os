@@ -10,6 +10,7 @@ import { createCalendarAccess, saveCalendarConnection } from "./connections"
 import { CalendarProviderError } from "./provider"
 import { getCalendarProvider } from "./registry"
 import { syncCalendarConnection } from "./sync-connection"
+import { logger } from "@/server/log"
 
 // GET /api/integrations/<google|outlook>-calendar/callback: where Google or
 // Microsoft sends the student back after they approve (or cancel) calendar
@@ -62,7 +63,7 @@ export async function handleCalendarCallback(request: NextRequest, providerId: C
     // Proves the stored tokens decrypt for this student.
     await createCalendarAccess(db, user.id, provider, vault)
   } catch (error) {
-    console.error(`[calendar:${provider.id}] connecting failed`, { name: error instanceof Error ? error.name : typeof error })
+    logger.error(`calendar:${provider.id}`, `connecting failed`, { name: error instanceof Error ? error.name : typeof error })
     if (error instanceof CalendarProviderError && error.kind === "permission") return backToSettings("permission")
     if (error instanceof CalendarProviderError && error.kind === "not-configured") return backToSettings("not_configured")
     return backToSettings("error")

@@ -9,6 +9,7 @@ import { getCredentialVault } from "./credential-vault"
 import { oauthCookiePath, oauthStateCookieName, verifyOAuthState } from "./oauth-state"
 import { LmsNotApprovedError } from "./provider"
 import { getLmsProvider } from "./registry"
+import { logger } from "@/server/log"
 
 // GET /api/integrations/<provider>/callback: where the LMS sends the student
 // back after they approve (or cancel) the connection. The same for every LMS:
@@ -59,7 +60,7 @@ export async function handleLmsCallback(request: NextRequest, provider: LmsProvi
     await saveLmsConnection(getDb(), user.id, provider, { ...tokens, baseUrl: verified.baseUrl }, vault)
   } catch (error) {
     // Only the error's type is logged: provider errors can contain tokens.
-    console.error(`[${provider}] connecting failed`, { name: error instanceof Error ? error.name : typeof error })
+    logger.error(`${provider}`, `connecting failed`, { name: error instanceof Error ? error.name : typeof error })
     return backToSettings(error instanceof LmsNotApprovedError ? "not_approved" : "error")
   }
   return backToSettings("connected")

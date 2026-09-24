@@ -1,0 +1,2 @@
+CREATE INDEX "notifications_related_task_idx" ON "notifications" USING btree ("related_task_id");--> statement-breakpoint
+CREATE INDEX "notifications_related_session_idx" ON "notifications" USING btree ("related_study_session_id");

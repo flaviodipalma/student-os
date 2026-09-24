@@ -15,6 +15,7 @@ import { createToolContext, timeLabel, untrusted, type ToolContext } from "./con
 import { ASSISTANT_SYSTEM_PROMPT, turnContext } from "./prompt"
 import { readTools } from "./read-tools"
 import type { AssistantTool } from "./tool"
+import { logger } from "@/server/log"
 
 // The Assistant service: one student's message in, a reply (and maybe a change
 // to confirm) out.
@@ -66,7 +67,7 @@ export function runTool(ctx: ToolContext, state: TurnState, name: string, input:
     if (output.focusTaskId) state.focusTaskId = output.focusTaskId
     return asJson(output.result)
   } catch (error) {
-    console.error("[assistant] tool failed", { tool: name, type: error instanceof Error ? error.name : typeof error })
+    logger.error("assistant", "tool failed", { tool: name, type: error instanceof Error ? error.name : typeof error })
     return asJson({ error: "tool_failed", problem: "That lookup failed. Tell the student you couldn't get that information right now." }, true)
   }
 }
@@ -124,8 +125,8 @@ export async function askAssistant(
     })
   } catch (error) {
     const kind = error instanceof AssistantAIError ? error.kind : "failed"
-    if (!(error instanceof AssistantAIError)) console.error("[assistant] unexpected error", { type: error instanceof Error ? error.name : typeof error })
-    console.warn("[assistant] request failed", { kind })
+    if (!(error instanceof AssistantAIError)) logger.error("assistant", "unexpected error", { type: error instanceof Error ? error.name : typeof error })
+    logger.warn("assistant", "request failed", { kind })
     throw new AppError("unavailable", ASSISTANT_ERROR_MESSAGE)
   }
   return { message, ...(state.pending ? { pending: state.pending } : {}), ...(state.focusTaskId ?? focusTaskId ? { focusTaskId: state.focusTaskId ?? focusTaskId } : {}) }

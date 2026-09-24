@@ -3,6 +3,7 @@ import "server-only"
 import Anthropic from "@anthropic-ai/sdk"
 import { modelSettings } from "@/lib/ai/model-settings"
 import { AssistantAIError, type AssistantAIRequest, type StudentAssistantAIService } from "./ai-service"
+import { logger } from "@/server/log"
 
 // Claude implementation of StudentAssistantAIService: a tool-use loop. Claude
 // asks for tools, the Assistant service runs them for the signed-in student,
@@ -53,7 +54,7 @@ export class AnthropicAssistantService implements StudentAssistantAIService {
       }
 
       if (response.stop_reason === "refusal") {
-        console.warn("[assistant-ai] request declined")
+        logger.warn("assistant-ai", "request declined")
         throw new AssistantAIError("refused")
       }
       if (response.stop_reason !== "tool_use") {
@@ -82,15 +83,15 @@ function toAssistantError(error: unknown): AssistantAIError {
   if (error instanceof Anthropic.APIConnectionTimeoutError) return new AssistantAIError("timeout", { cause: error })
   if (error instanceof Anthropic.APIConnectionError) return new AssistantAIError("unavailable", { cause: error })
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-    console.error("[assistant-ai] authentication failed: check ANTHROPIC_API_KEY", { status: error.status })
+    logger.error("assistant-ai", "authentication failed: check ANTHROPIC_API_KEY", { status: error.status })
     return new AssistantAIError("not-configured", { cause: error })
   }
   if (error instanceof Anthropic.RateLimitError) return new AssistantAIError("busy", { cause: error })
   if (error instanceof Anthropic.APIError) {
-    console.error("[assistant-ai] API error", { status: error.status, type: error.name })
+    logger.error("assistant-ai", "API error", { status: error.status, type: error.name })
     return new AssistantAIError(error.status === 529 ? "busy" : "failed", { cause: error })
   }
   const hasKey = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
-  console.error(hasKey ? "[assistant-ai] request failed before reaching the API" : "[assistant-ai] no credentials: set ANTHROPIC_API_KEY")
+  logger.error("assistant-ai", hasKey ? "request failed before reaching the API" : "no credentials: set ANTHROPIC_API_KEY")
   return new AssistantAIError(hasKey ? "failed" : "not-configured", { cause: error })
 }

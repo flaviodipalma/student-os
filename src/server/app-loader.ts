@@ -8,6 +8,7 @@ import { loadAppData, type AppData } from "./services/app-data"
 import { getThemePreference } from "./services/preferences"
 import { ensureProfile } from "./services/profiles"
 import { getStudentClock, getStudentTimeZone } from "./student-clock"
+import { logger } from "@/server/log"
 
 // wallClock: "now" in the student's time zone, for the shared clock.
 // timeZone: the student's IANA zone (undefined until their browser reports it),
@@ -27,7 +28,7 @@ export async function loadSignedInApp(): Promise<SignedInApp | null> {
     const [data, theme] = await Promise.all([loadAppData(db, user.id), getThemePreference(db, user.id)])
     return { user, wallClock, timeZone, theme, data }
   } catch (error) {
-    console.error("[app] couldn't load user data", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("app", "couldn't load user data", { name: error instanceof Error ? error.name : typeof error })
     return null
   }
 }

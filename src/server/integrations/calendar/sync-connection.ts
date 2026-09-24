@@ -6,6 +6,7 @@ import type { CredentialVault } from "../lms/credential-vault"
 import { syncExternalCalendar, type CalendarSyncResult } from "./calendar-sync"
 import { createCalendarAccess, recordCalendarSync } from "./connections"
 import { CalendarProviderError, type CalendarProvider } from "./provider"
+import { logger } from "@/server/log"
 
 // "Sync now" for a personal calendar:
 //   1. valid tokens (refreshed if needed; a revoked grant -> "needs attention")
@@ -34,7 +35,7 @@ export async function syncCalendarConnection(
   } catch (error) {
     const safe = error instanceof CalendarProviderError ? error : new CalendarProviderError("failed", provider.name)
     // Only the error's type is logged: provider responses can contain tokens.
-    console.error(`[calendar:${provider.id}] sync failed`, { kind: safe.kind, name: error instanceof Error ? error.name : typeof error })
+    logger.error(`calendar:${provider.id}`, `sync failed`, { kind: safe.kind, name: error instanceof Error ? error.name : typeof error })
     await recordCalendarSync(db, userId, provider.id, { ok: false, error: safe }).catch(() => {})
     throw safe
   }

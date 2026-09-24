@@ -6,6 +6,7 @@ import { SyllabusImportError } from "@/lib/syllabus/errors"
 import { processSyllabus } from "@/lib/syllabus/importer"
 import { MAX_FILE_BYTES } from "@/lib/syllabus/pdf"
 import type { ExtractMessage } from "@/lib/syllabus/protocol"
+import { logger } from "@/server/log"
 
 // POST /api/syllabus/extract (multipart form: "file" = the PDF, "today" = YYYY-MM-DD)
 //
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
         const importError =
           error instanceof SyllabusImportError ? error : new SyllabusImportError("ai-failed", { cause: error })
         // Log the error kind only, never the syllabus contents.
-        console.warn("[syllabus-import] failed", { code: importError.code, bytes: bytes.length })
+        logger.warn("syllabus-import", "failed", { code: importError.code, bytes: bytes.length })
         send({ type: "error", code: importError.code, message: importError.userMessage })
       } finally {
         controller.close()

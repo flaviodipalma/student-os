@@ -9,6 +9,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { ensureProfile } from "@/server/services/profiles"
 import { authCallbackUrl, enabledSocialProviders, rememberAuthIntent } from "@/server/social-auth"
+import { logger } from "@/server/log"
 
 // Sign up, log in and log out with Supabase Auth: email + password, or Google /
 // Microsoft / Apple (OAuth / OpenID Connect, run by Supabase). Every method
@@ -71,7 +72,7 @@ export async function signUpAction(_previous: AuthFormState, formData: FormData)
     if (data.user) await ensureProfile(getDb(), data.user.id, firstName)
     needsConfirmation = !data.session
   } catch (error) {
-    console.error("[auth] sign-up failed", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "sign-up failed", { name: error instanceof Error ? error.name : typeof error })
     return { error: "We couldn't create your account right now. Please try again." }
   }
 
@@ -96,7 +97,7 @@ export async function logInAction(_previous: AuthFormState, formData: FormData):
     const firstName = data.user.user_metadata?.first_name
     await ensureProfile(getDb(), data.user.id, typeof firstName === "string" ? firstName : "")
   } catch (error) {
-    console.error("[auth] log-in failed", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "log-in failed", { name: error instanceof Error ? error.name : typeof error })
     return { error: "We couldn't log you in right now. Please try again." }
   }
   redirect(safeNext(formData.get("next")))
@@ -107,7 +108,7 @@ export async function logOutAction(): Promise<void> {
     const supabase = await createSupabaseServerClient()
     await supabase.auth.signOut()
   } catch (error) {
-    console.error("[auth] log-out failed", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "log-out failed", { name: error instanceof Error ? error.name : typeof error })
   }
   redirect("/login")
 }
@@ -133,7 +134,7 @@ export async function continueWithProviderAction(_previous: AuthFormState, formD
     url = data.url
     await rememberAuthIntent({ kind: "sign-in", next: safeNextPath(formData.get("next")) ?? undefined })
   } catch (error) {
-    console.error("[auth] social sign-in failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "social sign-in failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
     return { error: authErrorMessages.unavailable }
   }
   redirect(url)
@@ -162,7 +163,7 @@ export async function linkLoginMethodAction(_previous: AuthFormState, formData: 
     url = data.url
     await rememberAuthIntent({ kind: "link", provider })
   } catch (error) {
-    console.error("[auth] linking failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "linking failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
     return { error: authErrorMessages.unavailable }
   }
   redirect(url)
@@ -185,7 +186,7 @@ export async function unlinkLoginMethodAction(identityId: unknown): Promise<Acti
     if (result.error) return { ok: false, code: "database", error: "We couldn't remove that login method. Please try again." }
     return { ok: true, data: null }
   } catch (error) {
-    console.error("[auth] unlink failed", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "unlink failed", { name: error instanceof Error ? error.name : typeof error })
     return { ok: false, code: "database", error: "We couldn't remove that login method. Please try again." }
   }
 }

@@ -3,6 +3,7 @@ import "server-only"
 import { AnthropicSyllabusService } from "./anthropic-syllabus-service"
 import { MockSyllabusService } from "./mock-syllabus-service"
 import type { SyllabusAIService } from "./syllabus-ai-service"
+import { logger } from "@/server/log"
 
 export type { SyllabusAIService, SyllabusAIContext } from "./syllabus-ai-service"
 
@@ -12,7 +13,7 @@ export type { SyllabusAIService, SyllabusAIContext } from "./syllabus-ai-service
 export function getSyllabusAIService(): SyllabusAIService {
   const provider = process.env.SYLLABUS_AI_PROVIDER ?? "anthropic"
   if (provider === "mock") {
-    console.warn("[syllabus-ai] using the MOCK provider (SYLLABUS_AI_PROVIDER=mock); not real AI")
+    logger.warn("syllabus-ai", "using the MOCK provider (SYLLABUS_AI_PROVIDER=mock); not real AI")
     return new MockSyllabusService()
   }
   return new AnthropicSyllabusService()

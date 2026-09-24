@@ -11,6 +11,8 @@ import { supabaseEnv } from "@/lib/supabase/env"
 const PUBLIC_PATHS = ["/login", "/signup", "/auth"]
 
 export async function proxy(request: NextRequest) {
+  // Health checks answer on their own (no session, no Supabase call).
+  if (request.nextUrl.pathname.startsWith("/api/health")) return NextResponse.next()
   const env = supabaseEnv()
   if (!env) return NextResponse.next({ request })
 

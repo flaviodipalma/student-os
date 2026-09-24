@@ -32,7 +32,8 @@ with sample data. Real accounts always start empty.
 ## Database changes
 
 Edit `src/server/db/schema.ts`, then `npm run db:generate` (writes a migration to `./drizzle`)
-and `npm run db:migrate` (applies it).
+and `npm run db:migrate` (applies it). The full workflow, including production, is in
+[docs/deployment.md](docs/deployment.md#migrations).
 
 ## Checks
 
@@ -41,4 +42,8 @@ npx tsc --noEmit   # types
 npm run lint       # lint
 npm test           # unit + database tests (Vitest, in-process Postgres; no setup needed)
 npm run build      # production build
+npm run check:env  # environment variables (APP_ENV=production for deployment rules)
+npm start          # run the production build locally (after npm run build)
 ```
+
+Deploying: [docs/deployment.md](docs/deployment.md). Security: [docs/security.md](docs/security.md).

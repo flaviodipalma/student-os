@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers"
 import { loginMethodOf, socialProviderIds, socialProviders, type SocialProviderId } from "@/lib/auth-providers"
 import { supabaseEnv } from "@/lib/supabase/env"
 import { createSupabaseServerClient } from "./auth"
+import { logger } from "@/server/log"
 
 // Server helpers for Google / Microsoft / Apple sign-in through Supabase Auth.
 // The providers' client ids and secrets live in the Supabase project
@@ -29,7 +30,7 @@ export async function enabledSocialProviders(): Promise<SocialProviderId[]> {
     cached = { at: Date.now(), enabled }
     return enabled
   } catch (error) {
-    console.warn("[auth] couldn't read the enabled sign-in methods", { name: error instanceof Error ? error.name : typeof error })
+    logger.warn("auth", "couldn't read the enabled sign-in methods", { name: error instanceof Error ? error.name : typeof error })
     return []
   }
 }
@@ -93,7 +94,7 @@ export async function getAccountDetails(): Promise<AccountDetails | null> {
     })
     return { email: data.user.email ?? null, createdAt: data.user.created_at ?? null, loginMethods }
   } catch (error) {
-    console.error("[auth] couldn't load account details", { name: error instanceof Error ? error.name : typeof error })
+    logger.error("auth", "couldn't load account details", { name: error instanceof Error ? error.name : typeof error })
     return null
   }
 }
