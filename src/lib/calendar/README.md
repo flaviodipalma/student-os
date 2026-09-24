@@ -10,9 +10,14 @@ calendar items** (`scheduleBetween` in the app store). Each item has a **source*
 | Student OS | study sessions | `study_sessions` | yes (Planner) |
 | Canvas | Canvas calendar events | `external_calendar_events` (`source = canvas`) | no (read-only) |
 | Blackboard | Blackboard calendar events | `external_calendar_events` (`source = blackboard`) | no (read-only) |
+| Google Calendar | the student's Google calendars | `external_calendar_events` (`source = google`) | no (read-only) |
+| Outlook | the student's Outlook calendar | `external_calendar_events` (`source = outlook`) | no (read-only) |
 
-`CalendarEvent.source` is unset for Student OS items and `"canvas"` / `"blackboard"`
-for external ones (`EventSource` in `src/lib/types.ts`). Events, tasks and study
+Google Calendar and Outlook are connected with OAuth in Settings > Integrations >
+Calendars (separate from login); see `docs/calendar-integrations.md`.
+
+`CalendarEvent.source` is unset for Student OS items and `"canvas"` / `"blackboard"` /
+`"google"` / `"outlook"` for external ones (`EventSource` in `src/lib/types.ts`). Events, tasks and study
 sessions stay distinct: a **task** is something to get done (Canvas assignments and
 Blackboard gradable items become tasks, as before); an **event** occupies time (the
 calendar events below); a **study session** is time set aside for a task.
@@ -82,8 +87,8 @@ Nothing is ever sent to Canvas or Blackboard.
 **Hide from Student OS** sets `hidden` on the student's own copy: the event leaves
 the Calendar, the Dashboard and the Planner's busy time, and stays hidden through
 later syncs even if the event changes. The Calendar's "N hidden" button lists hidden
-events with **Restore**. Filters (All / Student OS / Canvas / Blackboard; default
-All) appear once an external calendar is connected.
+events with **Restore**. Filters (All / Student OS / Canvas / Blackboard / Google Calendar /
+Outlook; default All) appear once an external calendar is connected.
 
 ## Time zones
 

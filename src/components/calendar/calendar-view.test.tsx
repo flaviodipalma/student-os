@@ -48,7 +48,7 @@ vi.mock("@/lib/use-media-query", () => ({ useMediaQuery: () => false }))
 
 const { CalendarView } = await import("./calendar-view")
 
-const external = (id: string, source: "canvas" | "blackboard", title: string, startsAt: string, endsAt: string, extra: Partial<ExternalEventRecord> = {}): ExternalEventRecord => ({
+const external = (id: string, source: ExternalEventRecord["source"], title: string, startsAt: string, endsAt: string, extra: Partial<ExternalEventRecord> = {}): ExternalEventRecord => ({
   id,
   source,
   title,
@@ -148,6 +148,37 @@ describe("Calendar with external events", () => {
     expect(block(/^Soccer Practice/)).toBeTruthy()
     expect(block(/^CSC215 Exam/)).toBeTruthy()
     expect(screen.queryByRole("button", { name: /^Psychology Exam/ })).toBeNull() // Wednesday
+  })
+
+  it("Google Calendar and Outlook join the same calendar: labelled, filterable, read-only with their own link", async () => {
+    state.externalEvents.push(
+      external("g1", "google", "Dentist", "2026-09-29T20:00:00Z", "2026-09-29T21:00:00Z", { url: "https://www.google.com/calendar/event?eid=abc" }),
+      external("o1", "outlook", "Team Meeting", "2026-09-29T21:30:00Z", "2026-09-29T22:15:00Z", { url: "https://outlook.office365.com/owa/?itemid=1" })
+    )
+    render(<CalendarView />)
+    expect(block(/^Dentist, 4:00 PM – 5:00 PM, from Google Calendar/)).toBeTruthy()
+    expect(block(/^Team Meeting, 5:30 PM – 6:15 PM, from Outlook/)).toBeTruthy()
+    const user = userEvent.setup()
+    const filters = screen.getByRole("group", { name: "Show events from" })
+    expect(within(filters).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "All",
+      "Student OS",
+      "Canvas",
+      "Blackboard",
+      "Google Calendar",
+      "Outlook",
+    ])
+    await user.click(within(filters).getByRole("button", { name: "Google Calendar" }))
+    expect(block(/^Dentist/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /^Team Meeting/ })).toBeNull()
+    expect(screen.queryByRole("button", { name: /^CSC215 Exam/ })).toBeNull()
+
+    await user.click(within(filters).getByRole("button", { name: "Outlook" }))
+    await user.click(block(/^Team Meeting/))
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText(/can only be changed in Outlook/)).toBeTruthy()
+    expect(within(dialog).getByRole("link", { name: /Open in Outlook/ }).getAttribute("href")).toBe("https://outlook.office365.com/owa/?itemid=1")
+    expect(within(dialog).queryByRole("textbox")).toBeNull()
   })
 
   it("without external calendars, no filters are shown", () => {

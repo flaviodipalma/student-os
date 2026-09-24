@@ -64,6 +64,13 @@
       "when": 1790202545770,
       "tag": "0008_study_session_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790214720937,
+      "tag": "0009_calendar_connections",
+      "breakpoints": true
     }
   ]
 }

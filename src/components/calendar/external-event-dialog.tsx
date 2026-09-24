@@ -8,7 +8,7 @@ import { eventSourceNames, type ExternalEventRecord } from "@/lib/types"
 
 // External calendar events (Canvas, Blackboard) are read-only in Student OS:
 // this shows their details, links to the original, and lets the student hide
-// them locally. Nothing here changes the event in Canvas or Blackboard.
+// them locally. Nothing here changes the event in its own calendar (Canvas, Blackboard, Google, Outlook).
 
 // Only plain https links are rendered as links (they were checked against the
 // student's own LMS address when synced; this is a second check).
@@ -67,8 +67,8 @@ export function ExternalEventDialog({
           )}
           {record.description && <p className="whitespace-pre-line text-muted-foreground">{record.description}</p>}
           <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-            This event comes from your {source} calendar, so it can only be changed in {source}. Student OS updates it
-            each time you sync.
+            This event comes from {source}, so it can only be changed in {source}. Student OS updates it each time
+            you sync.
           </p>
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
@@ -105,7 +105,7 @@ export function HiddenEventsDialog({ open, onOpenChange }: { open: boolean; onOp
         <DialogHeader>
           <DialogTitle>Hidden events</DialogTitle>
           <DialogDescription>
-            Calendar events you hid from Student OS. They&apos;re still in Canvas or Blackboard, and they don&apos;t block
+            Calendar events you hid from Student OS. They&apos;re still in their own calendar, and they don&apos;t block
             study time while hidden.
           </DialogDescription>
         </DialogHeader>

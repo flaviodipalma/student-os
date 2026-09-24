@@ -48,6 +48,9 @@ export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
 // How Student OS reads the LMS: OAuth + API, or the student's private calendar feed link.
+// Where an external calendar event comes from: an LMS calendar feed or a personal calendar.
+export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook"])
+export const calendarProvider = pgEnum("calendar_provider", ["google", "outlook"])
 export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed"])
 export const notificationType = pgEnum("notification_type", [
   "task_due_soon",
@@ -356,7 +359,39 @@ export const lmsConnections = pgTable(
   (t) => [unique("lms_connections_user_provider_key").on(t.userId, t.provider)]
 ).enableRLS()
 
-// Events copied from a student's external calendar (Canvas, Blackboard). Read-only
+// A student's connection to a personal calendar (Google Calendar, Outlook), one
+// per provider. Separate from login: signing in with Google or Microsoft never
+// creates one; the student connects a calendar in Settings > Integrations.
+// Tokens are ENCRYPTED with the same credential vault as LMS tokens and never
+// leave the server. Disconnecting deletes the row (and its tokens); the
+// calendar's events are marked removed.
+export const calendarConnections = pgTable(
+  "calendar_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    provider: calendarProvider("provider").notNull(),
+    // The calendar account's own id and address (shown as "Connected as ...").
+    externalAccountId: text("external_account_id"),
+    accountEmail: text("account_email"),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    // The permissions the student granted (space-separated), e.g. read-only calendar.
+    scopes: text("scopes"),
+    status: lmsConnectionStatus("status").notNull().default("connected"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    // A safe, student-facing message about the last failed sync (never provider internals).
+    lastSyncError: text("last_sync_error"),
+    ...timestamps,
+  },
+  (t) => [unique("calendar_connections_user_provider_key").on(t.userId, t.provider)]
+).enableRLS()
+
+// Events copied from a student's external calendar (Canvas, Blackboard, Google
+// Calendar, Outlook). Read-only
 // copies: Student OS never changes the original. One row per (student, source,
 // external id), so re-syncing never duplicates, and Canvas "123" and Blackboard
 // "123" are different rows. Times are real instants (timestamptz); they're shown
@@ -368,7 +403,7 @@ export const externalCalendarEvents = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    source: lmsProvider("source").notNull(),
+    source: externalCalendarSource("source").notNull(),
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
     description: text("description"),

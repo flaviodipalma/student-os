@@ -2,6 +2,10 @@ import "server-only"
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import type { LmsProviderId } from "@/lib/types"
+
+// Every OAuth connection flow: the LMSs and the personal calendars (the id is
+// also the callback folder: /api/integrations/<id>/callback).
+export type OAuthFlowId = LmsProviderId | "google-calendar" | "outlook-calendar"
 import type { CredentialVault } from "./credential-vault"
 
 // OAuth `state` (CSRF protection for the sign-in callback).
@@ -18,16 +22,16 @@ import type { CredentialVault } from "./credential-vault"
 
 export const OAUTH_STATE_MAX_AGE_SECONDS = 600
 
-export const oauthStateCookieName = (provider: LmsProviderId) => `lms_oauth_${provider}`
+export const oauthStateCookieName = (provider: OAuthFlowId) => `lms_oauth_${provider}`
 // The cookie is only sent to the provider's callback route.
-export const oauthCookiePath = (provider: LmsProviderId) => `/api/integrations/${provider}`
+export const oauthCookiePath = (provider: OAuthFlowId) => `/api/integrations/${provider}`
 
 type Payload = { state: string; userId: string; baseUrl: string; issuedAt: number; codeVerifier: string }
 
-const context = (provider: LmsProviderId) => `oauth-state:${provider}`
+const context = (provider: OAuthFlowId) => `oauth-state:${provider}`
 
 export function createOAuthState(
-  input: { provider: LmsProviderId; userId: string; baseUrl: string },
+  input: { provider: OAuthFlowId; userId: string; baseUrl: string },
   vault: CredentialVault,
   now = new Date()
 ): { state: string; codeVerifier: string; cookieValue: string } {
@@ -45,7 +49,7 @@ export function pkceChallenge(codeVerifier: string): string {
 
 // The LMS address (and PKCE verifier) the flow was started with, or null if anything doesn't match.
 export function verifyOAuthState(
-  input: { provider: LmsProviderId; userId: string; state: string | null; cookieValue: string | undefined },
+  input: { provider: OAuthFlowId; userId: string; state: string | null; cookieValue: string | undefined },
   vault: CredentialVault,
   now = new Date()
 ): { baseUrl: string; codeVerifier: string } | null {

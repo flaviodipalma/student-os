@@ -7,7 +7,7 @@ import {
   type StoredExternalEvent,
 } from "@/lib/calendar/external-events"
 import type { LmsSyncResult } from "@/lib/lms/types"
-import { lmsProviderNames, type ExternalCalendarSource } from "@/lib/types"
+import { eventSourceNames, type ExternalCalendarSource } from "@/lib/types"
 import { externalCalendarEvents } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { tryLock } from "../lms/sync"
@@ -119,10 +119,10 @@ export async function addCalendarToSync(
   try {
     const calendar = await syncExternalCalendar(db, userId, source, parsed.events, { now, skipped: parsed.skipped })
     const errors =
-      calendar.failed > 0 ? [...result.errors, `${calendar.failed} ${lmsProviderNames[source]} calendar event(s) couldn't be saved.`] : result.errors
+      calendar.failed > 0 ? [...result.errors, `${calendar.failed} ${eventSourceNames[source]} calendar event(s) couldn't be saved.`] : result.errors
     return { ...result, calendarEvents: calendar, errors }
   } catch (error) {
     console.error(`[calendar:${source}] calendar sync failed`, { name: error instanceof Error ? error.name : typeof error })
-    return { ...result, errors: [...result.errors, `${lmsProviderNames[source]} calendar events couldn't be updated this time. Please try again.`] }
+    return { ...result, errors: [...result.errors, `${eventSourceNames[source]} calendar events couldn't be updated this time. Please try again.`] }
   }
 }

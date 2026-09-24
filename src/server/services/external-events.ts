@@ -70,3 +70,14 @@ export async function removeExternalEventsFrom(
       )
     )
 }
+
+// Disconnecting a personal calendar (Google Calendar, Outlook): its copied events
+// are deleted, since they can be private appointments. Connecting again downloads
+// them again. Only this source's rows, only this student's.
+export async function deleteExternalEventsFrom(db: Database, userId: string, source: ExternalCalendarSource): Promise<number> {
+  const deleted = await db
+    .delete(externalCalendarEvents)
+    .where(and(eq(externalCalendarEvents.userId, userId), eq(externalCalendarEvents.source, source)))
+    .returning({ id: externalCalendarEvents.id })
+  return deleted.length
+}

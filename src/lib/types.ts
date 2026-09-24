@@ -86,10 +86,17 @@ export type EventType = NativeEventType | "other"
 // Where a calendar item comes from. Student OS items (events, weekly commitments,
 // study sessions) are the student's own; the others are read-only copies from an
 // external calendar.
-export type ExternalCalendarSource = LmsProviderId
+// Personal calendars a student can connect (Settings > Integrations > Calendars).
+// Separate from signing in: logging in with Google never connects Google Calendar.
+export const calendarProviderIds = ["google", "outlook"] as const
+export type CalendarProviderId = (typeof calendarProviderIds)[number]
+export const calendarProviderNames: Record<CalendarProviderId, string> = { google: "Google Calendar", outlook: "Outlook" }
+
+export const externalCalendarSources = [...lmsProviderIds, ...calendarProviderIds] as const
+export type ExternalCalendarSource = (typeof externalCalendarSources)[number]
 export type EventSource = "student_os" | ExternalCalendarSource
 
-export const eventSourceNames: Record<EventSource, string> = { student_os: "Student OS", ...lmsProviderNames }
+export const eventSourceNames: Record<EventSource, string> = { student_os: "Student OS", ...lmsProviderNames, ...calendarProviderNames }
 
 export type CalendarEvent = {
   id: string

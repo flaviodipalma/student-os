@@ -2,7 +2,7 @@ import { fromMinutes, toMinutes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
 import { completedMinutesFor, createPlanner, dayAvailability, type Planner } from "@/lib/planner"
 import { plannerInputFor } from "@/lib/planner-input"
-import { lmsProviderNames, type CalendarEvent, type Task } from "@/lib/types"
+import { eventSourceNames, type CalendarEvent, type Task } from "@/lib/types"
 import type { AppData } from "../services/app-data"
 
 // What every Assistant tool works from: the signed-in student's data (loaded on
@@ -69,7 +69,7 @@ export const clampTime = (minutes: number) => fromMinutes(Math.max(0, Math.min(m
 export const lengthOf = (item: { startTime: string; endTime: string }) => toMinutes(item.endTime) - toMinutes(item.startTime)
 
 export function sourceName(item: Pick<CalendarEvent, "source">): string {
-  return item.source && item.source !== "student_os" ? lmsProviderNames[item.source] : "Student OS"
+  return item.source && item.source !== "student_os" ? eventSourceNames[item.source] : "Student OS"
 }
 
 export function courseCodeOf(ctx: ToolContext, courseId: string | undefined): string | null {

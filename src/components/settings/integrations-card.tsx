@@ -31,7 +31,9 @@ import { useAppStore } from "@/lib/app-store"
 import type { LmsSyncResult } from "@/lib/lms/types"
 import type { LmsProviderId } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import type { CalendarIntegrationStatus } from "@/server/integrations/calendar/connections"
 import type { LmsIntegrationStatus } from "@/server/integrations/lms/connections"
+import { CalendarConnections, type CalendarOutcomes } from "./calendar-connections"
 
 // Settings > Integrations. Only safe connection summaries reach this component
 // (no tokens). Connecting, syncing and disconnecting go through server actions.
@@ -58,10 +60,15 @@ export function IntegrationsCard({
   integrations,
   outcomes,
   timeZone,
+  calendars,
+  calendarOutcomes = {},
 }: {
   integrations: LmsIntegrationStatus[] | null
   outcomes: IntegrationOutcomes
   timeZone: string | undefined
+  // Personal calendars (Google Calendar, Outlook).
+  calendars?: CalendarIntegrationStatus[] | null
+  calendarOutcomes?: CalendarOutcomes
 }) {
   const notices = (integrations ?? []).flatMap((integration) => {
     const outcome = outcomes[integration.provider]
@@ -74,11 +81,21 @@ export function IntegrationsCard({
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Integrations</CardTitle>
         <CardDescription>
-          Learning management systems. Your courses and assignments come into Student OS as normal courses and tasks,
-          and your Planner uses them.
+          Connected calendars and learning management systems. Everything shows up in one Student OS calendar, and your
+          Planner works around it.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {calendars !== undefined && (
+          <>
+            <h3 className="text-sm font-semibold">Calendars</h3>
+            <CalendarConnections calendars={calendars} outcomes={calendarOutcomes} timeZone={timeZone} />
+            <h3 className="pt-3 text-sm font-semibold">Learning management systems</h3>
+            <p className="-mt-2 text-sm text-muted-foreground">
+              Your courses and assignments come into Student OS as normal courses and tasks.
+            </p>
+          </>
+        )}
         {notices.map((notice) => (
           <Notice key={notice.provider} tone={notice.tone}>
             {notice.text}
@@ -110,7 +127,7 @@ export function IntegrationsCard({
   )
 }
 
-function Notice({ tone, children }: { tone: "success" | "error" | "info"; children: React.ReactNode }) {
+export function Notice({ tone, children }: { tone: "success" | "error" | "info"; children: React.ReactNode }) {
   const Icon = tone === "success" ? CircleCheckIcon : tone === "error" ? AlertTriangleIcon : InfoIcon
   return (
     <p
@@ -128,7 +145,7 @@ function Notice({ tone, children }: { tone: "success" | "error" | "info"; childr
   )
 }
 
-function Logo({ name }: { name: string }) {
+export function Logo({ name }: { name: string }) {
   return (
     <span
       aria-hidden

@@ -9,7 +9,7 @@ import { useMediaQuery } from "@/lib/use-media-query"
 import { useEvents } from "@/lib/event-store"
 import { eventTypeLabel, eventTypes } from "@/lib/events"
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
-import { eventSourceNames, lmsProviderIds, type CalendarEvent, type EventSource } from "@/lib/types"
+import { eventSourceNames, externalCalendarSources, type CalendarEvent, type EventSource } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EventFormDialog, type EventDraft } from "./event-form-dialog"
 import { ExternalEventDialog, HiddenEventsDialog } from "./external-event-dialog"
@@ -56,14 +56,14 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarEvent | undefined>()
   const [draft, setDraft] = useState<EventDraft | undefined>()
-  // External (Canvas / Blackboard) events open read-only details instead of the form.
+  // External (Canvas, Blackboard, Google Calendar, Outlook) events open read-only details instead of the form.
   const [externalOpen, setExternalOpen] = useState(Boolean(initialExternalId))
   const [externalId, setExternalId] = useState<string | undefined>(initialExternalId)
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const [filter, setFilter] = useState<SourceFilter>("all")
   // Filters appear only once there's something to filter (an external calendar is connected).
-  // Same order as everywhere else (Canvas, then Blackboard).
-  const sources = lmsProviderIds.filter((source) => externalEvents.some((event) => event.source === source))
+  // Same order as everywhere else (Canvas, Blackboard, Google Calendar, Outlook).
+  const sources = externalCalendarSources.filter((source) => externalEvents.some((event) => event.source === source))
   const hiddenCount = externalEvents.filter((event) => event.hidden).length
 
   const days =
@@ -151,7 +151,7 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
           {sources.length > 0 && (
             <li className="inline-flex items-center gap-1.5">
               <span aria-hidden className={cn("size-2.5 rounded-sm", eventStyle.other.swatch)} />
-              Canvas / Blackboard
+              {sources.map((source) => eventSourceNames[source]).join(" / ")}
             </li>
           )}
         </ul>
