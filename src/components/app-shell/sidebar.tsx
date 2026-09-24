@@ -3,6 +3,7 @@ import { ThemeMenu } from "@/components/theme/theme-menu"
 import { AccountSection, type Account } from "./account-section"
 import { Brand } from "./brand"
 import { NavLinks } from "./nav-links"
+import { SendFeedback } from "./send-feedback"
 
 // Desktop-only sidebar. On small screens the same links live in <MobileNav />.
 export function Sidebar({ account }: { account: Account }) {
@@ -17,6 +18,9 @@ export function Sidebar({ account }: { account: Account }) {
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2">
         <NavLinks />
+      </div>
+      <div className="px-3 pb-2">
+        <SendFeedback />
       </div>
       <AccountSection account={account} />
     </aside>

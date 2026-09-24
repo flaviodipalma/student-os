@@ -7,7 +7,7 @@ import { formatDuration } from "@/lib/format"
 import { priorityLabel, typeLabel } from "@/lib/tasks"
 import type { Task } from "@/lib/types"
 import { taskFields } from "@/lib/validation"
-import { availabilityOn, dayLabel, lengthOf, relativeDay, taskBrief, timeLabel, untrusted, type ToolContext } from "./context"
+import { availabilityOn, dayLabel, lengthOf, relativeDay, remainingMinutes, taskBrief, timeLabel, untrusted, type ToolContext } from "./context"
 import { resolveCourse, resolveTask } from "./resolve"
 import { dateInput, defineTool, taskRefInput, timeInput, type ToolOutput } from "./tool"
 
@@ -142,6 +142,29 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
             : `Schedule a ${quote(task.title)} study session ${when}.`,
           ...(slot.note ? { note: slot.note } : {}),
           confirmLabel: action.sessionId ? "Move session" : "Schedule session",
+        },
+      }
+    }
+
+    case "log-progress": {
+      const task = taskOf(action.taskId)
+      if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+      if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
+      const minutes = toMinutes(action.endTime) - toMinutes(action.startTime)
+      if (minutes < 5 || minutes > 12 * 60) return { ok: false, problem: "Record between 5 minutes and 12 hours of work." }
+      // Work already done: never in the future.
+      const nowMinutes = ctx.now.getHours() * 60 + ctx.now.getMinutes()
+      if (action.date > ctx.today || (action.date === ctx.today && toMinutes(action.endTime) > nowMinutes + 5)) {
+        return { ok: false, problem: "Only work you've already done can be recorded." }
+      }
+      const left = remainingMinutes(ctx, task)
+      return {
+        ok: true,
+        pending: {
+          action,
+          summary: `Record ${formatDuration(minutes)} of work on ${quote(task.title)} (${dueText(ctx, action.date)}, ${timeLabel(action.startTime)}–${timeLabel(action.endTime)}).`,
+          ...(left !== null ? { note: `About ${formatDuration(Math.max(0, left - minutes))} of the estimate would be left; the Planner plans only that.` } : {}),
+          confirmLabel: "Record progress",
         },
       }
     }
@@ -344,4 +367,23 @@ export const createStudySession = defineTool({
   },
 })
 
-export const actionTools = [completeTask, createTask, updateTask, rescheduleStudySession, createStudySession]
+export const logStudyProgress = defineTool({
+  name: "logStudyProgress",
+  description:
+    "Propose recording work the student already did on a task (\"I worked 45 minutes on my essay\", \"I did half of my project\": use getTaskDetails for the estimate first). Saved as a completed study session ending now, so the Planner plans only what's left. The student confirms before it's saved.",
+  input: z.object({ task: taskRefInput, minutes: z.int().min(5).max(720).describe("How long the student worked.") }),
+  run(ctx, { task: ref, minutes }) {
+    const found = resolveTask(ctx.data.tasks, ref)
+    if (!("found" in found)) return unresolved(ctx, found)
+    // Ending now (rounded down to 5 minutes), within today.
+    const end = Math.floor((ctx.now.getHours() * 60 + ctx.now.getMinutes()) / 5) * 5
+    const start = Math.max(0, end - minutes)
+    if (end - start < 5) return { result: { status: "not_possible", problem: "It's too early today to record that much work; record it with the Planner's Partly done instead." } }
+    return proposal(
+      prepareAction(ctx, { kind: "log-progress", taskId: found.found.id, date: ctx.today, startTime: fromMinutes(start), endTime: fromMinutes(end) }),
+      found.found.id
+    )
+  },
+})
+
+export const actionTools = [completeTask, createTask, updateTask, rescheduleStudySession, createStudySession, logStudyProgress]

@@ -94,6 +94,14 @@ describe("What should I do now?", () => {
     render(<WhatNowCard onOpenTask={onOpenTask} />)
     expect(screen.getByText("You're all caught up.")).toBeTruthy()
   })
+
+  it("a new student with no tasks isn't told they're caught up: they're told what to do", () => {
+    mocks.answer = { kind: "done", reason: "no-tasks", next: null }
+    render(<WhatNowCard onOpenTask={onOpenTask} />)
+    expect(screen.getByText("Nothing to plan yet.")).toBeTruthy()
+    expect(screen.getByText(/Add your tasks or import a syllabus/)).toBeTruthy()
+    expect(screen.queryByText(/caught up/)).toBeNull()
+  })
 })
 
 describe("study session dialogs", () => {

@@ -42,6 +42,9 @@ export type ProposedAction =
     }
   // sessionId: a stored session to move; without one, a new session is put on the calendar.
   | { kind: "schedule-session"; taskId: string; sessionId?: string; date: string; startTime: string; endTime: string }
+  // Work the student already did ("I worked 45 minutes on it"): saved as a
+  // completed study session, so the Planner only plans what's left.
+  | { kind: "log-progress"; taskId: string; date: string; startTime: string; endTime: string }
 
 export type PendingAction = {
   action: ProposedAction

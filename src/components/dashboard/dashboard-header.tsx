@@ -12,7 +12,8 @@ export function DashboardHeader({ greeting, dateLabel }: { greeting: string; dat
   const overdue = tasks.filter((task) => isOverdue(task, today)).length
 
   let message: string
-  if (remaining.length === 0 && overdue > 0)
+  if (tasks.length === 0) message = "Add your deadlines, and Student OS will plan your days around your schedule."
+  else if (remaining.length === 0 && overdue > 0)
     message = `You have ${overdue} overdue ${overdue === 1 ? "task" : "tasks"} to catch up on.`
   else if (remaining.length === 0) message = "You're all caught up for today."
   else if (important > 0)

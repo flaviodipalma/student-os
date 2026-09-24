@@ -141,13 +141,15 @@ function restHeading(answer: Exclude<WhatNow, { kind: "work" | "studying" }>, to
           ? "It's outside your study hours."
           : "No study time available right now."
     case "done":
-      return answer.reason === "covered" ? "Nothing else to plan today." : "You're all caught up."
+      return answer.reason === "covered" ? "Nothing else to plan today." : answer.reason === "no-tasks" ? "Nothing to plan yet." : "You're all caught up."
   }
 }
 
 function restDetail(answer: Exclude<WhatNow, { kind: "work" | "studying" }>, today: string): string {
   const next = answer.next
   if (next) return `${answer.kind === "busy" ? "Next recommended" : "Next opportunity"}: ${nextLabel(next, today)}.`
+  // A new student: say what to do, not that they're done.
+  if (answer.kind === "done" && answer.reason === "no-tasks") return "Add your tasks or import a syllabus, and Student OS will tell you what to work on and when."
   if (answer.kind === "done" && answer.reason !== "covered") return "Nothing needs planning right now."
   return "Nothing else is planned for now. Enjoy the free time."
 }

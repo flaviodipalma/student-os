@@ -349,7 +349,7 @@ function headline(plan: DailyPlan, dayWord: string): { title: string; detail: st
     case "past":
       return { title: "This day has passed", detail: "Pick today or a later day to see a plan." }
     case "no-tasks":
-      return { title: "You're all caught up.", detail: "Add a task or import a syllabus, and your plan will appear here." }
+      return { title: "Nothing to plan yet.", detail: "Add a task or import a syllabus, and your plan will appear here." }
     case "all-done":
       return { title: "All your tasks are done. Nice work!", detail: "Enjoy the free time, or add what's coming up next." }
     case "covered":

@@ -61,6 +61,7 @@ export const notificationType = pgEnum("notification_type", [
   "event_upcoming",
   "daily_plan_ready",
 ])
+export const feedbackKind = pgEnum("feedback_kind", ["bug", "confusing", "idea", "other"])
 export const themePreference = pgEnum("theme_preference", ["light", "dark", "system"])
 export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
@@ -472,5 +473,27 @@ export const notifications = pgTable(
     check("notifications_title_length", sql`char_length(${t.title}) between 1 and 200`),
     check("notifications_message_length", sql`char_length(${t.message}) between 1 and 500`),
     check("notifications_link_internal", sql`${t.link} like '/%' and ${t.link} not like '//%'`),
+  ]
+).enableRLS()
+
+// Beta feedback ("Send feedback" in the navigation). Only the student's own
+// words, the kind, and the page they were on (a path, no query string). Read by
+// the team in the Supabase dashboard; the app never shows it to anyone else.
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    kind: feedbackKind("kind").notNull(),
+    message: text("message").notNull(),
+    page: text("page"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("feedback_created_idx").on(t.createdAt),
+    check("feedback_message_length", sql`char_length(btrim(${t.message})) between 1 and 2000`),
+    check("feedback_page_path", sql`${t.page} is null or (${t.page} like '/%' and char_length(${t.page}) <= 200)`),
   ]
 ).enableRLS()

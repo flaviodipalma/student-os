@@ -13,6 +13,7 @@ import {
 import { AccountSection, type Account } from "./account-section"
 import { Brand } from "./brand"
 import { NavLinks } from "./nav-links"
+import { SendFeedback } from "./send-feedback"
 
 export function MobileNav({ account }: { account: Account }) {
   const [open, setOpen] = useState(false)
@@ -32,6 +33,9 @@ export function MobileNav({ account }: { account: Account }) {
         </SheetHeader>
         <div className="flex-1 px-3">
           <NavLinks onNavigate={() => setOpen(false)} />
+        </div>
+        <div className="px-3 pb-2">
+          <SendFeedback onOpen={() => setOpen(false)} />
         </div>
         <AccountSection account={account} />
       </SheetContent>

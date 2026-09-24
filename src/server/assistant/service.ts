@@ -3,6 +3,8 @@ import "server-only"
 import { z } from "zod"
 import type { AssistantPageContext, AssistantReply, ChatTurn, ConfirmedChange, PendingAction, ProposedAction } from "@/lib/assistant"
 import { ASSISTANT_ERROR_MESSAGE } from "@/lib/assistant"
+import { toMinutes } from "@/lib/events"
+import { formatDuration } from "@/lib/format"
 import { dateKeySchema, firstIssue, idSchema } from "@/lib/validation"
 import type { Database } from "../db/types"
 import { AppError, ValidationError } from "../errors"
@@ -163,6 +165,13 @@ export const proposedActionSchema: z.ZodType<ProposedAction> = z.discriminatedUn
     }),
   }),
   z.object({
+    kind: z.literal("log-progress"),
+    taskId: idSchema,
+    date: dateKeySchema,
+    startTime: time,
+    endTime: time,
+  }),
+  z.object({
     kind: z.literal("schedule-session"),
     taskId: idSchema,
     sessionId: idSchema.optional(),
@@ -195,6 +204,21 @@ export async function confirmAssistantChange(deps: AssistantDeps, action: Propos
     case "update-task": {
       const task = await updateTask(db, userId, action.taskId, action.changes)
       return { message: `Done. ${quote(task.title)} is updated.`, tasks: [task], studySessions: [] }
+    }
+    case "log-progress": {
+      const session = await createStudySession(db, userId, {
+        id: crypto.randomUUID(),
+        taskId: action.taskId,
+        date: action.date,
+        startTime: action.startTime,
+        endTime: action.endTime,
+        status: "completed",
+      })
+      return {
+        message: `Done. ${formatDuration(toMinutes(action.endTime) - toMinutes(action.startTime))} of work on ${quote(data.tasks.find((task) => task.id === action.taskId)?.title)} is recorded; your plan now counts it.`,
+        tasks: [],
+        studySessions: [session],
+      }
     }
     case "schedule-session": {
       const times = { date: action.date, startTime: action.startTime, endTime: action.endTime }

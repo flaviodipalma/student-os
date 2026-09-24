@@ -557,3 +557,44 @@ describe("end to end: the example conversation", () => {
 it("fixture: tomorrow is Wednesday", () => {
   expect(addDays(TODAY, 1)).toBe(TOMORROW)
 })
+
+describe("beta questions (Prompt 29), answered from real data", () => {
+  it("'I finished half of my project': records that work (after Confirm) and the Planner plans only the rest", async () => {
+    const ai = new ScriptedAI(async (request) => {
+      const details = await tool(request, "getTaskDetails", { task: "Database Project" })
+      const half = Math.round(details.task.estimateMinutes / 2 / 5) * 5
+      const logged = await tool(request, "logStudyProgress", { task: details.task.taskId, minutes: half })
+      return `${logged.summary} Confirm below.`
+    })
+    const reply = await askAssistant({ ...deps(), ai }, askAssistantSchema.parse({ messages: [user("I finished half of my project. What should I do next?")] }))
+    expect(reply.pending?.action).toMatchObject({ kind: "log-progress", taskId: ids.db, date: TODAY, endTime: "16:00", startTime: "14:30" })
+    expect(reply.pending?.summary).toMatch(/^Record 1h 30m of work on “Database Project” \(today, 2:30\sPM–4:00\sPM\)\.$/)
+    // Nothing saved until Confirm.
+    expect((await loadAppData(t.db, alex)).studySessions.some((s) => s.date === TODAY && s.status === "completed")).toBe(false)
+    const done = await confirmAssistantChange(deps(), reply.pending!.action)
+    expect(done.message).toMatch(/1h 30m of work on “Database Project” is recorded/)
+    const ctx = await contextFor()
+    expect(ctx.data.studySessions.some((s) => s.id === done.studySessions[0].id && s.status === "completed")).toBe(true)
+    // 135 + 90 of 180 minutes done: nothing left to plan.
+    expect(ctx.planner.planFor(TODAY).ranked.some((r) => r.task.id === ids.db)).toBe(false)
+    await t.db.delete(sessionsTable).where(eq(sessionsTable.id, done.studySessions[0].id))
+  })
+
+  it("progress can only be recorded for work already done, on the student's own task", async () => {
+    await expect(
+      confirmAssistantChange(deps(), { kind: "log-progress", taskId: ids.db, date: "2026-09-23", startTime: "10:00", endTime: "11:00" })
+    ).rejects.toThrow("Only work you've already done")
+    await expect(
+      confirmAssistantChange(deps(bob), { kind: "log-progress", taskId: ids.db, date: TODAY, startTime: "10:00", endTime: "11:00" })
+    ).rejects.toThrow("doesn't exist")
+  })
+
+  it("'Why am I so busy tomorrow?': the answer comes from tomorrow's real plan (the Canvas lecture is in it)", async () => {
+    const ai = new ScriptedAI(async (request) => {
+      const plan = await tool(request, "getTodaysPlan", { date: TOMORROW })
+      return `Tomorrow: ${plan.schedule.map((i: { title: string; source: string }) => `${i.title} (${i.source})`).join(", ")}.`
+    })
+    const reply = await askAssistant({ ...deps(), ai }, askAssistantSchema.parse({ messages: [user("Why am I so busy tomorrow?")] }))
+    expect(reply.message).toContain(`PSY101 Lecture. ${INJECTION} (Canvas)`)
+  })
+})

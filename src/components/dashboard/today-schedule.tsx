@@ -22,7 +22,7 @@ const MAX_ITEMS = 6
 
 function summary(plan: DailyPlan, events: number): string {
   const suggested = plan.suggestions.length
-  if (plan.status === "no-tasks") return "You're all caught up."
+  if (plan.status === "no-tasks") return "Nothing to plan yet. Add your tasks to get a daily plan."
   if (plan.status === "all-done") return "All your tasks are done. Nice work!"
   if (plan.status === "no-time" && events === 0) return "You don't have any available study time today."
   // Only what's still ahead today.
