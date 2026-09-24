@@ -1,9 +1,6 @@
 import type { Metadata } from "next"
-import { LogOutIcon } from "lucide-react"
-import { logOutAction } from "@/app/actions/auth"
 import { PageHeader } from "@/components/app-shell/page-header"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AccountCard } from "@/components/settings/account-card"
 import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
 import { SettingsView } from "@/components/settings/settings-view"
 import { getNavItem } from "@/lib/navigation"
@@ -11,6 +8,7 @@ import { lmsProviderIds } from "@/lib/types"
 import { requireUser } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { getLmsIntegrationStatus, type LmsIntegrationStatus } from "@/server/integrations/lms/connections"
+import { enabledSocialProviders, getAccountDetails } from "@/server/social-auth"
 import { getStudentTimeZone } from "@/server/student-clock"
 
 const section = getNavItem("/settings")
@@ -67,20 +65,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           outcomes={outcomes}
           timeZone={await getStudentTimeZone()}
         />
-        <Card id="account">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Account</CardTitle>
-            <CardDescription>You&apos;re signed in as {user.email ?? "your account"}.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={logOutAction}>
-              <Button type="submit" variant="outline">
-                <LogOutIcon data-icon="inline-start" />
-                Log out
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <AccountCard
+          account={await getAccountDetails()}
+          available={await enabledSocialProviders()}
+          outcome={typeof params.login === "string" ? { code: params.login, provider: typeof params.provider === "string" ? params.provider : undefined } : undefined}
+        />
       </div>
     </>
   )

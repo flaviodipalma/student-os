@@ -3,11 +3,17 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { z } from "zod"
-import { createSupabaseServerClient } from "@/server/auth"
+import type { ActionResult } from "@/lib/action-result"
+import { authErrorFromCode, authErrorMessages, isSocialProvider, safeNextPath, socialProviders } from "@/lib/auth-providers"
+import { createSupabaseServerClient, getCurrentUser } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { ensureProfile } from "@/server/services/profiles"
+import { authCallbackUrl, enabledSocialProviders, rememberAuthIntent } from "@/server/social-auth"
 
-// Sign up, log in and log out, using Supabase Auth (email + password).
+// Sign up, log in and log out with Supabase Auth: email + password, or Google /
+// Microsoft / Apple (OAuth / OpenID Connect, run by Supabase). Every method
+// signs in the same kind of Student OS user; social sign-in never connects a
+// calendar.
 
 export type AuthFormState = { error?: string; notice?: string }
 
@@ -27,7 +33,7 @@ const logInSchema = z.object({
 
 // Only allow redirects to paths inside this app.
 function safeNext(value: FormDataEntryValue | null): string {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard"
+  return safeNextPath(value) ?? "/dashboard"
 }
 
 const signUpErrors: Record<string, string> = {
@@ -104,4 +110,82 @@ export async function logOutAction(): Promise<void> {
     console.error("[auth] log-out failed", { name: error instanceof Error ? error.name : typeof error })
   }
   redirect("/login")
+}
+
+// ---- Google / Microsoft / Apple
+
+// "Continue with Google" (sign in, or sign up: new students then go through
+// onboarding). Sends the browser to the provider; Supabase handles state and
+// PKCE, and the provider sends the student back to /auth/callback.
+export async function continueWithProviderAction(_previous: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const provider = formData.get("provider")
+  if (!isSocialProvider(provider)) return { error: authErrorMessages.failed }
+  if (!(await enabledSocialProviders()).includes(provider)) return { error: authErrorMessages["not-configured"] }
+
+  let url: string
+  try {
+    const supabase = await createSupabaseServerClient()
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: socialProviders[provider].supabaseId,
+      options: { redirectTo: await authCallbackUrl(), scopes: socialProviders[provider].scopes, skipBrowserRedirect: true },
+    })
+    if (error || !data.url) return { error: authErrorMessages[authErrorFromCode(error?.code)] }
+    url = data.url
+    await rememberAuthIntent({ kind: "sign-in", next: safeNextPath(formData.get("next")) ?? undefined })
+  } catch (error) {
+    console.error("[auth] social sign-in failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
+    return { error: authErrorMessages.unavailable }
+  }
+  redirect(url)
+}
+
+// Settings > Account: add Google / Microsoft / Apple to the signed-in account.
+// Only a signed-in student can add a login method, so nobody can claim an
+// account just by having the same email address.
+export async function linkLoginMethodAction(_previous: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const provider = formData.get("provider")
+  if (!isSocialProvider(provider)) return { error: authErrorMessages.failed }
+  if (!(await getCurrentUser())) redirect("/login?next=/settings")
+  if (!(await enabledSocialProviders()).includes(provider)) return { error: authErrorMessages["not-configured"] }
+
+  let url: string
+  try {
+    const supabase = await createSupabaseServerClient()
+    const { data, error } = await supabase.auth.linkIdentity({
+      provider: socialProviders[provider].supabaseId,
+      options: { redirectTo: await authCallbackUrl(), scopes: socialProviders[provider].scopes, skipBrowserRedirect: true },
+    })
+    if (error || !data.url) {
+      if (error?.code === "manual_linking_disabled") return { error: "Adding login methods isn't turned on for this Student OS server yet." }
+      return { error: authErrorMessages[authErrorFromCode(error?.code)] }
+    }
+    url = data.url
+    await rememberAuthIntent({ kind: "link", provider })
+  } catch (error) {
+    console.error("[auth] linking failed to start", { provider, name: error instanceof Error ? error.name : typeof error })
+    return { error: authErrorMessages.unavailable }
+  }
+  redirect(url)
+}
+
+// Settings > Account: remove a login method. The last one can't be removed (the
+// student would be locked out), and only the signed-in student's own.
+export async function unlinkLoginMethodAction(identityId: unknown): Promise<ActionResult<null>> {
+  if (typeof identityId !== "string" || !identityId) return { ok: false, code: "validation", error: "That login method wasn't found." }
+  try {
+    const supabase = await createSupabaseServerClient()
+    const { data, error } = await supabase.auth.getUserIdentities()
+    if (error || !data) return { ok: false, code: "unauthorized", error: "Your session has expired. Please log in again." }
+    const identity = data.identities.find((item) => item.identity_id === identityId)
+    if (!identity) return { ok: false, code: "not-found", error: "That login method wasn't found." }
+    if (data.identities.length < 2) {
+      return { ok: false, code: "validation", error: "This is your only way to log in. Add another method before removing it." }
+    }
+    const result = await supabase.auth.unlinkIdentity(identity)
+    if (result.error) return { ok: false, code: "database", error: "We couldn't remove that login method. Please try again." }
+    return { ok: true, data: null }
+  } catch (error) {
+    console.error("[auth] unlink failed", { name: error instanceof Error ? error.name : typeof error })
+    return { ok: false, code: "database", error: "We couldn't remove that login method. Please try again." }
+  }
 }

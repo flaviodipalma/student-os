@@ -7,8 +7,26 @@ import { logInAction, signUpAction, type AuthFormState } from "@/app/actions/aut
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import type { SocialProviderId } from "@/lib/auth-providers"
+import { SocialButtons } from "./social-buttons"
 
-export function AuthForm({ mode, next, notice }: { mode: "login" | "signup"; next?: string; notice?: string }) {
+// Log in / sign up: Google, Microsoft and Apple first (the ones this server has
+// set up), then email and password. Every method leads to the same kind of
+// Student OS account; new accounts go through onboarding.
+export function AuthForm({
+  mode,
+  next,
+  notice,
+  error,
+  providers = [],
+}: {
+  mode: "login" | "signup"
+  next?: string
+  notice?: string
+  // Why the last sign-in didn't work (from the callback), already in plain words.
+  error?: string
+  providers?: SocialProviderId[]
+}) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     mode === "login" ? logInAction : signUpAction,
     {}
@@ -20,7 +38,7 @@ export function AuthForm({ mode, next, notice }: { mode: "login" | "signup"; nex
 
   return (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight">{isSignup ? "Create your account" : "Welcome back"}</h1>
+      <h1 className="text-xl font-semibold tracking-tight">{isSignup ? "Create your Student OS account" : "Welcome back"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {isSignup ? "Your courses, deadlines and plan, in one place." : "Log in to see what's next today."}
       </p>
@@ -32,7 +50,27 @@ export function AuthForm({ mode, next, notice }: { mode: "login" | "signup"; nex
         </p>
       )}
 
-      <form action={formAction} className="mt-6 grid gap-4">
+      {error && !state.error && (
+        <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+          {error}
+        </p>
+      )}
+
+      {providers.length > 0 && (
+        <>
+          <div className="mt-6">
+            <SocialButtons providers={providers} next={next} />
+          </div>
+          <div className="mt-6 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            {isSignup ? "or create an account with email" : "or continue with email"}
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </>
+      )}
+
+      <form action={formAction} className={providers.length > 0 ? "mt-4 grid gap-4" : "mt-6 grid gap-4"}>
         {next && <input type="hidden" name="next" value={next} />}
         {isSignup && (
           <div className="grid gap-1.5">
@@ -80,7 +118,7 @@ export function AuthForm({ mode, next, notice }: { mode: "login" | "signup"; nex
         )}
 
         <Button type="submit" size="lg" disabled={pending}>
-          {pending ? (isSignup ? "Creating account…" : "Logging in…") : isSignup ? "Create account" : "Log in"}
+          {pending ? (isSignup ? "Creating account…" : "Logging in…") : isSignup ? "Create account with email" : "Log in"}
         </Button>
       </form>
 
