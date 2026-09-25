@@ -19,30 +19,29 @@ import { AppError, toAppError } from "../../errors"
 import { createCourse, updateCourse } from "../../services/courses"
 import { createTask, updateTask } from "../../services/tasks"
 import { recordLmsSync } from "./connections"
-import type { CredentialVault } from "./credential-vault"
-import { LmsError, type LmsProvider } from "./provider"
-import { createLmsAccess } from "./token-service"
+import { LmsError } from "./provider"
 
-// Syncs one student's LMS into their normal Student OS courses and tasks:
+// Syncs one student's LMS data into their normal Student OS courses and tasks.
+// The data comes from the browser extension (src/server/integrations/extension),
+// already validated and normalized:
 //
 //   1. the student: always the signed-in user's id (from the session)
-//   2. their connection for this provider (credentials decrypted on the server)
-//   3. fetch normalized courses from the provider adapter
+//   2-3. the courses the extension sent
 //   4-5. match them to existing courses and create / update / link (sync-plan.ts)
-//   6. fetch normalized assignments for each course
+//   6. each course's assignments
 //   7-8. match them to existing tasks and create / update / link, keeping the
 //        student's own changes (three-way merge, conflicts reported)
 //   9. record when it synced (or a safe error)
 //   10. return a summary (LmsSyncResult)
 //
-// Fetching happens first; all saving happens in one transaction, so a failure
+// Reading happens first; all saving happens in one transaction, so a failure
 // part-way leaves Student OS as it was. Writes go through the normal course and
 // task services, so the same ownership checks and validation apply.
 // Imported records are ordinary courses and tasks: the Planner, Dashboard and
 // Tasks page need nothing LMS-specific.
 
-// Where a sync reads from: normalized courses and assignments, from any source
-// (OAuth + API, or a calendar feed). The sync itself is the same for all.
+// Where a sync reads from: normalized courses and assignments (the extension's
+// Canvas or Blackboard import). The sync itself is the same for both.
 export type LmsReader = {
   provider: LmsProviderId
   name: string
@@ -55,27 +54,6 @@ export type LmsReader = {
 }
 
 type SyncOptions = { now?: Date; timeZone?: string }
-
-// Sync through an OAuth connection (tokens via the token service).
-export async function syncLms(
-  db: Database,
-  userId: string,
-  provider: LmsProvider,
-  vault: CredentialVault,
-  options: SyncOptions = {}
-): Promise<LmsSyncResult> {
-  const now = options.now ?? new Date()
-  return runSync(db, userId, { provider: provider.id, name: provider.name }, options, async () => {
-    const access = await createLmsAccess(db, userId, provider, vault, { timeZone: options.timeZone, now: () => now })
-    return {
-      provider: provider.id,
-      name: provider.name,
-      listsAllCourses: true,
-      getCourses: () => provider.getCourses(access),
-      getAssignments: (courseId) => provider.getAssignments(access, courseId),
-    }
-  })
-}
 
 // The shared sync. `open` sets up the reader (inside the error handling, so a
 // failure there is recorded on the connection too).
@@ -236,8 +214,7 @@ export async function runSync(
   } catch (error) {
     // Only a safe message is kept or returned; provider errors can contain tokens or URLs.
     const safe = error instanceof AppError ? error.message : `Syncing with ${provider.name} failed. Please try again.`
-    const reconnect = error instanceof LmsError && error.reconnect
-    await recordLmsSync(db, userId, provider.id, { error: safe, reconnect }).catch(() => {})
+    await recordLmsSync(db, userId, provider.id, { error: safe }).catch(() => {})
     throw error instanceof AppError ? error : new AppError("database", safe)
   }
 }

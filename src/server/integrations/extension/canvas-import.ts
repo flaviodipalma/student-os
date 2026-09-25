@@ -5,11 +5,10 @@ import type { LmsAssignment, LmsCourse, LmsSyncResult } from "@/lib/lms/types"
 import { isValidTimeZone } from "@/lib/time-zone"
 import type { Database } from "../../db/types"
 import { canvasAssignmentToLms, canvasCourseToLms } from "../lms/canvas/mapping"
-import { getLmsConnectionMethod, saveLmsExtensionConnection } from "../lms/connections"
+import { saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
 import { parseExtensionLmsBaseUrl } from "./base-url"
-import { removeExternalEventsFrom } from "../../services/external-events"
 
 // A Canvas import sent by the Student OS browser extension. The extension reads
 // Canvas with the student's own browser session:
@@ -55,11 +54,7 @@ export async function importCanvasFromExtension(
       .filter((assignment): assignment is LmsAssignment => assignment !== null)
   }
 
-  // Switching from the calendar feed: its Canvas calendar events would never update
-  // again, so they stop showing (as when disconnecting). Tasks are linked by the sync.
-  const previous = await getLmsConnectionMethod(db, userId, "canvas").catch(() => null)
   await saveLmsExtensionConnection(db, userId, "canvas", baseUrl)
-  if (previous === "calendar_feed") await removeExternalEventsFrom(db, userId, "canvas", options.now)
   return runSync(db, userId, { provider: "canvas", name: "Canvas" }, { now: options.now, timeZone }, async () => ({
     provider: "canvas",
     name: "Canvas",

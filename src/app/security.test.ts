@@ -83,7 +83,7 @@ describe("authentication: nothing runs without a signed-in student", () => {
       assistant.confirmAssistantAction({ kind: "complete-task", taskId: id }),
       calendar.syncCalendarAction("google"),
       calendar.disconnectCalendarAction("outlook"),
-      integrations.syncLmsAction("canvas"),
+      integrations.disconnectLmsAction("canvas"),
       integrations.setExternalEventHiddenAction(id, true),
       auth.unlinkLoginMethodAction("identity"),
     ]

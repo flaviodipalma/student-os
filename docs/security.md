@@ -85,27 +85,27 @@ users. Details for each area live next to the code (linked below).
 
 ## OAuth and credentials
 
-- **Calendar/LMS OAuth** (Google Calendar, Outlook, Canvas, Blackboard): random
+- **Calendar OAuth** (Google Calendar, Outlook): random
   single-use `state` + PKCE verifier in an encrypted HttpOnly cookie on the
   callback path, bound to the student and provider, 10 minutes; code exchanged on
   the server; redirect URI and secret from server config.
-- **Tokens and feed links** are encrypted with AES-256-GCM
+- **Calendar tokens** are encrypted with AES-256-GCM
   (`LMS_TOKEN_ENCRYPTION_KEY`), bound to `<user id>:<provider>`, decrypted only on
   the server for a sync/disconnect, sent only in `Authorization` headers to the
   provider's own hosts. Never returned to the browser, put in URLs, stored in the
   browser or logged. Disconnecting deletes them (Google tokens are also revoked).
 - **Login providers**: secrets live in Supabase; Student OS stores no provider
   tokens for login.
-- **Browser extension**: stores nothing secret. The student's Canvas login stays in
-  their browser (the extension reads Canvas in the Canvas tab); the extension keeps
-  only the Student OS address and the chosen course ids. It reads only the Canvas
-  fields Student OS uses (no grades or scores), and the server validates all of it
-  like an OAuth sync (same-host links, size limits). The school's address may be any
-  public HTTPS address (schools run Canvas and Blackboard on their own domains): unlike
-  OAuth, where the server sends secrets to it and only allowlisted hosts are accepted,
-  an extension import never makes the server contact it. No IPs, ports or local names.
-  Automatic sync is opt-in and asks Chrome for access to the student's Canvas address
-  only (never all sites); turning it off gives that access back.
+- **Canvas and Blackboard** connect only through the browser extension, and nothing
+  secret is stored for them anywhere: the student's LMS login stays in their browser
+  (the extension reads the LMS in its own tab), the server never contacts the LMS,
+  and a connection row holds only the LMS address and the last sync's status. The
+  extension keeps only the Student OS address and the chosen course ids. It reads
+  only the fields Student OS uses, and the server validates everything (same-host
+  links, size limits). The school's address may be any public HTTPS address (schools
+  run Canvas and Blackboard on their own domains), since the server never contacts
+  it; no IPs, ports or local names. Automatic sync is opt-in and asks Chrome for
+  access to that one LMS address only (never all sites); turning it off gives it back.
 - External links (Open in Canvas / Google / Outlook) must be `https` (and, when
   synced, on the provider's own host); reminder links must be in-app paths (a
   database constraint).
@@ -152,7 +152,7 @@ password reset are limited by Supabase Auth.
 - HTTPS everywhere; set `SITE_URL`; HSTS is sent automatically in production.
 - Real, unique secrets in the host's secret store (never in the repo):
   `DATABASE_URL`, `ANTHROPIC_API_KEY`, `LMS_TOKEN_ENCRYPTION_KEY` (32 random bytes,
-  backed up: losing it means everyone reconnects), OAuth client secrets. Rotate
+  backed up: losing it means everyone reconnects their calendars), OAuth client secrets. Rotate
   anything that was ever shared.
 - Supabase: production project, Site URL + Redirect URLs for the real domain
   only, email confirmation on, leaked-password protection and auth rate limits

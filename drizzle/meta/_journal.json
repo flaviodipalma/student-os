@@ -120,6 +120,13 @@
       "when": 1790307295060,
       "tag": "0016_drop_extension_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790360996883,
+      "tag": "0017_extension_only_lms",
+      "breakpoints": true
     }
   ]
 }

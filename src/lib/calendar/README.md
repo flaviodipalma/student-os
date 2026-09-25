@@ -22,16 +22,18 @@ sessions stay distinct: a **task** is something to get done (Canvas assignments 
 Blackboard gradable items become tasks, as before); an **event** occupies time (the
 calendar events below); a **study session** is time set aside for a task.
 
-**Calendar integration is not full LMS access.** Today Canvas and Blackboard are
-connected through each student's private calendar feed. Full Canvas/Blackboard API
-access (course details, submission status) needs each university to approve
-Student OS first; see `src/server/integrations/lms/README.md`.
+**Where events come from:** Google Calendar and Outlook (connected on the
+Integrations page). Canvas and Blackboard connect only through the Student OS
+browser extension, which imports courses and assignments (as tasks), not calendar
+events yet; see `src/server/integrations/lms/README.md`. The `canvas` and
+`blackboard` sources remain for events imported earlier by the removed
+calendar-feed links (hidden since migration 0017).
 
 ## Flow
 
 ```
-Canvas / Blackboard calendar feed (downloaded once per sync, server-side)
-  -> provider parser                 canvasFeedCalendarEvents / blackboardFeedCalendarEvents
+Google Calendar API / Microsoft Graph (server-side, per-student OAuth)
+  -> provider adapter                server/integrations/calendar/google, /outlook
   -> ExternalCalendarEvent            normalized, provider-independent (external-events.ts)
   -> syncExternalCalendar             shared calendar sync service (server/integrations/calendar)
   -> external_calendar_events         one row per (student, source, external id)
@@ -108,8 +110,8 @@ Outlook; default All) appear once an external calendar is connected.
 - Rows are only read and written with the signed-in student's id (from the
   session); hiding someone else's event returns "not found". Hidden state is per
   student.
-- Feed links and tokens stay encrypted on the server; the app only receives event
-  data. Event links are checked when synced (same LMS host, HTTPS) and again before
+- Calendar tokens stay encrypted on the server; the app only receives event
+  data. Event links are checked when synced (the provider's own host, HTTPS) and again before
   rendering; they open in a new tab with `rel="noopener noreferrer"`.
 - Only error types are logged, never event contents or links.
 - The table has Row Level Security on with no policies, like every table.

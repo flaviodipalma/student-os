@@ -4,7 +4,6 @@ import { z } from "zod"
 import type { LmsAssignment, LmsCourse, LmsSubmissionStatus, LmsSyncResult } from "@/lib/lms/types"
 import { isValidTimeZone } from "@/lib/time-zone"
 import type { Database } from "../../db/types"
-import { removeExternalEventsFrom } from "../../services/external-events"
 import {
   attemptsStatus,
   blackboardAssignmentToLms,
@@ -14,7 +13,7 @@ import {
   parseBlackboardColumn,
   type BlackboardColumn,
 } from "../lms/blackboard/mapping"
-import { getLmsConnectionMethod, saveLmsExtensionConnection } from "../lms/connections"
+import { saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
 import { parseExtensionLmsBaseUrl } from "./base-url"
@@ -105,11 +104,7 @@ export async function importBlackboardFromExtension(
       )
   }
 
-  // Switching from the calendar link: its calendar events would never update again,
-  // so they stop showing (as when disconnecting).
-  const previous = await getLmsConnectionMethod(db, userId, "blackboard").catch(() => null)
   await saveLmsExtensionConnection(db, userId, "blackboard", baseUrl)
-  if (previous === "calendar_feed") await removeExternalEventsFrom(db, userId, "blackboard", options.now)
   return runSync(db, userId, { provider: "blackboard", name: "Blackboard" }, { now: options.now, timeZone }, async () => ({
     provider: "blackboard",
     name: "Blackboard",

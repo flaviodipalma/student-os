@@ -1,15 +1,10 @@
-import { randomBytes } from "node:crypto"
 import { eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { lmsConnections } from "@/server/db/schema"
 import type { Database } from "@/server/db/types"
 import { MAX_IMPORT_BYTES } from "@/server/integrations/extension/import-route"
-import { saveLmsFeedConnection } from "@/server/integrations/lms/connections"
-import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
-import { syncCanvasFeed } from "@/server/integrations/lms/canvas/feed-sync"
 import { resetRateLimits } from "@/server/rate-limit"
 import { listCourses } from "@/server/services/courses"
-import { listExternalEvents } from "@/server/services/external-events"
 import { listTasks } from "@/server/services/tasks"
 import { createTestDb } from "@/server/test-utils/test-db"
 
@@ -234,44 +229,5 @@ describe("POST /api/extension/canvas/import", () => {
     expect(await send(payload(), alex.userId)).toMatchObject({ status: 429, body: { error: expect.stringMatching(/a lot right now/) } })
     // Someone else's allowance is their own.
     expect((await send(payload(), (await student("Bob")).userId)).status).toBe(200)
-  })
-
-  it("switching from the calendar feed links the tasks it already imported (no duplicates)", async () => {
-    vi.stubEnv("LMS_TOKEN_ENCRYPTION_KEY", randomBytes(32).toString("base64"))
-    const alex = await student("Alex")
-    const feedUrl = `${BASE}/feeds/calendars/user_secretfeed.ics`
-    await saveLmsFeedConnection(t.db, alex.userId, "canvas", { baseUrl: BASE, feedUrl }, getCredentialVault())
-    const feed = [
-      "BEGIN:VCALENDAR",
-      "BEGIN:VEVENT",
-      "UID:event-assignment-1",
-      "SUMMARY:Project 1 [CSC 215]",
-      "DTSTART;TZID=UTC:20260926T035900",
-      `URL;VALUE=URI:${BASE}/calendar?include_contexts=course_215&month=09&year=2026#assignment_1`,
-      "END:VEVENT",
-      "BEGIN:VEVENT",
-      "UID:event-calendar-event-5",
-      "SUMMARY:Midterm review session",
-      "DTSTART:20261001T180000Z",
-      "DTEND:20261001T190000Z",
-      `URL;VALUE=URI:${BASE}/calendar?include_contexts=course_215#calendar_event_5`,
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n")
-    const fromFeed = await syncCanvasFeed(t.db, alex.userId, getCredentialVault(), {
-      timeZone: "America/New_York",
-      fetch: (async () => new Response(feed)) as typeof fetch,
-    })
-    expect(fromFeed).toMatchObject({ coursesCreated: 1, assignmentsCreated: 1 })
-    expect(await listExternalEvents(t.db, alex.userId)).toEqual([expect.objectContaining({ title: "Midterm review session" })])
-
-    const fromExtension = await send(payload({ assignments: { "215": [project] } }), alex.userId)
-    expect(fromExtension.body.result).toMatchObject({ coursesCreated: 0, assignmentsCreated: 0 })
-    expect(await listCourses(t.db, alex.userId)).toHaveLength(1)
-    expect(await listTasks(t.db, alex.userId)).toEqual([expect.objectContaining({ title: "Project 1", dueDate: "2026-09-25" })])
-    // Now an extension connection: the feed link is gone from the database, and the
-    // feed's calendar events (which would never update again) stop showing.
-    expect(await connectionOf(alex.userId)).toMatchObject({ method: "extension", feedUrlEncrypted: null })
-    expect(await listExternalEvents(t.db, alex.userId)).toEqual([])
   })
 })

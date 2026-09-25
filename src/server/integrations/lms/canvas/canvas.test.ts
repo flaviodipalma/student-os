@@ -1,105 +1,17 @@
-import { randomBytes } from "node:crypto"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { generatePlan } from "@/lib/planner"
-import { lmsConnections } from "../../../db/schema"
 import { createTestDb } from "../../../test-utils/test-db"
 import { loadAppData } from "../../../services/app-data"
 import { updateTask } from "../../../services/tasks"
-import { listLmsConnections, loadLmsCredentials, saveLmsConnection } from "../connections"
-import { createCredentialVault } from "../credential-vault"
-import { createOAuthState, verifyOAuthState } from "../oauth-state"
-import { LmsError, type LmsAccess } from "../provider"
-import { syncLms } from "../sync"
-import { createLmsAccess } from "../token-service"
-import { CanvasApiClient, nextPageUrl } from "./api-client"
-import { CanvasProvider } from "./canvas-provider"
-import { CANVAS_SCOPES, parseCanvasBaseUrl, type CanvasConfig } from "./config"
+import { importCanvasFromExtension } from "../../extension/canvas-import"
 import { canvasAssignmentToLms, canvasCourseToLms, canvasDueToLocal, htmlToText } from "./mapping"
-import { canvasAuthorizationUrl, exchangeCanvasCode, refreshCanvasToken, revokeCanvasToken } from "./oauth"
 
-// The Canvas integration without touching a real Canvas. HTTP goes to a fake
-// fetch that serves TEST FIXTURES: hand-written responses shaped after the
-// fields documented in the Canvas REST API (OAuth2, Courses, Assignments).
-// They are not real Canvas data and aren't used anywhere outside these tests.
+// Canvas data in Student OS: the mapping (canvas/mapping.ts) and whole syncs through
+// the only way in, the browser extension's import, against a real Postgres. TEST
+// FIXTURES are hand-written, shaped after the fields documented in the Canvas REST
+// API (Courses, Assignments); they aren't real Canvas data.
 
 const BASE = "https://school.instructure.com"
-const config: CanvasConfig = {
-  clientId: "test-client-id",
-  clientSecret: "test-client-secret",
-  redirectUri: "http://localhost:3000/api/integrations/canvas/callback",
-  allowedHosts: ["*.instructure.com"],
-  scopes: CANVAS_SCOPES,
-}
-const vault = createCredentialVault(randomBytes(32))
-
-type Recorded = { method: string; url: URL; headers: Headers; body: string }
-
-// ---- A fake Canvas (test fixture) ------------------------------------------------
-function fakeCanvas(fixture: {
-  courses?: unknown[]
-  assignments?: Record<string, unknown[] | number>
-  pageSize?: number
-  validTokens?: string[]
-}) {
-  const requests: Recorded[] = []
-  const state = {
-    courses: fixture.courses ?? [],
-    assignments: fixture.assignments ?? {},
-    validTokens: new Set(fixture.validTokens ?? ["canvas-access-1"]),
-    issued: 1,
-  }
-  const pageSize = fixture.pageSize ?? 100
-  const json = (body: unknown, init: ResponseInit = {}) =>
-    new Response(JSON.stringify(body), { ...init, headers: { "Content-Type": "application/json", ...init.headers } })
-
-  function page(url: URL, items: unknown[]) {
-    const number = Number(url.searchParams.get("page") ?? "1")
-    const slice = items.slice((number - 1) * pageSize, number * pageSize)
-    const headers: Record<string, string> = {}
-    if (number * pageSize < items.length) {
-      const next = new URL(url)
-      next.searchParams.set("page", String(number + 1))
-      headers.Link = `<${url.toString()}>; rel="current", <${next.toString()}>; rel="next"`
-    }
-    return json(slice, { headers })
-  }
-
-  const fetchImpl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const url = new URL(String(input))
-    const headers = new Headers(init.headers)
-    const body = init.body ? String(init.body) : ""
-    requests.push({ method: init.method ?? "GET", url, headers, body })
-    if (url.origin !== BASE) throw new TypeError("fetch failed")
-
-    if (url.pathname === "/login/oauth2/token" && init.method === "POST") {
-      const form = new URLSearchParams(body)
-      if (form.get("client_secret") !== config.clientSecret) return json({ error: "invalid_client" }, { status: 401 })
-      if (form.get("grant_type") === "authorization_code" && form.get("code") === "good-code") {
-        return json({ access_token: "canvas-access-1", token_type: "Bearer", refresh_token: "canvas-refresh", expires_in: 3600, user: { id: 42, name: "Alex" } })
-      }
-      if (form.get("grant_type") === "refresh_token" && form.get("refresh_token") === "canvas-refresh") {
-        const token = `canvas-access-${++state.issued}`
-        state.validTokens.add(token)
-        return json({ access_token: token, token_type: "Bearer", expires_in: 3600, user: { id: 42 } })
-      }
-      return json({ error: "invalid_grant" }, { status: 400 })
-    }
-    if (url.pathname === "/login/oauth2/token" && init.method === "DELETE") return json({})
-
-    const token = headers.get("authorization")?.replace(/^Bearer /, "")
-    if (!token || !state.validTokens.has(token)) return json({ errors: [{ message: "Invalid access token." }] }, { status: 401 })
-    if (url.pathname === "/api/v1/courses") return page(url, state.courses)
-    const match = url.pathname.match(/^\/api\/v1\/courses\/([^/]+)\/assignments$/)
-    if (match) {
-      const items = state.assignments[match[1]]
-      if (typeof items === "number") return json({ errors: [] }, { status: items })
-      return page(url, items ?? [])
-    }
-    return json({ errors: [] }, { status: 404 })
-  }) as typeof fetch
-
-  return { fetch: fetchImpl, requests, state }
-}
 
 const course = (id: number, overrides: Record<string, unknown> = {}) => ({
   id,
@@ -121,211 +33,6 @@ const assignment = (id: number, courseId: number, overrides: Record<string, unkn
   submission: { workflow_state: "unsubmitted" },
   ...overrides,
 })
-// -------------------------------------------------------------------------------------------
-
-const staticAccess = (fetchToken = "canvas-access-1"): LmsAccess & { refreshes: number } => {
-  const access = {
-    baseUrl: BASE,
-    timeZone: "America/New_York",
-    externalUserId: null,
-    refreshes: 0,
-    getAccessToken: async () => fetchToken,
-    refreshAccessToken: async () => {
-      access.refreshes++
-      return "canvas-access-2"
-    },
-  }
-  return access
-}
-
-describe("Canvas address", () => {
-  it("accepts a school's Canvas address, normalized to https://host", () => {
-    expect(parseCanvasBaseUrl("quinnipiac.instructure.com", config.allowedHosts)).toBe("https://quinnipiac.instructure.com")
-    expect(parseCanvasBaseUrl(" https://School.Instructure.com/courses/1 ", config.allowedHosts)).toBe(BASE)
-    expect(parseCanvasBaseUrl("canvas.myschool.edu", ["canvas.myschool.edu"])).toBe("https://canvas.myschool.edu")
-  })
-
-  it("refuses anything the client secret mustn't be sent to", () => {
-    for (const bad of [
-      "",
-      "http://school.instructure.com",
-      "https://evil.example.com",
-      "https://instructure.com",
-      "https://school.instructure.com.evil.com",
-      "https://user:pass@school.instructure.com",
-      "https://school.instructure.com:8443",
-      "https://127.0.0.1",
-      "localhost",
-      "javascript:alert(1)",
-    ]) {
-      expect(() => parseCanvasBaseUrl(bad, config.allowedHosts), bad).toThrow(LmsError)
-    }
-  })
-})
-
-describe("OAuth", () => {
-  it("builds the authorization URL with the state, redirect URI and read-only scopes (no secret)", () => {
-    const url = new URL(canvasAuthorizationUrl(config, BASE, "state-123"))
-    expect(url.origin + url.pathname).toBe(`${BASE}/login/oauth2/auth`)
-    expect(Object.fromEntries(url.searchParams)).toEqual({
-      client_id: "test-client-id",
-      response_type: "code",
-      redirect_uri: config.redirectUri,
-      state: "state-123",
-      scope: "url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/assignments",
-      purpose: "Student OS",
-    })
-    expect(url.toString()).not.toContain("secret")
-  })
-
-  it("exchanges the code for tokens on the server", async () => {
-    const canvas = fakeCanvas({})
-    const now = new Date("2026-09-23T12:00:00Z")
-    const tokens = await exchangeCanvasCode(config, BASE, "good-code", canvas.fetch, now)
-    expect(tokens).toEqual({
-      accessToken: "canvas-access-1",
-      refreshToken: "canvas-refresh",
-      expiresAt: new Date("2026-09-23T13:00:00Z"),
-      externalUserId: "42",
-    })
-    const [request] = canvas.requests
-    expect(request.method).toBe("POST")
-    expect(Object.fromEntries(new URLSearchParams(request.body))).toMatchObject({
-      grant_type: "authorization_code",
-      client_secret: "test-client-secret",
-      redirect_uri: config.redirectUri,
-      code: "good-code",
-    })
-  })
-
-  it("reports a rejected code, an outage and an unreadable response safely", async () => {
-    const canvas = fakeCanvas({})
-    await expect(exchangeCanvasCode(config, BASE, "bad-code", canvas.fetch)).rejects.toMatchObject({ reconnect: true })
-    const down = (async () => new Response("oops", { status: 503 })) as typeof fetch
-    await expect(exchangeCanvasCode(config, BASE, "good-code", down)).rejects.toThrow("Canvas is temporarily unavailable")
-    const garbage = (async () => new Response("{\"hello\":1}", { status: 200 })) as typeof fetch
-    await expect(exchangeCanvasCode(config, BASE, "good-code", garbage)).rejects.toThrow("couldn't read")
-    const offline = (async () => {
-      throw new TypeError("fetch failed")
-    }) as typeof fetch
-    await expect(exchangeCanvasCode(config, BASE, "good-code", offline)).rejects.toThrow("temporarily unavailable")
-  })
-
-  it("refreshes the access token and keeps the same refresh token", async () => {
-    const canvas = fakeCanvas({})
-    const tokens = await refreshCanvasToken(config, BASE, "canvas-refresh", canvas.fetch)
-    expect(tokens.accessToken).toBe("canvas-access-2")
-    expect(tokens.refreshToken).toBe("canvas-refresh")
-    await expect(refreshCanvasToken(config, BASE, "revoked", canvas.fetch)).rejects.toMatchObject({ reconnect: true })
-  })
-
-  it("revokes on disconnect, and never fails if Canvas can't be reached", async () => {
-    const canvas = fakeCanvas({})
-    await revokeCanvasToken(BASE, "canvas-access-1", canvas.fetch)
-    expect(canvas.requests[0]).toMatchObject({ method: "DELETE" })
-    expect(canvas.requests[0].headers.get("authorization")).toBe("Bearer canvas-access-1")
-    await expect(revokeCanvasToken(BASE, "x", (async () => Promise.reject(new Error("down"))) as typeof fetch)).resolves.toBeUndefined()
-  })
-})
-
-describe("OAuth state (CSRF protection)", () => {
-  const start = new Date("2026-09-23T12:00:00Z")
-  const later = (minutes: number) => new Date(start.getTime() + minutes * 60_000)
-  const created = createOAuthState({ provider: "canvas", userId: "alice", baseUrl: BASE }, vault, start)
-  const check = (overrides: Partial<Parameters<typeof verifyOAuthState>[0]>, now = later(1)) =>
-    verifyOAuthState({ provider: "canvas", userId: "alice", state: created.state, cookieValue: created.cookieValue, ...overrides }, vault, now)
-
-  it("is random and doesn't reveal what it protects", () => {
-    expect(created.state).toMatch(/^[A-Za-z0-9_-]{43}$/)
-    expect(createOAuthState({ provider: "canvas", userId: "alice", baseUrl: BASE }, vault).state).not.toBe(created.state)
-    expect(created.cookieValue).not.toContain("alice")
-    expect(created.cookieValue).not.toContain(created.state)
-  })
-
-  it("accepts the matching state from the same student within 10 minutes", () => {
-    expect(check({})).toEqual({ baseUrl: BASE, codeVerifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) })
-  })
-
-  it("rejects a different state, another student, another provider, a tampered or missing cookie, or an old one", () => {
-    expect(check({ state: "forged" })).toBeNull()
-    expect(check({ state: null })).toBeNull()
-    expect(check({ userId: "bob" })).toBeNull()
-    expect(check({ provider: "blackboard" })).toBeNull()
-    expect(check({ cookieValue: undefined })).toBeNull()
-    expect(check({ cookieValue: created.cookieValue.slice(0, -4) + "AAAA" })).toBeNull()
-    expect(check({}, later(11))).toBeNull()
-  })
-})
-
-describe("Canvas API client", () => {
-  it("sends the token in the Authorization header, never in the URL", async () => {
-    const canvas = fakeCanvas({ courses: [course(1)] })
-    await new CanvasApiClient(staticAccess(), { fetch: canvas.fetch }).getAll("/courses")
-    const [request] = canvas.requests
-    expect(request.headers.get("authorization")).toBe("Bearer canvas-access-1")
-    expect(request.url.toString()).not.toContain("canvas-access")
-    expect(request.url.searchParams.get("per_page")).toBe("100")
-  })
-
-  it("follows pagination to the end", async () => {
-    const canvas = fakeCanvas({ courses: [1, 2, 3, 4, 5].map((id) => course(id)), pageSize: 2 })
-    const items = await new CanvasApiClient(staticAccess(), { fetch: canvas.fetch }).getAll("/courses")
-    expect(items).toHaveLength(5)
-    expect(canvas.requests).toHaveLength(3)
-  })
-
-  it("stops at the page limit, and never follows a next link to another host", async () => {
-    const canvas = fakeCanvas({ courses: [1, 2, 3, 4, 5].map((id) => course(id)), pageSize: 1 })
-    expect(await new CanvasApiClient(staticAccess(), { fetch: canvas.fetch, maxPages: 2 }).getAll("/courses")).toHaveLength(2)
-
-    const elsewhere = (async (input: RequestInfo | URL) =>
-      new Response(JSON.stringify([course(Number(new URL(String(input)).searchParams.get("page") ?? 1))]), {
-        headers: { Link: `<https://attacker.example/api/v1/courses?page=2>; rel="next"` },
-      })) as typeof fetch
-    expect(await new CanvasApiClient(staticAccess(), { fetch: elsewhere }).getAll("/courses")).toHaveLength(1)
-  })
-
-  it("parses Link headers in any case", () => {
-    expect(nextPageUrl(`<${BASE}/a?page=1>; rel="current", <${BASE}/a?page=2>; REL="Next"`)).toBe(`${BASE}/a?page=2`)
-    expect(nextPageUrl(`<${BASE}/a?page=1>; rel="current"`)).toBeNull()
-    expect(nextPageUrl(null)).toBeNull()
-  })
-
-  it("on a 401, refreshes the token once and retries", async () => {
-    const canvas = fakeCanvas({ courses: [course(1)], validTokens: ["canvas-access-2"] })
-    const access = staticAccess("expired-token")
-    expect(await new CanvasApiClient(access, { fetch: canvas.fetch }).getAll("/courses")).toHaveLength(1)
-    expect(access.refreshes).toBe(1)
-    expect(canvas.requests.map((r) => r.headers.get("authorization"))).toEqual(["Bearer expired-token", "Bearer canvas-access-2"])
-  })
-
-  it("asks to reconnect if the refreshed token is rejected too", async () => {
-    const canvas = fakeCanvas({ courses: [course(1)], validTokens: [] })
-    await expect(new CanvasApiClient(staticAccess("x"), { fetch: canvas.fetch }).getAll("/courses")).rejects.toMatchObject({
-      message: "Your Canvas connection expired. Please reconnect.",
-      reconnect: true,
-    })
-  })
-
-  it("turns API errors into simple messages", async () => {
-    const respond = (status: number, body = "") => (async () => new Response(body, { status })) as typeof fetch
-    const get = (fetchImpl: typeof fetch, scope: "course" | "connection" = "connection") =>
-      new CanvasApiClient(staticAccess(), { fetch: fetchImpl }).getAll("/courses", [], scope)
-    await expect(get(respond(429))).rejects.toThrow("Canvas is busy right now")
-    await expect(get(respond(403, "403 Forbidden (Rate Limit Exceeded)"))).rejects.toThrow("Canvas is busy right now")
-    await expect(get(respond(403))).rejects.toThrow("didn't allow Student OS to read your courses")
-    await expect(get(respond(403), "course")).rejects.toMatchObject({ scope: "course" })
-    await expect(get(respond(404))).rejects.toThrow("Canvas wasn't found at that address.")
-    await expect(get(respond(500))).rejects.toThrow("Canvas is temporarily unavailable")
-    await expect(get(respond(200, "<html>not json</html>"))).rejects.toThrow("couldn't read")
-    await expect(get(respond(200, "{\"not\":\"a list\"}"))).rejects.toThrow("couldn't read")
-    const timeout = (async () => {
-      throw new DOMException("The operation was aborted due to timeout", "TimeoutError")
-    }) as typeof fetch
-    await expect(get(timeout)).rejects.toThrow("temporarily unavailable")
-  })
-})
-
 describe("mapping Canvas data", () => {
   it("maps a course; skips deleted, date-restricted and nameless ones", () => {
     expect(canvasCourseToLms(course(215, { name: "Data Structures", course_code: "CSC 215" }))).toEqual({
@@ -397,23 +104,29 @@ afterEach(() => t.close())
 
 const NOW = new Date("2026-09-23T12:00:00Z")
 
-async function connected(name: string, expiresAt = new Date("2026-09-23T13:00:00Z")) {
-  const user = await t.addUser(name)
-  await saveLmsConnection(
+// What Canvas shows the student (what the extension sends), changed between syncs.
+const fakeCanvas = (fixture: { courses?: unknown[]; assignments?: Record<string, unknown[] | number> }) => ({
+  state: { courses: fixture.courses ?? [], assignments: fixture.assignments ?? {} },
+})
+
+const connected = async (name: string) => t.addUser(name)
+
+// One sync: every course, with the assignments of those it could read (a number is
+// a course the extension couldn't read, like an HTTP error).
+const sync = (user: string, canvas: ReturnType<typeof fakeCanvas>) =>
+  importCanvasFromExtension(
     t.db,
     user,
-    "canvas",
-    { accessToken: "canvas-access-1", refreshToken: "canvas-refresh", expiresAt, externalUserId: "42", baseUrl: BASE },
-    vault
+    {
+      baseUrl: BASE,
+      timeZone: "America/New_York",
+      courses: canvas.state.courses,
+      assignments: Object.fromEntries(
+        Object.entries(canvas.state.assignments).filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]))
+      ),
+    },
+    { now: NOW }
   )
-  return user
-}
-
-const sync = (user: string, canvas: ReturnType<typeof fakeCanvas>) =>
-  syncLms(t.db, user, new CanvasProvider({ fetch: canvas.fetch, config: () => config }), vault, {
-    now: NOW,
-    timeZone: "America/New_York",
-  })
 
 describe("syncing Canvas into Student OS", () => {
   it("imports courses and assignments as normal courses and tasks", async () => {
@@ -448,8 +161,6 @@ describe("syncing Canvas into Student OS", () => {
         },
       }),
     ])
-    // Only reads: every request to the API was a GET.
-    expect(canvas.requests.filter((r) => r.url.pathname.startsWith("/api/")).every((r) => r.method === "GET")).toBe(true)
   })
 
   it("repeat syncs don't duplicate; changes update; removed assignments are kept and reported", async () => {
@@ -492,32 +203,9 @@ describe("syncing Canvas into Student OS", () => {
     await sync(user, canvas)
     canvas.state.assignments["2"] = 403
     const result = await sync(user, canvas)
-    expect(result.errors).toEqual(["Course 2: Canvas didn't allow Student OS to read this course."])
+    expect(result.errors).toEqual(["Course 2: The extension couldn't read this course's assignments."])
     expect(result.assignmentsMissing).toBe(0) // not "missing": it just couldn't be read
     expect((await loadAppData(t.db, user)).tasks).toHaveLength(2)
-  })
-
-  it("refreshes an expired token before syncing, and stores the new one encrypted", async () => {
-    const user = await connected("Alex", new Date("2026-09-23T11:00:00Z")) // expired an hour ago
-    const canvas = fakeCanvas({ courses: [course(215)], assignments: { "215": [] }, validTokens: [] })
-    await sync(user, canvas)
-    expect(canvas.requests[0].body).toContain("grant_type=refresh_token")
-    const [row] = await t.db.select().from(lmsConnections)
-    expect(row.accessTokenEncrypted).not.toContain("canvas-access")
-    expect((await loadLmsCredentials(t.db, user, "canvas", vault)).accessToken).toBe("canvas-access-2")
-  })
-
-  it("asks the student to reconnect when the refresh token is rejected", async () => {
-    const user = await t.addUser("Alex")
-    await saveLmsConnection(
-      t.db,
-      user,
-      "canvas",
-      { accessToken: "old", refreshToken: "revoked", expiresAt: new Date("2026-09-23T11:00:00Z"), externalUserId: null, baseUrl: BASE },
-      vault
-    )
-    await expect(sync(user, fakeCanvas({}))).rejects.toThrow("Your Canvas connection expired. Please reconnect.")
-    expect((await listLmsConnections(t.db, user))[0]).toMatchObject({ status: "needs_reauth" })
   })
 
   it("keeps each student's Canvas data separate", async () => {
@@ -538,15 +226,7 @@ describe("syncing Canvas into Student OS", () => {
     const plan = generatePlan({ date: "2026-09-23", tasks: data.tasks, events: data.events, now: new Date(2026, 8, 23, 8, 0) })
     expect(plan.suggestions.map((s) => s.taskId)).toContain(data.tasks[0].id)
   })
-
-  it("the token service never hands out tokens for another student's connection", async () => {
-    await connected("Alice")
-    const bob = await t.addUser("Bob")
-    await expect(createLmsAccess(t.db, bob, new CanvasProvider({ config: () => config }), vault)).rejects.toThrow("doesn't exist")
-  })
 })
-
-// ---- Keeping Canvas and Student OS in sync over time --------------------------------
 
 describe("syncing over time", () => {
   it("marks tasks done from Canvas only conservatively, and never un-completes", async () => {
@@ -610,7 +290,7 @@ describe("syncing over time", () => {
     ])
   })
 
-  it("updates a renamed course, unless the student renamed it; reports courses that left Canvas", async () => {
+  it("updates a renamed course, unless the student renamed it; a course no longer sent is kept, not reported", async () => {
     const user = await connected("Alex")
     const canvas = fakeCanvas({ courses: [course(1, { name: "Algebra" }), course(2, { name: "Biology" })], assignments: {} })
     await sync(user, canvas)
@@ -622,10 +302,11 @@ describe("syncing over time", () => {
     let names = (await loadAppData(t.db, user)).courses.map((c) => c.name).sort()
     expect(names).toEqual(["Algebra II", "Bio (my name)"])
 
-    // The term ends: Canvas stops listing Algebra. It's reported, and kept.
+    // The student unchecks Algebra (or the term ends): it's kept, and not reported as gone,
+    // since the extension only sends the courses the student chose.
     canvas.state.courses = [course(2, { name: "Biology 101" })]
     const ended = await sync(user, canvas)
-    expect(ended.missingCourses.map((c) => c.name)).toEqual(["Algebra II"])
+    expect(ended.missingCourses).toEqual([])
     names = (await loadAppData(t.db, user)).courses.map((c) => c.name).sort()
     expect(names).toEqual(["Algebra II", "Bio (my name)"])
   })

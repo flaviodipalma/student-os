@@ -6,17 +6,15 @@ import {
   type ExternalCalendarEvent,
   type StoredExternalEvent,
 } from "@/lib/calendar/external-events"
-import type { LmsSyncResult } from "@/lib/lms/types"
-import { eventSourceNames, type ExternalCalendarSource } from "@/lib/types"
+import type { ExternalCalendarSource } from "@/lib/types"
 import { externalCalendarEvents } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { tryLock } from "../lms/sync"
 import { logger } from "@/server/log"
 
 // The calendar sync service: saves one provider's normalized events for one
-// student (from any ExternalCalendarProvider: today the Canvas and Blackboard
-// calendar feeds). Shared by every provider; provider-specific parsing lives in
-// the provider's own folder.
+// student (Google Calendar, Outlook). Shared by every provider; provider-specific
+// reading lives in the provider's own folder.
 //
 //   new       -> created
 //   unchanged -> nothing
@@ -103,27 +101,4 @@ export async function syncExternalCalendar(
     }
   })
   return result
-}
-
-// Runs after a feed's task sync, with events from the same download, and adds
-// the counts to that sync's summary. A calendar problem is reported there; it
-// never undoes the task sync, and the events already saved stay as they were.
-export async function addCalendarToSync(
-  db: Database,
-  userId: string,
-  source: ExternalCalendarSource,
-  parsed: { events: ExternalCalendarEvent[]; skipped: number } | null,
-  result: LmsSyncResult,
-  now: Date
-): Promise<LmsSyncResult> {
-  if (!parsed) return result
-  try {
-    const calendar = await syncExternalCalendar(db, userId, source, parsed.events, { now, skipped: parsed.skipped })
-    const errors =
-      calendar.failed > 0 ? [...result.errors, `${calendar.failed} ${eventSourceNames[source]} calendar event(s) couldn't be saved.`] : result.errors
-    return { ...result, calendarEvents: calendar, errors }
-  } catch (error) {
-    logger.error(`calendar:${source}`, `calendar sync failed`, { name: error instanceof Error ? error.name : typeof error })
-    return { ...result, errors: [...result.errors, `${eventSourceNames[source]} calendar events couldn't be updated this time. Please try again.`] }
-  }
 }

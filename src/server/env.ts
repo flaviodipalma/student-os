@@ -65,7 +65,7 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
       report.errors.push("LMS_TOKEN_ENCRYPTION_KEY must be 32 random bytes, base64 (openssl rand -base64 32).")
     }
   } else {
-    report.warnings.push("LMS_TOKEN_ENCRYPTION_KEY isn't set: Canvas, Blackboard, Google Calendar and Outlook can't be connected.")
+    report.warnings.push("LMS_TOKEN_ENCRYPTION_KEY isn't set: Google Calendar and Outlook can't be connected.")
   }
 
   // ---- AI
@@ -86,8 +86,6 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
   const redirects: string[] = []
   if (group(env, report, "Google Calendar", ["GOOGLE_CALENDAR_CLIENT_ID", "GOOGLE_CALENDAR_CLIENT_SECRET", "GOOGLE_CALENDAR_REDIRECT_URI"])) redirects.push("GOOGLE_CALENDAR_REDIRECT_URI")
   if (group(env, report, "Outlook", ["OUTLOOK_CALENDAR_CLIENT_ID", "OUTLOOK_CALENDAR_CLIENT_SECRET", "OUTLOOK_CALENDAR_REDIRECT_URI"])) redirects.push("OUTLOOK_CALENDAR_REDIRECT_URI")
-  if (group(env, report, "Canvas sign-in", ["CANVAS_CLIENT_ID", "CANVAS_CLIENT_SECRET", "CANVAS_REDIRECT_URI"])) redirects.push("CANVAS_REDIRECT_URI")
-  if (group(env, report, "Blackboard sign-in", ["BLACKBOARD_CLIENT_ID", "BLACKBOARD_CLIENT_SECRET", "BLACKBOARD_REDIRECT_URI"])) redirects.push("BLACKBOARD_REDIRECT_URI")
 
   // ---- Browser extension: which Chrome extensions may use a student's login
   // (src/server/integrations/extension/http.ts). Unset = any extension.

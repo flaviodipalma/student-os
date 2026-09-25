@@ -63,5 +63,5 @@ single-student audit (`src/server/services/persona-audit.test.ts`).
 - Connect Google Calendar / Outlook with real accounts if those will be offered
   (OAuth apps in testing mode allow listed test users only).
 - Tell beta students: reminders appear while Student OS is open (no email/push);
-  all-day calendar events aren't shown yet; Canvas/Blackboard work through the
-  calendar feed link.
+  all-day calendar events aren't shown yet; Canvas/Blackboard connect through the
+  Student OS browser extension (Chrome, desktop).

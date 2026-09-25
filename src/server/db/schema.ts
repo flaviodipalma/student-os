@@ -47,11 +47,13 @@ export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "
 // Learning management systems Student OS can import from (see src/server/integrations/lms).
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
-// Where an external calendar event comes from: an LMS calendar feed or a personal calendar.
+// Where an external calendar event comes from: a personal calendar (Google, Outlook). "canvas"
+// and "blackboard" are from the removed LMS calendar-feed links (hidden since migration 0017).
 export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook"])
 export const calendarProvider = pgEnum("calendar_provider", ["google", "outlook"])
-// How Student OS reads the LMS: OAuth + API, the student's private calendar feed link,
-// or the Student OS browser extension (reads the LMS with the student's own browser session).
+// How Student OS reads the LMS: only the Student OS browser extension now ("extension",
+// with the student's own browser session). "oauth" and "calendar_feed" are no longer
+// used (migration 0017 removed them), but Postgres can't drop enum values.
 export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed", "extension"])
 export const notificationType = pgEnum("notification_type", [
   "task_due_soon",
@@ -354,11 +356,12 @@ export const syllabusImports = pgTable(
   (t) => [index("syllabus_imports_user_id_idx").on(t.userId)]
 ).enableRLS()
 
-// A student's connection to a learning management system (one per provider).
-// Access and refresh tokens are stored ENCRYPTED (AES-256-GCM, see
-// src/server/integrations/lms/credential-vault.ts), never in plain text, and
-// never leave the server. Disconnecting deletes the row; imported courses and
-// tasks stay, as normal Student OS data.
+// A student's connection to a learning management system (one per provider),
+// made by the Student OS browser extension, which reads the LMS with the student's
+// own login. No LMS secret is stored: just the LMS address and how the last sync
+// went. Disconnecting deletes the row; imported courses and tasks stay, as normal
+// Student OS data. (`method` is always "extension" now; the older "oauth" and
+// "calendar_feed" values stay in the enum only because Postgres can't drop them.)
 export const lmsConnections = pgTable(
   "lms_connections",
   {
@@ -367,17 +370,9 @@ export const lmsConnections = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
     provider: lmsProvider("provider").notNull(),
-    method: lmsConnectionMethod("method").notNull().default("oauth"),
-    // The student's id in the LMS, if the provider reports one.
-    externalUserId: text("external_user_id"),
+    method: lmsConnectionMethod("method").notNull().default("extension"),
     // Institution-specific LMS address (Canvas and Blackboard are hosted per school).
     baseUrl: text("base_url"),
-    accessTokenEncrypted: text("access_token_encrypted"),
-    refreshTokenEncrypted: text("refresh_token_encrypted"),
-    // Calendar-feed connections: the student's private feed link, ENCRYPTED like a token
-    // (anyone with the link can read their calendar).
-    feedUrlEncrypted: text("feed_url_encrypted"),
-    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
     status: lmsConnectionStatus("status").notNull().default("connected"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     // A safe, student-facing message about the last failed sync (never provider internals).

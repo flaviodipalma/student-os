@@ -2,10 +2,10 @@ import { addDays } from "@/lib/format"
 import { wallClockIn } from "@/lib/time-zone"
 import type { CalendarEvent, ExternalCalendarSource, ExternalEventRecord } from "@/lib/types"
 
-// External calendar events (Canvas, Blackboard, ...) in Student OS.
+// External calendar events (Google Calendar, Outlook, ...) in Student OS.
 //
-//   provider calendar (e.g. an iCalendar feed)
-//     -> provider-specific parser (canvas/feed.ts, blackboard/feed.ts)
+//   provider calendar
+//     -> provider-specific adapter (server/integrations/calendar/google, /outlook)
 //     -> ExternalCalendarEvent       normalized, provider-independent (below)
 //     -> calendar sync service       one row per (student, source, externalId)
 //     -> ExternalEventRecord         what the app loads

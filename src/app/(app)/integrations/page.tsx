@@ -1,10 +1,9 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/app-shell/page-header"
-import { ExtensionCard } from "@/components/settings/extension-card"
 import type { CalendarOutcomes } from "@/components/settings/calendar-connections"
-import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
+import { IntegrationsCard } from "@/components/settings/integrations-card"
 import { getNavItem } from "@/lib/navigation"
-import { calendarProviderIds, lmsProviderIds } from "@/lib/types"
+import { calendarProviderIds } from "@/lib/types"
 import { requireUser } from "@/server/auth"
 import { getDb } from "@/server/db"
 import { getCalendarIntegrationStatus, type CalendarIntegrationStatus } from "@/server/integrations/calendar/connections"
@@ -40,14 +39,9 @@ export default async function IntegrationsPage({ searchParams }: PageProps<"/int
     logger.error("integrations", "couldn't load calendar connections", { name: error instanceof Error ? error.name : typeof error })
   }
 
-  // Where a sign-in sent the student back to (?canvas=connected, ?google-calendar=denied):
+  // Where a calendar sign-in sent the student back to (?google-calendar=connected):
   // a short outcome code, never data.
   const params = await searchParams
-  const outcomes: IntegrationOutcomes = {}
-  for (const provider of lmsProviderIds) {
-    const outcome = params[provider]
-    if (typeof outcome === "string") outcomes[provider] = outcome
-  }
   const calendarOutcomes: CalendarOutcomes = {}
   for (const provider of calendarProviderIds) {
     const outcome = params[getCalendarProvider(provider).flow]
@@ -62,12 +56,10 @@ export default async function IntegrationsPage({ searchParams }: PageProps<"/int
       <div className="space-y-6">
         <IntegrationsCard
           integrations={integrations}
-          outcomes={outcomes}
           timeZone={timeZone}
           calendars={calendars}
           calendarOutcomes={calendarOutcomes}
         />
-        <ExtensionCard />
       </div>
     </>
   )

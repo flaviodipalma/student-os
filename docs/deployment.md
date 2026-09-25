@@ -9,7 +9,7 @@ Browser ──HTTPS──> Next.js app (e.g. Vercel)  ──> Supabase: Auth + P
                         │                        (pooler connection, RLS on, no policies)
                         ├──> Anthropic (syllabus reader, Assistant)
                         ├──> Google Calendar API / Microsoft Graph (per-student OAuth)
-                        └──> Canvas / Blackboard (feeds or OAuth)
+                        └──< Student OS browser extension (Canvas / Blackboard, read in the student's own browser)
 Login: Google / Microsoft / Apple through Supabase Auth
 ```
 
@@ -54,9 +54,8 @@ Full list with explanations: `.env.example`. For production:
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Public by design (RLS blocks all table access) |
 | `DATABASE_URL` | yes | Supabase **transaction pooler** URI (port 6543), server-only |
 | `ANTHROPIC_API_KEY` | yes | Server-only; optional `SYLLABUS_AI_MODEL`, `ASSISTANT_AI_MODEL` |
-| `LMS_TOKEN_ENCRYPTION_KEY` | for any integration | `openssl rand -base64 32`; **back it up** (losing it = every student reconnects) |
+| `LMS_TOKEN_ENCRYPTION_KEY` | for Google Calendar / Outlook | `openssl rand -base64 32`; **back it up** (losing it = every student reconnects their calendars) |
 | `GOOGLE_CALENDAR_*`, `OUTLOOK_CALENDAR_*` | optional | Client id, secret, `https://<domain>/api/integrations/<google\|outlook>-calendar/callback` |
-| `CANVAS_*`, `BLACKBOARD_*` | optional | OAuth apps (only with a school's approval); calendar feeds and the browser extension need none |
 | `STUDENT_OS_EXTENSION_IDS` | recommended | The published Chrome extension's id: only it may use a student's login (`extension/README.md`) |
 
 Never give a secret a `NEXT_PUBLIC_` name (the startup check refuses it).
@@ -125,8 +124,8 @@ entries from production apps.
   `docs/authentication.md` (Apple's secret expires every 6 months).
 - **Google Calendar / Outlook:** `docs/calendar-integrations.md` (Google consent
   screen verification before public launch; Microsoft client secret expiry).
-- **Canvas / Blackboard sign-in:** only with a school's approval
-  (`src/server/integrations/lms/README.md`); calendar feeds work without it.
+- **Canvas / Blackboard:** nothing to set up on their side: students connect with the
+  browser extension (`extension/README.md`). Publish it and set `STUDENT_OS_EXTENSION_IDS`.
 - **Anthropic:** a production key with a spending limit set in the console.
 
 ## Monitoring

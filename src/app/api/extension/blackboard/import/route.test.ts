@@ -1,14 +1,9 @@
-import { randomBytes } from "node:crypto"
 import { eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { lmsConnections } from "@/server/db/schema"
 import type { Database } from "@/server/db/types"
-import { syncBlackboardFeed } from "@/server/integrations/lms/blackboard/feed-sync"
-import { saveLmsFeedConnection } from "@/server/integrations/lms/connections"
-import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
 import { resetRateLimits } from "@/server/rate-limit"
 import { listCourses } from "@/server/services/courses"
-import { listExternalEvents } from "@/server/services/external-events"
 import { listTasks } from "@/server/services/tasks"
 import { createTestDb } from "@/server/test-utils/test-db"
 
@@ -191,39 +186,4 @@ describe("POST /api/extension/blackboard/import", () => {
     expect(response.status).toBe(200)
   })
 
-  it("switching from the calendar link links its tasks (no duplicates) and hides its calendar events", async () => {
-    vi.stubEnv("LMS_TOKEN_ENCRYPTION_KEY", randomBytes(32).toString("base64"))
-    const alex = await t.addUser("Alex")
-    const feedUrl = `${BASE}/webapps/calendar/calendarFeed/0a1b2c3d4e5f60718293a4b5c6d7e8f9/learn.ics`
-    await saveLmsFeedConnection(t.db, alex, "blackboard", { baseUrl: BASE, feedUrl }, getCredentialVault())
-    const feed = [
-      "BEGIN:VCALENDAR",
-      "BEGIN:VEVENT",
-      "DTSTART;TZID=America/New_York:20261001T235900",
-      "SUMMARY:Project 1",
-      "UID:_blackboard.platform.gradebook2.GradableItem-_1_1",
-      "END:VEVENT",
-      "BEGIN:VEVENT",
-      "UID:office-hours-1",
-      "SUMMARY:Office hours",
-      "DTSTART:20261001T150000Z",
-      "DTEND:20261001T160000Z",
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n")
-    const fromFeed = await syncBlackboardFeed(t.db, alex, getCredentialVault(), {
-      timeZone: "America/New_York",
-      now: new Date("2026-09-25T12:00:00Z"),
-      fetch: (async () => new Response(feed)) as typeof fetch,
-    })
-    expect(fromFeed).toMatchObject({ assignmentsCreated: 1 })
-    expect(await listExternalEvents(t.db, alex)).toEqual([expect.objectContaining({ title: "Office hours" })])
-
-    const fromExtension = await send(payload({ columns: { _215_1: [project] }, grades: {} }), alex)
-    expect(fromExtension.body.result).toMatchObject({ assignmentsCreated: 0 })
-    const tasks = await listTasks(t.db, alex)
-    expect(tasks.filter((task) => task.title === "Project 1")).toHaveLength(1)
-    expect(await connectionOf(alex)).toMatchObject({ method: "extension", feedUrlEncrypted: null })
-    expect(await listExternalEvents(t.db, alex)).toEqual([])
-  })
 })

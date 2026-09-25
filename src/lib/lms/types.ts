@@ -44,18 +44,6 @@ export type LmsAssignment = {
   submissionStatus: LmsSubmissionStatus
 }
 
-// Credentials for one connection, decrypted on the server just for the
-// duration of a request. Never sent to the browser, logged or stored as-is.
-export type LmsCredentials = {
-  accessToken: string
-  refreshToken: string | null
-  expiresAt: Date | null
-  // Institution-specific LMS address, e.g. https://school.instructure.com
-  baseUrl: string | null
-  // The student's id in the LMS (e.g. Blackboard's "_123_1"), if known.
-  externalUserId: string | null
-}
-
 // What a sync did, shown to the student afterwards.
 export type LmsSyncConflict = {
   taskId: string
@@ -92,7 +80,4 @@ export type LmsSyncResult = {
   // Safe, student-facing messages.
   errors: string[]
   syncedAt: string
-  // Calendar events from the same source (calendar feeds only; see
-  // src/lib/calendar/external-events.ts). Absent when the source has no calendar.
-  calendarEvents?: { added: number; updated: number; removed: number; skipped: number; failed: number }
 }

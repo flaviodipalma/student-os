@@ -179,8 +179,8 @@ export function planTasks(
   // The Student OS course for an LMS course id (after the course plan is applied).
   courseIdFor: (courseExternalId: string) => string | undefined,
   // What was synced: the provider, and the Student OS courses its assignments were fetched for.
-  // missingFrom: only tasks due on/after this date can be "missing" (for sources,
-  // like a calendar feed, that may leave out older items).
+  // missingFrom: only tasks due on/after this date can be "missing" (for sources
+  // that may leave out older items).
   scope: { provider: LmsProviderId; courseIds: string[]; missingFrom?: string }
 ): TaskPlan {
   const conflicts: LmsSyncConflict[] = []

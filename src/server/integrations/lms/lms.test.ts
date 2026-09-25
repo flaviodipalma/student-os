@@ -1,35 +1,19 @@
 import { randomBytes } from "node:crypto"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { generatePlan } from "@/lib/planner"
 import type { LmsAssignment, LmsCourse } from "@/lib/lms/types"
-import type { LmsProviderId } from "@/lib/types"
 import { lmsConnections } from "../../db/schema"
 import { NotFoundError } from "../../errors"
 import { createTestDb } from "../../test-utils/test-db"
 import { loadAppData } from "../../services/app-data"
 import { createCourse } from "../../services/courses"
 import { createTask, updateTask } from "../../services/tasks"
-import {
-  disconnectLms,
-  getLmsIntegrationStatus,
-  listLmsConnections,
-  loadLmsCredentials,
-  saveLmsConnection,
-} from "./connections"
-import { createCredentialVault, credentialContext, CredentialVaultError } from "./credential-vault"
-import { LmsNotAvailableError, UnavailableLmsProvider, type LmsAccess, type LmsProvider, type LmsTokenSet } from "./provider"
-import { getLmsProvider, listLmsProviders } from "./registry"
-import { syncLms } from "./sync"
+import { disconnectLms, getLmsIntegrationStatus, listLmsConnections, saveLmsExtensionConnection } from "./connections"
+import { createCredentialVault, CredentialVaultError } from "./credential-vault"
+import { runSync, type LmsReader } from "./sync"
 
-// An adapter that isn't built yet (every future LMS starts like this).
-class PlaceholderProvider extends UnavailableLmsProvider {
-  readonly id = "blackboard" as const
-  readonly name = "Placeholder LMS"
-  isConfigured = () => false
-}
-
-// The LMS architecture against a real Postgres (PGlite). No Canvas or
-// Blackboard API is called anywhere in here.
+// The LMS pipeline against a real Postgres (PGlite): connections (made by the
+// browser extension) and the shared sync. No Canvas or Blackboard is called.
 
 let t: Awaited<ReturnType<typeof createTestDb>>
 beforeEach(async () => {
@@ -39,48 +23,23 @@ afterEach(() => t.close())
 
 const vault = createCredentialVault(randomBytes(32))
 const NOW = new Date(2026, 8, 21, 8, 0)
-const tokens = (accessToken = "test-access-token"): LmsTokenSet & { baseUrl: string | null } => ({
-  accessToken,
-  refreshToken: "test-refresh-token",
-  expiresAt: new Date(2026, 8, 22),
-  externalUserId: "lms-user-1",
-  baseUrl: "https://lms.test.invalid",
-})
 
 // ---------------------------------------------------------------------------------
-// TEST FIXTURE PROVIDER. Returns hand-written data that is already in Student
-// OS's NORMALIZED format. It is not Canvas or Blackboard, doesn't imitate their
-// APIs, and exists only to drive the provider-independent sync pipeline.
-class FixtureLmsProvider implements LmsProvider {
-  readonly id: LmsProviderId = "canvas"
+// TEST FIXTURE READER. Returns hand-written data already in Student OS's
+// NORMALIZED format (what the extension imports produce). It isn't Canvas or
+// Blackboard; it only drives the provider-independent sync.
+class FixtureReader implements LmsReader {
+  readonly provider = "canvas" as const
   readonly name = "Test fixture LMS"
-  readonly available = true
-  seenTokens: string[] = []
+  readonly listsAllCourses = true
   constructor(
     public courses: LmsCourse[],
     public assignments: LmsAssignment[]
   ) {}
-  isConfigured() {
-    return true
-  }
-  getAuthorizationUrl(): string {
-    throw new Error("not used in tests")
-  }
-  async exchangeCode(): Promise<LmsTokenSet> {
-    throw new Error("not used in tests")
-  }
-  async refreshTokens(): Promise<LmsTokenSet> {
-    throw new Error("not used in tests")
-  }
-  async revokeTokens() {}
-  async getCourses(access: LmsAccess) {
-    this.seenTokens.push(await access.getAccessToken())
+  async getCourses() {
     return this.courses
   }
-  async getCourseDetails(_: LmsAccess, id: string) {
-    return this.courses.find((c) => c.externalId === id)!
-  }
-  async getAssignments(_: LmsAccess, courseExternalId: string) {
+  async getAssignments(courseExternalId: string) {
     return this.assignments.filter((a) => a.courseExternalId === courseExternalId)
   }
 }
@@ -113,10 +72,14 @@ const fixtureAssignment = (overrides: Partial<LmsAssignment> = {}): LmsAssignmen
 
 async function connectedStudent(name = "Alex") {
   const user = await t.addUser(name)
-  await saveLmsConnection(t.db, user, "canvas", tokens(), vault)
+  await saveLmsExtensionConnection(t.db, user, "canvas", "https://lms.test.invalid")
   return user
 }
 
+const syncWith = (user: string, reader: FixtureReader) =>
+  runSync(t.db, user, { provider: reader.provider, name: reader.name }, { now: NOW }, async () => reader)
+
+// Personal calendars (Google Calendar, Outlook) keep their tokens in this vault.
 describe("credential vault (token encryption)", () => {
   it("encrypts and decrypts, never storing the plain token", () => {
     const sealed = vault.seal("secret-token", "user:canvas")
@@ -137,104 +100,42 @@ describe("credential vault (token encryption)", () => {
   })
 })
 
-describe("providers", () => {
-  it("has a Canvas and a Blackboard adapter behind one interface", () => {
-    expect(listLmsProviders().map((p) => [p.id, p.name])).toEqual([
-      ["canvas", "Canvas"],
-      ["blackboard", "Blackboard"],
-    ])
-    expect(getLmsProvider("canvas").id).toBe("canvas")
-    expect(getLmsProvider("blackboard").id).toBe("blackboard")
-  })
-
-  it("an adapter that isn't built yet fails clearly and never touches the network", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch")
-    const provider = new PlaceholderProvider()
-    expect(provider.available).toBe(false)
-    expect(() => provider.getAuthorizationUrl()).toThrow(LmsNotAvailableError)
-    await expect(provider.getCourses()).rejects.toThrow("Placeholder LMS integration isn't available yet.")
-    await expect(provider.getAssignments()).rejects.toBeInstanceOf(LmsNotAvailableError)
-    await expect(provider.exchangeCode()).rejects.toBeInstanceOf(LmsNotAvailableError)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    fetchSpy.mockRestore()
-  })
-
-  it("Blackboard is implemented, and only usable once the server is configured", () => {
-    const blackboard = getLmsProvider("blackboard")
-    expect(blackboard.available).toBe(true)
-    expect(blackboard.isConfigured()).toBe(
-      Boolean(process.env.BLACKBOARD_CLIENT_ID && process.env.BLACKBOARD_CLIENT_SECRET && process.env.BLACKBOARD_REDIRECT_URI)
-    )
-  })
-
-  it("Canvas is implemented, and only usable once the server is configured", () => {
-    const canvas = getLmsProvider("canvas")
-    expect(canvas.available).toBe(true)
-    expect(canvas.isConfigured()).toBe(Boolean(process.env.CANVAS_CLIENT_ID && process.env.CANVAS_CLIENT_SECRET && process.env.CANVAS_REDIRECT_URI))
-  })
-})
-
 describe("LMS connections", () => {
-  it("stores tokens encrypted and only returns a token-free summary", async () => {
+  it("a connection holds no secret: only where the LMS is, and how the last sync went", async () => {
     const user = await connectedStudent()
     const [row] = await t.db.select().from(lmsConnections)
-    expect(row.accessTokenEncrypted).not.toContain("test-access-token")
-    expect(row.refreshTokenEncrypted).not.toContain("test-refresh-token")
-
-    const [summary] = await listLmsConnections(t.db, user)
-    expect(summary).toEqual({
-      provider: "canvas",
-      method: "oauth",
-      status: "connected",
-      connectedAt: expect.any(String),
-      lastSyncedAt: null,
-      lastSyncError: null,
-    })
-    expect(JSON.stringify(await getLmsIntegrationStatus(t.db, user))).not.toMatch(/test-access|test-refresh|lms-user-1/)
-    expect((await loadLmsCredentials(t.db, user, "canvas", vault)).accessToken).toBe("test-access-token")
-  })
-
-  it("shows Canvas and Blackboard as available (configured if the server has their app settings)", async () => {
-    const user = await t.addUser()
-    expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
-      { provider: "canvas", name: "Canvas", available: true, configured: getLmsProvider("canvas").isConfigured(), connection: null },
-      {
-        provider: "blackboard",
-        name: "Blackboard",
-        available: true,
-        configured: getLmsProvider("blackboard").isConfigured(),
-        connection: null,
-      },
+    expect(Object.keys(row).sort()).toEqual(["baseUrl", "createdAt", "id", "lastSyncError", "lastSyncedAt", "method", "provider", "status", "updatedAt", "userId"])
+    expect(row).toMatchObject({ method: "extension", baseUrl: "https://lms.test.invalid" })
+    expect(await listLmsConnections(t.db, user)).toEqual([
+      { provider: "canvas", status: "connected", connectedAt: expect.any(String), lastSyncedAt: null, lastSyncError: null },
     ])
   })
 
-  it("reconnecting replaces the tokens (one connection per provider)", async () => {
+  it("shows Canvas and Blackboard, each with the student's connection if any", async () => {
     const user = await connectedStudent()
-    await saveLmsConnection(t.db, user, "canvas", tokens("new-access-token"), vault)
-    expect(await t.db.select().from(lmsConnections)).toHaveLength(1)
-    expect((await loadLmsCredentials(t.db, user, "canvas", vault)).accessToken).toBe("new-access-token")
+    expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
+      { provider: "canvas", name: "Canvas", connection: expect.objectContaining({ provider: "canvas" }) },
+      { provider: "blackboard", name: "Blackboard", connection: null },
+    ])
   })
 
-  it("one student can't see, use or remove another's connection", async () => {
+  it("syncing again updates the same connection (one per LMS)", async () => {
+    const user = await connectedStudent()
+    await saveLmsExtensionConnection(t.db, user, "canvas", "https://canvas.myschool.edu")
+    expect(await t.db.select().from(lmsConnections)).toEqual([expect.objectContaining({ baseUrl: "https://canvas.myschool.edu" })])
+  })
+
+  it("one student can't see or remove another's connection", async () => {
     const alice = await connectedStudent("Alice")
     const bob = await t.addUser("Bob")
     expect(await listLmsConnections(t.db, bob)).toEqual([])
-    await expect(loadLmsCredentials(t.db, bob, "canvas", vault)).rejects.toBeInstanceOf(NotFoundError)
     await expect(disconnectLms(t.db, bob, "canvas")).rejects.toBeInstanceOf(NotFoundError)
-    await expect(syncLms(t.db, bob, new FixtureLmsProvider([fixtureCourse()], []), vault)).rejects.toBeInstanceOf(NotFoundError)
     expect(await listLmsConnections(t.db, alice)).toHaveLength(1)
-
-    // Alice's encrypted token copied into Bob's row doesn't decrypt for Bob.
-    const [alicesRow] = await t.db.select().from(lmsConnections)
-    await t.db.insert(lmsConnections).values({ userId: bob, provider: "canvas", accessTokenEncrypted: alicesRow.accessTokenEncrypted })
-    // (Bob just sees a "connect again" message; the token is never revealed.)
-    await expect(loadLmsCredentials(t.db, bob, "canvas", vault)).rejects.toThrow("Please connect Canvas again.")
-    expect(credentialContext(alice, "canvas")).not.toBe(credentialContext(bob, "canvas"))
   })
 
-  it("disconnecting deletes the tokens but keeps imported courses and tasks", async () => {
+  it("disconnecting deletes the connection but keeps imported courses and tasks", async () => {
     const user = await connectedStudent()
-    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
+    await syncWith(user, new FixtureReader([fixtureCourse()], [fixtureAssignment()]))
     await disconnectLms(t.db, user, "canvas")
     expect(await t.db.select().from(lmsConnections)).toEqual([])
     const data = await loadAppData(t.db, user)
@@ -243,11 +144,11 @@ describe("LMS connections", () => {
   })
 })
 
-describe("syncing (with the test fixture provider)", () => {
+describe("syncing (with a test fixture reader)", () => {
   it("imports LMS courses and assignments as normal courses and tasks, with their source", async () => {
     const user = await connectedStudent()
-    const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment(), fixtureAssignment({ externalId: "no-date", dueDate: null })])
-    const result = await syncLms(t.db, user, provider, vault, { now: NOW })
+    const reader = new FixtureReader([fixtureCourse()], [fixtureAssignment(), fixtureAssignment({ externalId: "no-date", dueDate: null })])
+    const result = await syncWith(user, reader)
 
     expect(result).toEqual({
       provider: "canvas",
@@ -268,7 +169,6 @@ describe("syncing (with the test fixture provider)", () => {
       errors: [],
       syncedAt: NOW.toISOString(),
     })
-    expect(provider.seenTokens).toEqual(["test-access-token"]) // decrypted on the server for the adapter
     const data = await loadAppData(t.db, user)
     expect(data.courses[0]).toMatchObject({
       code: "CSC 215",
@@ -292,9 +192,9 @@ describe("syncing (with the test fixture provider)", () => {
 
   it("syncing again creates no duplicates", async () => {
     const user = await connectedStudent()
-    const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, { now: NOW })
-    const again = await syncLms(t.db, user, provider, vault, { now: NOW })
+    const reader = new FixtureReader([fixtureCourse()], [fixtureAssignment()])
+    await syncWith(user, reader)
+    const again = await syncWith(user, reader)
     expect(again).toMatchObject({ coursesCreated: 0, assignmentsCreated: 0, assignmentsSkipped: 1 })
     const data = await loadAppData(t.db, user)
     expect(data.courses).toHaveLength(1)
@@ -303,35 +203,35 @@ describe("syncing (with the test fixture provider)", () => {
 
   it("applies LMS changes, but keeps the student's own changes and reports conflicts", async () => {
     const user = await connectedStudent()
-    const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, { now: NOW })
+    const reader = new FixtureReader([fixtureCourse()], [fixtureAssignment()])
+    await syncWith(user, reader)
     const [task] = (await loadAppData(t.db, user)).tasks
 
     // The LMS moves the due date; the student only changed priority: the date updates, priority stays.
     await updateTask(t.db, user, task.id, { priority: "critical" })
-    provider.assignments = [fixtureAssignment({ dueDate: "2026-09-25" })]
-    const first = await syncLms(t.db, user, provider, vault, { now: NOW })
+    reader.assignments = [fixtureAssignment({ dueDate: "2026-09-25" })]
+    const first = await syncWith(user, reader)
     expect(first.assignmentsUpdated).toBe(1)
     expect((await loadAppData(t.db, user)).tasks[0]).toMatchObject({ dueDate: "2026-09-25", priority: "critical" })
 
     // Now the student moves it to Saturday and the LMS moves it too: the student's date wins.
     await updateTask(t.db, user, task.id, { dueDate: "2026-09-26" })
-    provider.assignments = [fixtureAssignment({ dueDate: "2026-09-24" })]
-    const second = await syncLms(t.db, user, provider, vault, { now: NOW })
+    reader.assignments = [fixtureAssignment({ dueDate: "2026-09-24" })]
+    const second = await syncWith(user, reader)
     expect(second.conflicts).toEqual([
       { taskId: task.id, title: "Project 1", field: "dueDate", studentValue: "2026-09-26", lmsValue: "2026-09-24" },
     ])
     expect((await loadAppData(t.db, user)).tasks[0].dueDate).toBe("2026-09-26")
     // Reported once: the next sync with the same LMS value is quiet.
-    expect((await syncLms(t.db, user, provider, vault, { now: NOW })).conflicts).toEqual([])
+    expect((await syncWith(user, reader)).conflicts).toEqual([])
   })
 
   it("never deletes a task the LMS stopped listing; reports it as missing", async () => {
     const user = await connectedStudent()
-    const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, user, provider, vault, { now: NOW })
-    provider.assignments = []
-    const result = await syncLms(t.db, user, provider, vault, { now: NOW })
+    const reader = new FixtureReader([fixtureCourse()], [fixtureAssignment()])
+    await syncWith(user, reader)
+    reader.assignments = []
+    const result = await syncWith(user, reader)
     expect(result.assignmentsMissing).toBe(1)
     expect(result.missing).toEqual([{ taskId: expect.any(String), title: "Project 1" }])
     expect((await loadAppData(t.db, user)).tasks).toHaveLength(1)
@@ -350,7 +250,7 @@ describe("syncing (with the test fixture provider)", () => {
       estimateMinutes: 240,
       status: "in_progress",
     })
-    const result = await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
+    const result = await syncWith(user, new FixtureReader([fixtureCourse()], [fixtureAssignment()]))
     expect(result).toMatchObject({ coursesLinked: 1, coursesCreated: 0, assignmentsLinked: 1, assignmentsCreated: 0 })
     const data = await loadAppData(t.db, user)
     expect(data.courses).toHaveLength(1)
@@ -367,9 +267,9 @@ describe("syncing (with the test fixture provider)", () => {
   it("keeps each student's imports separate, even for the same LMS ids", async () => {
     const alice = await connectedStudent("Alice")
     const bob = await connectedStudent("Bob")
-    const provider = new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()])
-    await syncLms(t.db, alice, provider, vault, { now: NOW })
-    await syncLms(t.db, bob, provider, vault, { now: NOW })
+    const reader = new FixtureReader([fixtureCourse()], [fixtureAssignment()])
+    await syncWith(alice, reader)
+    await syncWith(bob, reader)
     const alices = await loadAppData(t.db, alice)
     const bobs = await loadAppData(t.db, bob)
     expect(alices.tasks).toHaveLength(1)
@@ -378,35 +278,23 @@ describe("syncing (with the test fixture provider)", () => {
     expect(bobs.courses[0].id).not.toBe(alices.courses[0].id)
   })
 
-  it("an unavailable provider fails safely: nothing imported, a safe message recorded", async () => {
-    const user = await t.addUser()
-    await saveLmsConnection(t.db, user, "blackboard", tokens(), vault)
-    await expect(syncLms(t.db, user, new PlaceholderProvider(), vault, { now: NOW })).rejects.toThrow(
-      "Placeholder LMS integration isn't available yet."
-    )
-    expect((await loadAppData(t.db, user)).courses).toEqual([])
-    expect((await listLmsConnections(t.db, user))[0]).toMatchObject({
-      status: "error",
-      lastSyncError: "Placeholder LMS integration isn't available yet.",
-    })
-  })
-
-  it("provider errors never reach the student or the database as-is", async () => {
+  it("unexpected errors never reach the student or the database as-is", async () => {
     const user = await connectedStudent()
-    const leaky = new FixtureLmsProvider([], [])
+    const leaky = new FixtureReader([], [])
     leaky.getCourses = async () => {
-      throw new Error("401 for https://lms.test.invalid?access_token=test-access-token")
+      throw new Error("internal detail https://lms.test.invalid?secret=abc")
     }
-    const error = await syncLms(t.db, user, leaky, vault, { now: NOW }).catch((e) => e)
+    const error = await syncWith(user, leaky).catch((e) => e)
     expect(error.message).toBe("Syncing with Test fixture LMS failed. Please try again.")
-    expect((await listLmsConnections(t.db, user))[0].lastSyncError).not.toContain("access_token")
+    expect((await listLmsConnections(t.db, user))[0]).toMatchObject({ status: "error" })
+    expect((await listLmsConnections(t.db, user))[0].lastSyncError).not.toContain("secret")
   })
 })
 
 describe("imported tasks in the rest of Student OS", () => {
   it("the Planner plans them like any other task", async () => {
     const user = await connectedStudent()
-    await syncLms(t.db, user, new FixtureLmsProvider([fixtureCourse()], [fixtureAssignment()]), vault, { now: NOW })
+    await syncWith(user, new FixtureReader([fixtureCourse()], [fixtureAssignment()]))
     const data = await loadAppData(t.db, user)
     const plan = generatePlan({ date: "2026-09-21", tasks: data.tasks, events: data.events, now: NOW })
     expect(plan.suggestions.some((s) => s.taskId === data.tasks[0].id)).toBe(true)
