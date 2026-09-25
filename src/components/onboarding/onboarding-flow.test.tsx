@@ -24,7 +24,7 @@ vi.mock("@/components/courses/course-form-dialog", () => ({
 }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
-    student: { firstName: "Alex", lastName: "", academicTerm: "", academicYear: null },
+    student: { firstName: "Alex", lastName: "", schoolName: "", schoolDomain: null },
     preferences: DEFAULT_STUDENT_PREFERENCES,
     recurringCommitments: [],
     courses: [],

@@ -76,7 +76,7 @@ async function extractCsc215(): Promise<ReviewDraft> {
 describe("a new student, from sign-up to today's plan", () => {
   it("1. signs up and finishes onboarding: profile, preferences, soccer on weekdays", async () => {
     await saveOnboardingDetails(t.db, alex, {
-      profile: { firstName: "Alex", lastName: "", academicTerm: "Fall 2026", academicYear: "sophomore" },
+      profile: { firstName: "Alex", lastName: "", schoolName: "", schoolDomain: null },
       preferences: { ...DEFAULT_STUDENT_PREFERENCES, maxStudyMinutesPerDay: 240, preferredBlockMinutes: 60 },
       commitments: [
         { title: "Soccer", daysOfWeek: [1, 2, 3, 4, 5], startTime: "10:30", endTime: "13:00", type: "sports" },

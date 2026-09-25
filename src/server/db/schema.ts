@@ -66,7 +66,6 @@ export const notificationType = pgEnum("notification_type", [
 ])
 export const feedbackKind = pgEnum("feedback_kind", ["bug", "confusing", "idea", "other"])
 export const themePreference = pgEnum("theme_preference", ["light", "dark", "system"])
-export const academicYear = pgEnum("academic_year", ["freshman", "sophomore", "junior", "senior", "graduate", "other"])
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -101,9 +100,10 @@ export const profiles = pgTable(
       .references(() => authUsers.id, { onDelete: "cascade" }),
     firstName: text("first_name").notNull().default(""),
     lastName: text("last_name").notNull().default(""),
-    // e.g. "Fall 2026"
-    academicTerm: text("academic_term").notNull().default(""),
-    academicYear: academicYear("academic_year"),
+    // The student's school, picked from the list (src/server/schools) or typed in;
+    // empty when not given. Its web domain (e.g. "qu.edu") when it came from the list.
+    schoolName: text("school_name").notNull().default(""),
+    schoolDomain: text("school_domain"),
     // New students go through onboarding first; this flips when they finish it.
     onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
     ...timestamps,
@@ -111,7 +111,11 @@ export const profiles = pgTable(
   (t) => [
     check("profiles_first_name_length", sql`char_length(${t.firstName}) <= 80`),
     check("profiles_last_name_length", sql`char_length(${t.lastName}) <= 80`),
-    check("profiles_academic_term_length", sql`char_length(${t.academicTerm}) <= 60`),
+    check("profiles_school_name_length", sql`char_length(${t.schoolName}) <= 200`),
+    check(
+      "profiles_school_domain_format",
+      sql`${t.schoolDomain} is null or (char_length(${t.schoolDomain}) <= 253 and ${t.schoolDomain} ~ '^[a-z0-9.-]+\\.[a-z]{2,}$')`
+    ),
   ]
 ).enableRLS()
 

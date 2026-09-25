@@ -20,8 +20,8 @@ function toStudent(row: typeof profiles.$inferSelect | undefined): Student {
   return {
     firstName: row?.firstName ?? "",
     lastName: row?.lastName ?? "",
-    academicTerm: row?.academicTerm ?? "",
-    academicYear: row?.academicYear ?? null,
+    schoolName: row?.schoolName ?? "",
+    schoolDomain: row?.schoolDomain ?? null,
     onboardingCompleted: row?.onboardingCompleted ?? false,
   }
 }
@@ -37,8 +37,8 @@ export async function updateProfile(db: Database, userId: string, input: Profile
     .set({
       firstName: input.firstName,
       lastName: input.lastName,
-      academicTerm: input.academicTerm,
-      academicYear: input.academicYear,
+      schoolName: input.schoolName,
+      schoolDomain: input.schoolDomain,
     })
     .where(eq(profiles.id, userId))
     .returning()

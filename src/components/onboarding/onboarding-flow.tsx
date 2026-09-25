@@ -60,8 +60,8 @@ export function OnboardingFlow() {
   const [profile, setProfile] = useState<ProfileInput>({
     firstName: store.student.firstName,
     lastName: store.student.lastName,
-    academicTerm: store.student.academicTerm,
-    academicYear: store.student.academicYear,
+    schoolName: store.student.schoolName,
+    schoolDomain: store.student.schoolDomain,
   })
   const [preferences, setPreferences] = useState<StudentPreferences>(store.preferences)
   const [commitments, setCommitments] = useState<EditableCommitment[]>(store.recurringCommitments)

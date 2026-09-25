@@ -121,9 +121,18 @@ export function firstIssue(error: z.ZodError): string {
 export const profileSchema = z.object({
   firstName: z.string().trim().min(1, "Add your first name.").max(80, "That name is too long."),
   lastName: z.string().trim().max(80, "That name is too long.").default(""),
-  academicTerm: z.string().trim().max(60, "Keep the term short, e.g. Fall 2026.").default(""),
-  academicYear: z.enum(["freshman", "sophomore", "junior", "senior", "graduate", "other"]).nullable().default(null),
+  schoolName: z.string().trim().max(200, "That school name is too long.").default(""),
+  schoolDomain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "That school's web address isn't valid.")
+    .nullable()
+    .default(null),
 })
+  // A domain only belongs with a school name.
+  .transform((profile) => (profile.schoolName ? profile : { ...profile, schoolDomain: null }))
 
 export const notificationPreferencesSchema = z.object({
   enabled: z.boolean(),

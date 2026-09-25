@@ -127,6 +127,20 @@
       "when": 1790360996883,
       "tag": "0017_extension_only_lms",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790378785449,
+      "tag": "0018_drop_term_and_year",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790378806042,
+      "tag": "0019_school",
+      "breakpoints": true
     }
   ]
 }

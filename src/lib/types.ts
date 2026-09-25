@@ -211,16 +211,13 @@ export const DEFAULT_LEARNING_SETTINGS: LearningSettings = {
 }
 
 // The signed-in student's profile.
-export const academicYears = ["freshman", "sophomore", "junior", "senior", "graduate", "other"] as const
-export type AcademicYear = (typeof academicYears)[number]
-
 export type Student = {
   firstName: string
   lastName: string
-  // e.g. "Fall 2026"
-  academicTerm: string
-  // Year in school; null when not set.
-  academicYear: AcademicYear | null
+  // The student's school ("" when not given), and its web domain when picked from
+  // the list (e.g. "qu.edu").
+  schoolName: string
+  schoolDomain: string | null
   onboardingCompleted: boolean
 }
 

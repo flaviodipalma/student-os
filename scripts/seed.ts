@@ -81,7 +81,7 @@ async function main() {
 
     // 3. A finished onboarding: profile, default preferences, the regular week.
     await saveOnboardingDetails(db, userId, {
-      profile: { firstName: "Flavio", lastName: "", academicTerm: "Fall 2026", academicYear: "sophomore" },
+      profile: { firstName: "Flavio", lastName: "", schoolName: "Quinnipiac University", schoolDomain: "qu.edu" },
       preferences: DEFAULT_STUDENT_PREFERENCES,
       commitments: seedWeeklyCommitments(),
     })

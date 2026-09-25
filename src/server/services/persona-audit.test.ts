@@ -42,7 +42,7 @@ beforeAll(async () => {
   t = await createTestDb()
   maya = await t.addUser("Maya")
   await saveOnboardingDetails(t.db, maya, {
-    profile: { firstName: "Maya", lastName: "Lopez", academicTerm: "Fall 2026", academicYear: "sophomore" },
+    profile: { firstName: "Maya", lastName: "Lopez", schoolName: "Quinnipiac University", schoolDomain: "qu.edu" },
     preferences: { studyStart: "08:00", studyEnd: "23:00", maxStudyMinutesPerDay: 240, preferredBlockMinutes: 60, breakMinutes: 10 },
     commitments: [
       // Classes and soccer as weekly commitments.

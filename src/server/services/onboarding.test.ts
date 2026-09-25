@@ -38,7 +38,7 @@ const practice: RecurringCommitmentInput = {
   type: "sports",
 }
 
-const profile = { firstName: "Flavio", lastName: "Di Palma", academicTerm: "Fall 2026", academicYear: "sophomore" as const }
+const profile = { firstName: "Flavio", lastName: "Di Palma", schoolName: "Quinnipiac University", schoolDomain: "qu.edu" }
 
 describe("onboarding", () => {
   it("a new student hasn't onboarded yet and starts with the default preferences", async () => {

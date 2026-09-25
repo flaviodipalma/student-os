@@ -22,8 +22,8 @@ export function SettingsView() {
   const [profile, setProfile] = useState<ProfileInput>({
     firstName: store.student.firstName,
     lastName: store.student.lastName,
-    academicTerm: store.student.academicTerm,
-    academicYear: store.student.academicYear,
+    schoolName: store.student.schoolName,
+    schoolDomain: store.student.schoolDomain,
   })
   const [preferences, setPreferences] = useState<StudentPreferences>(store.preferences)
   const notificationStore = useNotifications()
@@ -36,7 +36,7 @@ export function SettingsView() {
       <Section
         id="profile"
         title="About you"
-        description="Your name is used in greetings; term and year help keep things organized."
+        description="Your name is used in greetings. Your school is optional."
         onSave={async () => {
           const parsed = profileSchema.safeParse(profile)
           if (!parsed.success) return firstIssue(parsed.error)
