@@ -13,10 +13,10 @@ const ADDRESS_KEY = "address"
 const choiceKey = (canvasOrigin: string) => `courses:${canvasOrigin}`
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
-const checking = $<HTMLParagraphElement>("checking")
+const checking = $<HTMLDivElement>("checking")
 const loggedOut = $<HTMLElement>("logged-out")
 const signedIn = $<HTMLElement>("signed-in")
-const connectionError = $<HTMLParagraphElement>("connection-error")
+const connectionError = $<HTMLDivElement>("connection-error")
 const addressForm = $<HTMLFormElement>("address-form")
 const addressInput = $<HTMLInputElement>("address")
 const syncButton = $<HTMLButtonElement>("sync")
@@ -25,13 +25,19 @@ const picker = $<HTMLFormElement>("picker")
 const pickerGroups = $<HTMLDivElement>("picker-groups")
 const importButton = $<HTMLButtonElement>("import-chosen")
 const result = $<HTMLDivElement>("result")
-const syncError = $<HTMLParagraphElement>("sync-error")
+const syncError = $<HTMLDivElement>("sync-error")
 
 let address = DEFAULT_ADDRESS
 
 function setText(element: HTMLElement, message: string | null) {
   element.textContent = message ?? ""
   element.hidden = !message
+}
+
+// A notice (icon + text): the text goes in its "-text" element, so the icon stays.
+function setNotice(notice: HTMLElement, message: string | null) {
+  $(`${notice.id}-text`).textContent = message ?? ""
+  notice.hidden = !message
 }
 
 // ---- Who's logged in -------------------------------------------------------------
@@ -42,10 +48,13 @@ function show(state: State) {
   checking.hidden = state.kind !== "checking"
   signedIn.hidden = state.kind !== "signed-in"
   loggedOut.hidden = state.kind !== "logged-out"
-  setText(connectionError, state.kind === "error" ? state.message : null)
-  if (state.kind === "signed-in") $("first-name").textContent = state.firstName
+  setNotice(connectionError, state.kind === "error" ? state.message : null)
+  if (state.kind === "signed-in") {
+    $("first-name").textContent = state.firstName
+    $("avatar").textContent = state.firstName.trim().charAt(0).toUpperCase() || "?"
+  }
   if (state.kind === "logged-out") {
-    $("logged-out-message").textContent = state.message ?? "Log in to Student OS in this browser. The extension syncs to that account."
+    $("logged-out-message").textContent = state.message ?? "Log in in this browser. The extension syncs to that account."
   }
   $("address-label").textContent = address.replace(/^https?:\/\//, "")
 }
@@ -230,10 +239,11 @@ async function sync(choose: boolean): Promise<string[] | null> {
 }
 
 async function runSync(choose: boolean) {
-  setText(syncError, null)
+  setNotice(syncError, null)
   result.hidden = true
   syncButton.disabled = true
-  syncButton.textContent = "Syncing…"
+  syncButton.setAttribute("aria-busy", "true")
+  $("sync-label").textContent = "Syncing…"
   try {
     const lines = await sync(choose)
     if (!lines) return
@@ -251,11 +261,12 @@ async function runSync(choose: boolean) {
       show({ kind: "logged-out", message: "You're logged out of Student OS. Log in, then click Sync now again." })
       return
     }
-    setText(syncError, error instanceof StudentOsError ? error.message : "Something went wrong. Please try again.")
+    setNotice(syncError, error instanceof StudentOsError ? error.message : "Something went wrong. Please try again.")
   } finally {
     setText(progress, null)
     syncButton.disabled = false
-    syncButton.textContent = "Sync now"
+    syncButton.removeAttribute("aria-busy")
+    $("sync-label").textContent = "Sync now"
   }
 }
 

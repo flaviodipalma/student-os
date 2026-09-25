@@ -1,87 +1,257 @@
-/* Colors follow Student OS (src/app/globals.css), light and dark. */
+/* The Student OS popup. Colors, radius and type follow the app's design system
+   (docs/design-system.md, src/app/globals.css): the same Light and Dark token
+   values, chosen by the device's setting. Depth comes from quiet inner shadows: a
+   light rim along the top edge and a hairline inner border on cards, a raised
+   primary button, slightly inset fields. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("fonts/geist-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
 :root {
   color-scheme: light dark;
+  --radius: 0.625rem; /* buttons, inputs, rows (rounded-lg) */
+  --radius-card: 0.875rem; /* cards (rounded-xl) */
+  --radius-sm: 0.375rem;
+
   --background: oklch(0.982 0.003 270);
   --foreground: oklch(0.21 0.018 272);
   --card: oklch(1 0 0);
+  --muted: oklch(0.958 0.005 272);
   --muted-foreground: oklch(0.47 0.018 272);
+  --subtle-foreground: oklch(0.55 0.014 272);
   --primary: oklch(0.5 0.2 277);
+  --primary-hover: oklch(0.45 0.2 277);
   --primary-foreground: oklch(0.99 0.004 277);
+  --primary-soft: oklch(0.955 0.025 277);
+  --primary-soft-foreground: oklch(0.43 0.18 277);
   --border: oklch(0.91 0.006 272);
+  --border-subtle: oklch(0.94 0.005 272);
+  --input: oklch(0.88 0.008 272);
+  --ring: oklch(0.6 0.17 277);
+  --success: oklch(0.47 0.12 155);
+  --success-soft: oklch(0.965 0.03 158);
+  --success-border: oklch(0.86 0.07 158);
   --danger: oklch(0.5 0.19 27);
-  --success: oklch(0.55 0.14 155);
+  --danger-soft: oklch(0.965 0.018 22);
+  --danger-border: oklch(0.87 0.06 22);
+
+  /* Inner light and shadow. */
+  --rim: oklch(1 0 0 / 0.9);
+  --shade: oklch(0.2 0.02 272 / 0.04);
+  --card-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 var(--shade), inset 0 0 0 1px var(--border),
+    0 1px 2px oklch(0.2 0.02 272 / 0.05), 0 4px 12px -4px oklch(0.2 0.02 272 / 0.06);
+  --field-shadow: inset 0 1px 2px oklch(0.2 0.02 272 / 0.07), inset 0 0 0 1px var(--input);
+  --button-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 -1px 0 oklch(0.1 0.05 277 / 0.25),
+    0 1px 2px oklch(0.2 0.08 277 / 0.25), 0 3px 8px -3px oklch(0.4 0.2 277 / 0.35);
+  --secondary-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 var(--shade), inset 0 0 0 1px var(--border),
+    0 1px 2px oklch(0.2 0.02 272 / 0.05);
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fcfcff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: oklch(0.16 0.01 272);
     --foreground: oklch(0.93 0.006 272);
     --card: oklch(0.2 0.011 272);
+    --muted: oklch(0.25 0.012 272);
     --muted-foreground: oklch(0.74 0.012 272);
+    --subtle-foreground: oklch(0.64 0.012 272);
     --primary: oklch(0.7 0.15 277);
+    --primary-hover: oklch(0.76 0.13 277);
     --primary-foreground: oklch(0.17 0.03 277);
-    --border: oklch(1 0 0 / 12%);
+    --primary-soft: oklch(0.29 0.06 277);
+    --primary-soft-foreground: oklch(0.83 0.09 277);
+    --border: oklch(1 0 0 / 9%);
+    --border-subtle: oklch(1 0 0 / 6%);
+    --input: oklch(1 0 0 / 14%);
+    --ring: oklch(0.7 0.15 277);
+    --success: oklch(0.8 0.13 158);
+    --success-soft: oklch(0.27 0.045 160);
+    --success-border: oklch(0.42 0.07 160);
     --danger: oklch(0.76 0.14 25);
-    --success: oklch(0.75 0.14 155);
+    --danger-soft: oklch(0.27 0.05 25);
+    --danger-border: oklch(0.44 0.1 25);
+
+    /* In the dark, depth comes from lighter surfaces and a light rim, not drop shadows. */
+    --rim: oklch(1 0 0 / 0.07);
+    --shade: oklch(0 0 0 / 0.25);
+    --card-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 var(--shade), inset 0 0 0 1px var(--border),
+      0 8px 20px -8px oklch(0 0 0 / 0.5);
+    --field-shadow: inset 0 1px 3px oklch(0 0 0 / 0.35), inset 0 0 0 1px var(--input);
+    --button-shadow: inset 0 1px 0 oklch(1 0 0 / 0.35), inset 0 -1px 0 oklch(0.1 0.05 277 / 0.35),
+      0 4px 14px -4px oklch(0.6 0.15 277 / 0.35);
+    --secondary-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 var(--shade), inset 0 0 0 1px var(--border);
+    --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161528' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   }
 }
 
 * { box-sizing: border-box; }
-/* `hidden` must win over the display rules below (form is a grid). */
+/* `hidden` must win over the display rules below. */
 [hidden] { display: none !important; }
+
 body {
   margin: 0;
-  width: 320px;
+  width: 340px;
   background: var(--background);
   color: var(--foreground);
-  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 400 13px/1.5 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
 }
-main { padding: 16px; }
-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-h1 { margin: 0; font-size: 15px; font-weight: 600; }
+main, main > section { display: grid; gap: 12px; }
+main { padding: 14px 14px 12px; }
+p { margin: 0; }
+a { color: var(--primary-soft-foreground); text-decoration: none; font-weight: 500; border-radius: 4px; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid color-mix(in oklch, var(--ring), transparent 50%); outline-offset: 2px; }
+.icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+.title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.caption { font-size: 12px; color: var(--muted-foreground); }
+.hint { font-size: 12.5px; color: var(--muted-foreground); margin-bottom: -4px; }
+
+/* ---- Brand ---- */
+.brand { display: flex; align-items: center; gap: 10px; }
 .mark {
-  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px;
-  background: var(--primary); color: var(--primary-foreground); font-weight: 700; font-size: 13px;
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  background: linear-gradient(to bottom, color-mix(in oklch, var(--primary), white 10%), var(--primary));
+  color: var(--primary-foreground);
+  box-shadow: var(--button-shadow);
 }
-p { margin: 0 0 10px; }
-a { color: var(--primary); }
-.muted { color: var(--muted-foreground); font-size: 13px; }
-form { display: grid; gap: 6px; }
-label { font-weight: 500; font-size: 13px; margin-top: 4px; }
-input {
-  width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--card); color: var(--foreground); font: inherit;
+.mark .icon { width: 17px; height: 17px; }
+.brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+
+/* ---- Cards ---- */
+.card {
+  background: linear-gradient(to bottom, var(--card), color-mix(in oklch, var(--card), var(--muted) 45%));
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  padding: 12px;
 }
-input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in oklch, var(--primary), transparent 50%); outline-offset: 1px; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.checking { display: flex; align-items: center; gap: 10px; color: var(--muted-foreground); }
+
+.account { display: flex; align-items: center; gap: 12px; }
+/* The popup's one hero: a soft wash of the accent. */
+.hero {
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in oklch, var(--primary-soft), transparent 15%), transparent 60%),
+    linear-gradient(to bottom, var(--card), color-mix(in oklch, var(--card), var(--muted) 45%));
+}
+.account-text { min-width: 0; flex: 1; }
+.account-text .title { overflow-wrap: anywhere; }
+.avatar {
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  background: var(--primary-soft); color: var(--primary-soft-foreground);
+  font-size: 15px; font-weight: 600;
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 0 0 1px color-mix(in oklch, var(--primary-soft-foreground), transparent 80%);
+}
+.avatar-muted { background: var(--muted); color: var(--muted-foreground); box-shadow: inset 0 1px 0 var(--rim), inset 0 0 0 1px var(--border); }
+.live {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 500; color: var(--success);
+  background: var(--success-soft); box-shadow: inset 0 0 0 1px var(--success-border);
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in oklch, currentColor, transparent 80%); }
+
+/* ---- Buttons ---- */
 button {
-  margin-top: 8px; padding: 7px 12px; border: 0; border-radius: 8px; cursor: pointer;
-  background: var(--primary); color: var(--primary-foreground); font: inherit; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 14px; border: 0; border-radius: var(--radius); cursor: pointer;
+  font: 500 13px/1 inherit; font-family: inherit; letter-spacing: -0.005em;
+  /* Only movement animates: colors change at once, so a theme switch never shows a half-finished fade. */
+  transition: filter 120ms, transform 120ms;
 }
 button:disabled { opacity: 0.6; cursor: default; }
-button.secondary { background: transparent; color: var(--foreground); border: 1px solid var(--border); }
-.error { color: var(--danger); font-size: 13px; margin: 4px 0 0; }
-.status { display: flex; align-items: center; gap: 6px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
-.row { display: flex; flex-wrap: wrap; gap: 8px; }
-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
-footer .muted { font-size: 12px; }
-#address-form { margin-top: 8px; }
-#sync { width: 100%; }
-.result {
-  margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px;
-  background: color-mix(in oklch, var(--success), transparent 88%); border: 1px solid color-mix(in oklch, var(--success), transparent 60%);
+button.primary {
+  color: var(--primary-foreground);
+  background: linear-gradient(to bottom, color-mix(in oklch, var(--primary), white 8%), var(--primary));
+  box-shadow: var(--button-shadow);
 }
-.result-title { font-weight: 600; margin: 0 0 4px; }
-.result ul { margin: 0; padding-left: 18px; }
-.links { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; margin: 12px 0 0; }
-.picker-title { font-weight: 600; margin: 12px 0 2px; }
-.picker-groups { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; background: var(--card); }
-fieldset { border: 0; margin: 0; padding: 6px 0; }
-fieldset + fieldset { border-top: 1px solid var(--border); }
-/* Floated, so a legend sits inside its fieldset instead of on the border line. */
-legend { float: left; width: 100%; margin-bottom: 2px; font-weight: 600; font-size: 12px; padding: 0; color: var(--muted-foreground); }
-.course { clear: both; }
-.badge { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px; color: var(--success); background: color-mix(in oklch, var(--success), transparent 85%); }
-.course { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 13px; font-weight: 400; margin: 0; cursor: pointer; }
-.course input { width: auto; margin: 2px 0 0; accent-color: var(--primary); }
+button.primary:not(:disabled):hover { filter: brightness(1.06); }
+button.primary:not(:disabled):active { transform: translateY(0.5px); box-shadow: inset 0 1px 3px oklch(0 0 0 / 0.3); }
+button.secondary {
+  color: var(--foreground);
+  background: linear-gradient(to bottom, var(--card), color-mix(in oklch, var(--card), var(--muted) 60%));
+  box-shadow: var(--secondary-shadow);
+}
+button.secondary:not(:disabled):active { transform: translateY(0.5px); box-shadow: inset 0 1px 3px oklch(0 0 0 / 0.12), inset 0 0 0 1px var(--border); }
+button.block { width: 100%; height: 40px; font-size: 14px; }
+.grow { flex: 1; }
+.row { display: flex; gap: 8px; }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin, #sync[aria-busy="true"] .sync-icon { animation: spin 0.9s linear infinite; }
+.progress { font-size: 12px; color: var(--muted-foreground); text-align: center; }
+
+/* ---- Fields ---- */
+form { display: grid; gap: 8px; }
+label { font-size: 12px; font-weight: 500; }
+input:not([type]), input[type="text"] {
+  width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: var(--radius);
+  background: var(--background); color: var(--foreground); font: inherit;
+  box-shadow: var(--field-shadow);
+}
+
+/* ---- Course picker ---- */
+.picker { gap: 10px; }
+.picker-head { display: grid; gap: 2px; }
+.picker-groups {
+  max-height: 250px; overflow-y: auto; border-radius: var(--radius);
+  background: var(--background); box-shadow: var(--field-shadow); padding: 2px 10px;
+}
+fieldset { border: 0; margin: 0; padding: 8px 0; }
+fieldset + fieldset { border-top: 1px solid var(--border-subtle); }
+/* Floated, so the legend sits inside its fieldset instead of on the border line. */
+legend {
+  float: left; width: 100%; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; padding: 0;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtle-foreground);
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-transform: none;
+  color: var(--success); background: var(--success-soft); box-shadow: inset 0 0 0 1px var(--success-border);
+}
+.badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.course {
+  clear: both; display: flex; align-items: flex-start; gap: 9px; padding: 5px 4px; margin: 0 -4px;
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 400; cursor: pointer;
+}
+.course:hover { background: color-mix(in oklch, var(--muted), transparent 30%); }
+input[type="checkbox"] {
+  appearance: none; flex-shrink: 0; width: 16px; height: 16px; margin: 1.5px 0 0; border-radius: 5px; cursor: pointer;
+  background: var(--card); box-shadow: inset 0 1px 2px oklch(0.2 0.02 272 / 0.12), inset 0 0 0 1px var(--input);
+}
+input[type="checkbox"]:checked {
+  background: var(--check) center / 11px no-repeat, linear-gradient(to bottom, color-mix(in oklch, var(--primary), white 8%), var(--primary));
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px color-mix(in oklch, var(--primary), black 10%);
+}
+
+/* ---- Notices (always an icon, never color alone) ---- */
+.notice {
+  display: flex; gap: 9px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-card); font-size: 12.5px;
+}
+.notice .icon { margin-top: 1px; }
+.notice.success { color: var(--foreground); background: var(--success-soft); box-shadow: inset 0 1px 0 var(--rim), inset 0 0 0 1px var(--success-border); }
+.notice.success .icon { color: var(--success); }
+.notice.danger { color: var(--danger); background: var(--danger-soft); box-shadow: inset 0 1px 0 var(--rim), inset 0 0 0 1px var(--danger-border); }
+.notice-title { font-weight: 600; margin-bottom: 2px; }
+.notice ul { margin: 0; padding-left: 16px; }
+.notice li + li { margin-top: 1px; }
+
+/* ---- Links and footer ---- */
+.links { display: flex; justify-content: center; gap: 8px; font-size: 12.5px; }
+.sep { color: var(--subtle-foreground); }
+footer {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 12px;
+}
+.address-form { gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -47,7 +47,13 @@ and a Chrome-extension `Origin` (limited to the published extension with `STUDEN
 | `src/canvas.ts` | `readCanvas`: runs **inside the Canvas tab** (copied there by `chrome.scripting.executeScript`, so it must stay self-contained). In two steps: your active courses (with their term), then the assignments of the courses you chose (with submission status). It follows next-page links, reads a few courses at a time, and keeps only the fields Student OS uses (no grades or scores). Tested in `canvas.test.ts` |
 | `src/courses.ts` | Choosing courses: grouping by semester (Canvas term), which ones are current, the remembered choice. Tested in `courses.test.ts` |
 | `src/student-os.ts` | Talking to Student OS: address and code checks, `GET /api/extension/me`, sending the import, and the summary wording. Tested in `student-os.test.ts` |
-| `build.mjs` | esbuild bundle and copy into `dist/` |
+| `build.mjs` | esbuild bundle and copy into `dist/`; inlines the Lucide icons (`<i data-icon="…">` in `popup.html`) from lucide-react's icon data, so the popup ships no React |
+| `src/fonts/` | Geist (the app's typeface; SIL Open Font License, `OFL.txt`) |
+
+**Look:** `popup.css` uses the app's design tokens (same Light and Dark values as
+`src/app/globals.css`, chosen by the device's setting), the app's radius scale, Geist and Lucide icons.
+Depth comes from quiet inner shadows (a light rim on cards, a raised primary button, inset fields).
+Only movement animates, never colors, so a theme switch never shows a half-finished fade.
 
 Endpoints: `GET /api/extension/me` (who's logged in) and `POST /api/extension/canvas/import` (the import).
 Both use the Student OS login and accept only the extension (403 otherwise; 401 when logged out).
