@@ -7,8 +7,21 @@
     "default_title": "Student OS",
     "default_popup": "popup.html"
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
-  "optional_host_permissions": ["https://*/*"],
-  "minimum_chrome_version": "120"
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "minimum_chrome_version": "120",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
 }

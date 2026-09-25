@@ -23,7 +23,7 @@ async function lucide(name, className) {
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist)
 await build({
-  entryPoints: [join(root, "src/popup.ts")],
+  entryPoints: [join(root, "src/popup.ts"), join(root, "src/background.ts")],
   bundle: true,
   format: "esm",
   target: "chrome120",

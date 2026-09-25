@@ -59,6 +59,24 @@
           </div>
         </form>
 
+        <div id="new-courses" class="notice info" role="status" hidden>
+          <i data-icon="list-plus"></i>
+          <div>
+            <p class="notice-title">New courses in Canvas</p>
+            <p>Automatic sync keeps syncing your chosen courses. <a href="#" id="review-courses">Choose courses</a></p>
+          </div>
+        </div>
+
+        <div id="auto-sync" class="card auto" hidden>
+          <label class="switch-row" for="auto-toggle">
+            <span class="switch-text">
+              <span class="switch-title">Sync automatically</span>
+              <span id="auto-status" class="caption"></span>
+            </span>
+            <input type="checkbox" role="switch" id="auto-toggle" class="switch" />
+          </label>
+        </div>
+
         <div id="result" class="notice success" role="status" hidden>
           <i data-icon="circle-check"></i>
           <div>

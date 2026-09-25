@@ -101,6 +101,8 @@ users. Details for each area live next to the code (linked below).
   only the Student OS address and the chosen course ids. It reads only the Canvas
   fields Student OS uses (no grades or scores), and the server validates all of it
   like an OAuth sync (allowed Canvas host, same-host links, size limits).
+  Automatic sync is opt-in and asks Chrome for access to the student's Canvas address
+  only (never all sites); turning it off gives that access back.
 - External links (Open in Canvas / Google / Outlook) must be `https` (and, when
   synced, on the provider's own host); reminder links must be in-app paths (a
   database constraint).

@@ -7,7 +7,8 @@ logged in in the same browser: there's nothing to pair or paste. The extension r
 The server validates it and imports it like any other Canvas sync
 (`src/server/integrations/extension`).
 
-**Status:** Canvas **Sync now** with course choice works. Blackboard and background syncing are not built yet.
+**Status:** Canvas **Sync now** with course choice, and **automatic sync** when you open Canvas, work.
+Blackboard is not built yet.
 
 ## Try it (development)
 
@@ -21,6 +22,12 @@ The server validates it and imports it like any other Canvas sync
    it, and a course you haven't seen before (a new semester) brings the list back. Unchecking a course stops
    syncing it; its tasks stay in Student OS.
 
+6. Optional: turn on **Sync automatically**. Chrome asks for access to your Canvas address (its standard
+   wording is "read and change your data on …"; the extension only reads). From then on, opening Canvas syncs
+   your chosen courses in the background, at most once every 30 minutes. It's quiet: a badge on the icon only
+   when something needs you (**!** logged out of Student OS, **New** new courses in Canvas). Turning it off gives
+   the access back.
+
 After changing the extension's code, run `npm run build:extension` again and click the reload icon on the
 extension's card in `chrome://extensions`.
 
@@ -31,7 +38,7 @@ extension's card in `chrome://extensions`.
 | `activeTab`, `scripting` | When you click the extension on a Canvas page, it can read that one tab, with your login, only then. No standing access to any site. |
 | `storage` | Remembers the Student OS address and your course choice, on this computer only. |
 | `http://localhost/*`, `http://127.0.0.1/*` | Reaching Student OS during development. |
-| `https://*/*` (optional) | Asked for only for the Student OS address you enter, when you save it. |
+| `https://*/*` (optional) | Asked for only for specific addresses: the Student OS address you enter, and your Canvas address when you turn on automatic sync (so it can read Canvas without a click). |
 
 Having permission for the Student OS address is also what makes Chrome send your Student OS login with the
 extension's requests. How other websites are kept from using that login is described in
@@ -45,6 +52,9 @@ and a Chrome-extension `Origin` (limited to the published extension with `STUDEN
 | `manifest.json` | Manifest V3 |
 | `src/popup.html`, `popup.css`, `popup.ts` | The toolbar popup: who's logged in, Sync now, choosing courses, the Student OS address |
 | `src/canvas.ts` | `readCanvas`: runs **inside the Canvas tab** (copied there by `chrome.scripting.executeScript`, so it must stay self-contained). In two steps: your active courses (with their term), then the assignments of the courses you chose (with submission status). It follows next-page links, reads a few courses at a time, and keeps only the fields Student OS uses (no grades or scores). Tested in `canvas.test.ts` |
+| `src/background.ts` | The background worker: automatic sync when a Canvas tab finishes loading, the badge |
+| `src/auto-sync.ts` | When to sync automatically (30-minute gap, retries, the switch) and which courses (exactly the saved choice). Tested in `auto-sync.test.ts` |
+| `src/canvas-sync.ts` | Shared by the popup and the worker: what's stored, running `readCanvas` in a tab, sending the import, the badge |
 | `src/courses.ts` | Choosing courses: grouping by semester (Canvas term), which ones are current, the remembered choice. Tested in `courses.test.ts` |
 | `src/student-os.ts` | Talking to Student OS: address and code checks, `GET /api/extension/me`, sending the import, and the summary wording. Tested in `student-os.test.ts` |
 | `build.mjs` | esbuild bundle and copy into `dist/`; inlines the Lucide icons (`<i data-icon="…">` in `popup.html`) from lucide-react's icon data, so the popup ships no React |

@@ -191,6 +191,11 @@ pairing, no secrets stored.
    (`src/server/integrations/extension/canvas-import.ts`). The connection is saved
    with method `extension`.
 
+Automatic sync (optional, a switch in the extension): with access to the student's
+Canvas address, the extension's background worker syncs the chosen courses when a
+Canvas tab loads, at most once every 30 minutes, through the same endpoint and
+checks. It never adds courses on its own; a new one is flagged for the student.
+
 A course the student unchecks stops syncing; its tasks stay (never reported as
 missing). The Integrations page shows "Through the browser extension" with no Sync
 now button (only the extension can read Canvas for this connection); Disconnect

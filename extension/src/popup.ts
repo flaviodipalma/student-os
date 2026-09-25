@@ -1,16 +1,24 @@
-import { readCanvas, type CanvasRead, type CanvasStep } from "./canvas"
-import { courseOptions, groupByTerm, initialSelection, type CourseChoice, type CourseOption } from "./courses"
-import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, sendImport, StudentOsError, summaryLines } from "./student-os"
+import { timeAgo, type AutoSyncState } from "./auto-sync"
+import {
+  importChosen,
+  inCanvas,
+  loadAddress,
+  loadAutoSync,
+  loadChoice,
+  READ_PROBLEMS,
+  saveAddress,
+  saveChoice,
+  updateAutoSync,
+} from "./canvas-sync"
+import { courseOptions, groupByTerm, initialSelection, type CourseOption } from "./courses"
+import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, StudentOsError } from "./student-os"
 
 // The popup. It syncs to the Student OS account logged in in this browser (Chrome
 // sends that login with the extension's requests), so there's nothing to set up:
 // it checks who's logged in, then syncs Canvas from the tab the student is on.
 // Sync reads the course list, lets the student choose (the first time, and when a
-// new semester shows up), then imports those courses. The Student OS address and the
-// course choices are kept in chrome.storage.local, on this computer only.
-
-const ADDRESS_KEY = "address"
-const choiceKey = (canvasOrigin: string) => `courses:${canvasOrigin}`
+// new semester shows up), then imports those courses. After the first sync, a
+// switch turns on automatic sync (background.ts) when they open Canvas.
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const checking = $<HTMLDivElement>("checking")
@@ -26,6 +34,9 @@ const pickerGroups = $<HTMLDivElement>("picker-groups")
 const importButton = $<HTMLButtonElement>("import-chosen")
 const result = $<HTMLDivElement>("result")
 const syncError = $<HTMLDivElement>("sync-error")
+const autoCard = $<HTMLDivElement>("auto-sync")
+const autoToggle = $<HTMLInputElement>("auto-toggle")
+const newCourses = $<HTMLDivElement>("new-courses")
 
 let address = DEFAULT_ADDRESS
 
@@ -64,11 +75,43 @@ async function checkLogin() {
   try {
     const account = await currentAccount(address, fetch)
     show({ kind: "signed-in", firstName: account.firstName })
+    // Logged in again: automatic sync can carry on.
+    const auto = await loadAutoSync()
+    showAutoSync(auto.problem === "logged-out" ? await updateAutoSync({ problem: null }) : auto)
   } catch (error) {
     if (error instanceof StudentOsError && error.loggedOut) show({ kind: "logged-out" })
     else show({ kind: "error", message: error instanceof StudentOsError ? error.message : "Something went wrong. Please try again." })
   }
 }
+
+// ---- Automatic sync ------------------------------------------------------------
+
+// Shown once the student has synced by hand (so their Canvas and courses are known).
+function showAutoSync(state: AutoSyncState) {
+  autoCard.hidden = !state.canvasOrigin
+  autoToggle.checked = state.enabled
+  newCourses.hidden = state.problem !== "new-courses"
+  const last = state.lastSuccessAt ? `${state.lastAutomatic ? "Synced automatically" : "Last synced"} · ${timeAgo(state.lastSuccessAt, Date.now())}` : null
+  $("auto-status").textContent = state.enabled
+    ? (last ?? "On · when you open Canvas, every 30 minutes at most")
+    : "Off · turn on to sync whenever you open Canvas"
+}
+
+autoToggle.addEventListener("change", async () => {
+  const state = await loadAutoSync()
+  if (!state.canvasOrigin) return
+  const origins = [`${state.canvasOrigin}/*`]
+  if (autoToggle.checked) {
+    // Access to the student's Canvas, so the extension can read it without a click.
+    const granted = await chrome.permissions.request({ origins }).catch(() => false)
+    showAutoSync(await updateAutoSync({ enabled: granted }))
+    if (!granted) setNotice(syncError, "Automatic sync needs access to your Canvas. Turn it on again and choose Allow.")
+  } else {
+    showAutoSync(await updateAutoSync({ enabled: false }))
+    // Give the access back (not possible for addresses the extension always has, like this computer).
+    await chrome.permissions.remove({ origins }).catch(() => false)
+  }
+})
 
 // ---- The Student OS address --------------------------------------------------------
 
@@ -95,7 +138,7 @@ addressForm.addEventListener("submit", async (event) => {
     const next = normalizeAddress(addressInput.value)
     if (!(await allowAddress(next))) throw new StudentOsError(`The extension needs permission to reach ${next}.`)
     address = next
-    await chrome.storage.local.set({ [ADDRESS_KEY]: address })
+    await saveAddress(address)
     addressForm.hidden = true
     await checkLogin()
   } catch (error) {
@@ -108,7 +151,7 @@ $("log-in").addEventListener("click", () => {
 })
 $("check-again").addEventListener("click", () => void checkLogin())
 
-// ---- Reading Canvas ------------------------------------------------------------
+// ---- Choosing courses ----------------------------------------------------------
 
 // The tab to read: the one the student clicked the extension on. (Opened as a page,
 // e.g. in tests, ?tab=<id> names it instead.)
@@ -117,34 +160,6 @@ async function canvasTab(): Promise<chrome.tabs.Tab | undefined> {
   if (named) return chrome.tabs.get(named)
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   return tab
-}
-
-const READ_PROBLEMS = {
-  "not-canvas": "This tab isn't Canvas. Open your school's Canvas, then click Sync now.",
-  "logged-out": "You're logged out of Canvas. Log in, then click Sync now.",
-  error: "Canvas didn't answer. Reload the Canvas page and try again.",
-}
-
-// Runs readCanvas inside the Canvas tab (it's copied there), with the student's Canvas login.
-async function inCanvas<K extends CanvasStep["kind"]>(tabId: number, step: CanvasStep & { kind: K }) {
-  let read: CanvasRead | undefined
-  try {
-    const [injection] = await chrome.scripting.executeScript({ target: { tabId }, func: readCanvas, args: [step] })
-    read = injection?.result as CanvasRead | undefined
-  } catch {
-    // Pages the extension can't run on (the Chrome Web Store, chrome:// pages, …).
-    throw new StudentOsError(READ_PROBLEMS["not-canvas"])
-  }
-  if (!read) throw new StudentOsError(READ_PROBLEMS.error)
-  if (!read.ok) throw new StudentOsError(READ_PROBLEMS[read.reason])
-  return read as Extract<CanvasRead, { ok: true; kind: K }>
-}
-
-// ---- Choosing courses ----------------------------------------------------------
-
-async function loadChoice(canvasOrigin: string): Promise<CourseChoice | null> {
-  const stored = await chrome.storage.local.get(choiceKey(canvasOrigin))
-  return (stored[choiceKey(canvasOrigin)] as CourseChoice | undefined) ?? null
 }
 
 // Shows the checklist; resolves with the chosen ids, or null if the student cancels.
@@ -225,17 +240,14 @@ async function sync(choose: boolean): Promise<string[] | null> {
     const picked = await chooseCourses(options, selected)
     if (!picked) return null
     chosen = picked
-    await chrome.storage.local.set({ [choiceKey(list.baseUrl)]: { selected: chosen, seen: options.map((o) => o.id) } satisfies CourseChoice })
+    await saveChoice(list.baseUrl, { selected: chosen, seen: options.map((o) => o.id) })
+    // Every course has been seen now.
+    if ((await loadAutoSync()).problem === "new-courses") await updateAutoSync({ problem: null })
   }
 
-  setText(progress, `Reading assignments from ${chosen.length} ${chosen.length === 1 ? "course" : "courses"}…`)
-  const read = await inCanvas(tab.id, { kind: "assignments", courseIds: chosen })
-  const courses = list.courses.filter((course) => chosen.includes(String(course.id)))
-
-  setText(progress, "Sending to Student OS…")
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const summary = await sendImport(address, { baseUrl: list.baseUrl, courses, assignments: read.assignments }, timeZone, fetch)
-  return summaryLines(summary, read.coursesUnreadable)
+  const lines = await importChosen(tab.id, address, list, chosen, { automatic: false, onProgress: (message) => setText(progress, message) })
+  showAutoSync(await loadAutoSync())
+  return lines
 }
 
 async function runSync(choose: boolean) {
@@ -271,16 +283,18 @@ async function runSync(choose: boolean) {
 }
 
 syncButton.addEventListener("click", () => void runSync(false))
-$("choose-courses").addEventListener("click", (event) => {
-  event.preventDefault()
-  if (!syncButton.disabled) void runSync(true)
-})
+for (const id of ["choose-courses", "review-courses"]) {
+  $(id).addEventListener("click", (event) => {
+    event.preventDefault()
+    if (!syncButton.disabled) void runSync(true)
+  })
+}
 $("open-student-os").addEventListener("click", (event) => {
   event.preventDefault()
   void chrome.tabs.create({ url: `${address}/tasks` })
 })
 
-void chrome.storage.local.get(ADDRESS_KEY).then((stored) => {
-  if (typeof stored[ADDRESS_KEY] === "string") address = stored[ADDRESS_KEY]
+void loadAddress().then((stored) => {
+  address = stored
   void checkLogin()
 })
