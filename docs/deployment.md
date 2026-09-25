@@ -56,6 +56,7 @@ Full list with explanations: `.env.example`. For production:
 | `ANTHROPIC_API_KEY` | yes | Server-only; optional `SYLLABUS_AI_MODEL`, `ASSISTANT_AI_MODEL` |
 | `LMS_TOKEN_ENCRYPTION_KEY` | for Google Calendar / Outlook | `openssl rand -base64 32`; **back it up** (losing it = every student reconnects their calendars) |
 | `GOOGLE_CALENDAR_*`, `OUTLOOK_CALENDAR_*` | optional | Client id, secret, `https://<domain>/api/integrations/<google\|outlook>-calendar/callback` |
+| `NEXT_PUBLIC_EXTENSION_STORE_URL` | recommended | The extension's Chrome Web Store page: onboarding's "Add to Chrome" (public by design) |
 | `STUDENT_OS_EXTENSION_IDS` | recommended | The published Chrome extension's id: only it may use a student's login (`extension/README.md`) |
 
 Never give a secret a `NEXT_PUBLIC_` name (the startup check refuses it).

@@ -60,4 +60,33 @@ chrome.permissions.onRemoved.addListener(async (removed) => {
 })
 
 // The badge after Chrome restarts (it isn't kept).
-chrome.runtime.onStartup.addListener(async () => showBadge(await loadAutoSync()))
+chrome.runtime.onStartup.addListener(async () => {
+  await showBadge(await loadAutoSync())
+  await markStudentOs()
+})
+
+// ---- Telling Student OS the extension is installed ------------------------------------
+
+// marker.ts runs on the Student OS address the student uses, so its pages (onboarding)
+// know the extension is there. Registered for that address (the extension has access
+// to it), again whenever it changes, and added right away to Student OS tabs already
+// open (the onboarding page is usually open while the extension is being installed).
+async function markStudentOs() {
+  const address = await loadAddress()
+  const matches = [`${address}/*`]
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: ["student-os-marker"] }).catch(() => {})
+    await chrome.scripting.registerContentScripts([{ id: "student-os-marker", matches, js: ["marker.js"], runAt: "document_start" }])
+    const tabs = await chrome.tabs.query({ url: matches })
+    await Promise.all(
+      tabs.map((tab) => (tab.id ? chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["marker.js"] }).catch(() => {}) : null))
+    )
+  } catch {
+    // No access to that address yet (it's asked for when the student saves it).
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => void markStudentOs())
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.address) void markStudentOs()
+})

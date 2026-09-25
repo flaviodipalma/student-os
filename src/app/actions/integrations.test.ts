@@ -18,7 +18,7 @@ vi.mock("@/server/auth", () => ({
 }))
 vi.mock("@/server/db", () => ({ getDb: () => session.db }))
 
-const { disconnectLmsAction, setExternalEventHiddenAction } = await import("./integrations")
+const { disconnectLmsAction, lmsSyncStatusAction, setExternalEventHiddenAction } = await import("./integrations")
 
 const BASE = "https://school.instructure.com"
 
@@ -62,6 +62,31 @@ describe("disconnecting Canvas or Blackboard", () => {
     expect(await disconnectLmsAction("canvas")).toMatchObject({ ok: false, code: "not-found" })
     expect(await disconnectLmsAction("moodle")).toMatchObject({ ok: false, code: "validation" })
     expect(await listLmsConnections(t.db, alice)).toHaveLength(1)
+  })
+})
+
+describe("waiting for the first sync (onboarding)", () => {
+  it("nothing yet, then the sync time and the number of that LMS's courses", async () => {
+    const user = await t.addUser("Alice")
+    session.userId = user
+    expect(await lmsSyncStatusAction("canvas")).toEqual({ ok: true, data: { syncedAt: null, courses: 0 } })
+    await importCanvasFromExtension(t.db, user, {
+      baseUrl: BASE,
+      courses: [{ id: 215, name: "Data Structures", course_code: "CSC 215" }, { id: 216, name: "Calculus", course_code: "MAT 141" }],
+      assignments: { "215": [], "216": [] },
+    })
+    const status = await lmsSyncStatusAction("canvas")
+    expect(status).toMatchObject({ ok: true, data: { syncedAt: expect.any(String), courses: 2 } })
+    expect(await lmsSyncStatusAction("blackboard")).toEqual({ ok: true, data: { syncedAt: null, courses: 0 } })
+  })
+
+  it("only the signed-in student's own status; bad input refused", async () => {
+    const alice = await t.addUser("Alice")
+    await importCanvasFromExtension(t.db, alice, { baseUrl: BASE, courses: [{ id: 215, name: "Data Structures" }], assignments: { "215": [] } })
+    expect(await lmsSyncStatusAction("canvas")).toMatchObject({ ok: false, code: "unauthorized" })
+    session.userId = await t.addUser("Bob")
+    expect(await lmsSyncStatusAction("canvas")).toEqual({ ok: true, data: { syncedAt: null, courses: 0 } })
+    expect(await lmsSyncStatusAction("moodle")).toMatchObject({ ok: false, code: "validation" })
   })
 })
 

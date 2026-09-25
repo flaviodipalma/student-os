@@ -96,6 +96,14 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
     report.warnings.push("STUDENT_OS_EXTENSION_IDS isn't set: any Chrome extension can ask to sync with a student's login. Set it to the published extension's id.")
   }
 
+  // ---- The extension's Chrome Web Store page (onboarding's "Add to Chrome"). Public by design.
+  const storeUrl = env.NEXT_PUBLIC_EXTENSION_STORE_URL?.trim()
+  if (storeUrl && !storeUrl.startsWith("https://")) {
+    report.errors.push("NEXT_PUBLIC_EXTENSION_STORE_URL must be the extension's https:// Chrome Web Store page.")
+  } else if (production && !storeUrl) {
+    report.warnings.push("NEXT_PUBLIC_EXTENSION_STORE_URL isn't set: onboarding can't link new students to the extension. Set it to its Chrome Web Store page.")
+  }
+
   // ---- Production URLs: HTTPS, the real domain, no localhost
   if (production) {
     if (!env.SITE_URL) report.warnings.push("SITE_URL isn't set: sign-in redirects use each request's own address. Set it to https://<your domain>.")

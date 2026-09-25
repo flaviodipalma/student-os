@@ -57,6 +57,7 @@ and a Chrome-extension `Origin` (limited to the published extension with `STUDEN
 | `src/background.ts` | The background worker: automatic sync when a known site's tab finishes loading, the badge |
 | `src/auto-sync.ts` | Automatic sync, per site: when (30-minute gap, retries, the switch), which courses (exactly the saved choice), the badge, and carrying over the older single-Canvas settings. Tested in `auto-sync.test.ts` |
 | `src/lms-sync.ts` | Shared by the popup and the worker: what's stored, one adapter per LMS, telling which LMS a tab is, running the reader in the tab, sending the import, the badge |
+| `src/marker.ts` | Runs on Student OS pages only (registered for the Student OS address by the background worker, and added to already-open tabs on install): marks the page with the extension's version, so onboarding moves on by itself once the extension is installed. Reads nothing |
 | `src/courses.ts` | Choosing courses: grouping by semester (Canvas term), which ones are current, the remembered choice. Tested in `courses.test.ts` |
 | `src/student-os.ts` | Talking to Student OS: address and code checks, `GET /api/extension/me`, sending the import, and the summary wording. Tested in `student-os.test.ts` |
 | `build.mjs` | esbuild bundle and copy into `dist/`; inlines the Lucide icons (`<i data-icon="…">` in `popup.html`) from lucide-react's icon data, so the popup ships no React |

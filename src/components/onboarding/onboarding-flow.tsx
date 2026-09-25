@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
 import { BookOpenIcon, CheckIcon, CircleAlertIcon, FileUpIcon, GraduationCapIcon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
@@ -10,16 +10,22 @@ import { ProfileFields } from "@/components/preferences/profile-fields"
 import { StudyPreferencesFields } from "@/components/preferences/study-preferences-fields"
 import { SyllabusImporter } from "@/components/syllabus/syllabus-importer"
 import { Button } from "@/components/ui/button"
+import { ChooseSchool, GetExtension, SyncTutorial } from "./connect-school"
+import { OnboardingIntro } from "./onboarding-intro"
 import { useAppStore } from "@/lib/app-store"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import type { ProfileInput, StudentPreferences } from "@/lib/types"
+import { lmsProviderNames, type LmsProviderId, type ProfileInput, type StudentPreferences } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 
-// First-time setup, four short steps. Everything entered is kept while moving
-// back and forth. Steps 1-3 are saved together when leaving step 3 (so they
-// survive a reload); Finish marks onboarding complete. Uses the same fields,
-// validation and server actions as the Settings page.
+// First-time setup. A short intro ("Welcome to Student OS!", "Let's get started"),
+// then four steps. Everything entered is kept while moving back and forth. Steps
+// 1-3 are saved together when leaving step 3 (so they survive a reload). Step 4
+// brings in courses: connect Canvas or Blackboard through the browser extension
+// (get it, then a short tutorial that waits for the first sync), or, skipping
+// that, a syllabus or courses added by hand. Reaching the Dashboard marks
+// onboarding complete. Uses the same fields, validation and server actions as the
+// Settings page.
 
 const steps = [
   { title: "About you", description: "So Student OS knows what to call you." },
@@ -31,10 +37,26 @@ const steps = [
   { title: "Courses", description: "Add your classes now, or skip and do it later." },
 ]
 
+// Step 4's views.
+type CourseView = { kind: "choose" } | { kind: "extension"; provider: LmsProviderId } | { kind: "tutorial"; provider: LmsProviderId } | { kind: "manual" }
+
+function courseHeading(view: CourseView): { title: string; description: string } {
+  if (view.kind === "extension") {
+    return { title: "Get the Student OS extension", description: `To connect ${lmsProviderNames[view.provider]}, add the extension to Chrome.` }
+  }
+  if (view.kind === "tutorial") {
+    return { title: `Sync your ${lmsProviderNames[view.provider]} courses`, description: "Three quick steps. This page continues on its own." }
+  }
+  if (view.kind === "manual") return { title: "Add your courses", description: "Upload a syllabus or add your classes by hand." }
+  return { title: "Connect your school", description: "Bring in your courses and assignments from Canvas or Blackboard." }
+}
+
 export function OnboardingFlow() {
   const store = useAppStore()
   const router = useRouter()
+  const [intro, setIntro] = useState(true)
   const [step, setStep] = useState(0)
+  const [courseView, setCourseView] = useState<CourseView>({ kind: "choose" })
   const [profile, setProfile] = useState<ProfileInput>({
     firstName: store.student.firstName,
     lastName: store.student.lastName,
@@ -90,7 +112,7 @@ export function OnboardingFlow() {
     go(3)
   }
 
-  async function finish() {
+  const finish = useCallback(async () => {
     setBusy(true)
     const result = await store.completeOnboarding()
     if (!result.ok) {
@@ -98,12 +120,27 @@ export function OnboardingFlow() {
       return setError(result.error)
     }
     router.push("/dashboard")
-  }
+  }, [store, router])
 
-  const current = steps[step]
+  const showCourses = (view: CourseView) => {
+    setError(null)
+    setCourseView(view)
+    window.scrollTo({ top: 0 })
+  }
+  const onInstalled = useCallback(() => {
+    setCourseView((view) => (view.kind === "extension" ? { kind: "tutorial", provider: view.provider } : view))
+  }, [])
+  // The first sync is in: a moment to see "Your courses are in!", then the Dashboard.
+  const onSynced = useCallback(() => {
+    setTimeout(() => void finish(), 1500)
+  }, [finish])
+
+  const current = step === 3 ? courseHeading(courseView) : steps[step]
+
+  if (intro) return <OnboardingIntro onDone={() => setIntro(false)} />
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-2xl animate-in fade-in duration-700 motion-reduce:animate-none">
       <div className="mb-6 flex items-center gap-2.5">
         <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <GraduationCapIcon className="size-5" />
@@ -148,7 +185,24 @@ export function OnboardingFlow() {
               onDelete={(id) => setCommitments((prev) => prev.filter((c) => c.id !== id))}
             />
           )}
+          {step === 3 && courseView.kind === "choose" && (
+            <ChooseSchool
+              onConnect={(provider) => showCourses({ kind: "extension", provider })}
+              onUploadSyllabus={() => {
+                showCourses({ kind: "manual" })
+                setImporting(true)
+              }}
+              onAddByHand={() => {
+                showCourses({ kind: "manual" })
+                setCourseDialogOpen(true)
+              }}
+              onSkip={() => void finish()}
+            />
+          )}
+          {step === 3 && courseView.kind === "extension" && <GetExtension provider={courseView.provider} onInstalled={onInstalled} />}
+          {step === 3 && courseView.kind === "tutorial" && <SyncTutorial provider={courseView.provider} onSynced={onSynced} />}
           {step === 3 &&
+            courseView.kind === "manual" &&
             (importing ? (
               <div className="space-y-4">
                 <button
@@ -176,7 +230,11 @@ export function OnboardingFlow() {
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
             {/* No "Back" on the first step (there's nothing to go back to). */}
             {step > 0 ? (
-              <Button variant="ghost" onClick={() => go(step - 1)} disabled={busy}>
+              <Button
+                variant="ghost"
+                onClick={() => (step === 3 && courseView.kind !== "choose" ? showCourses({ kind: "choose" }) : go(step - 1))}
+                disabled={busy}
+              >
                 Back
               </Button>
             ) : (
@@ -201,8 +259,13 @@ export function OnboardingFlow() {
                   {busy ? "Saving…" : commitments.length === 0 ? "Skip for now" : "Save and continue"}
                 </Button>
               )}
-              {step === 3 && (
-                <Button onClick={finish} disabled={busy}>
+              {step === 3 && (courseView.kind === "extension" || courseView.kind === "tutorial") && (
+                <Button variant="ghost" onClick={() => void finish()} disabled={busy}>
+                  I&apos;ll do this later
+                </Button>
+              )}
+              {step === 3 && courseView.kind === "manual" && (
+                <Button onClick={() => void finish()} disabled={busy}>
                   {busy ? "Finishing…" : store.courses.length === 0 ? "Skip and finish" : "Finish setup"}
                 </Button>
               )}

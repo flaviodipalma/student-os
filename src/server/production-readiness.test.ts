@@ -85,6 +85,15 @@ describe("environment checks (server start and `npm run check:env`)", () => {
     expect(checkEnv({ ...deploy, APP_ENV: undefined, GOOGLE_CALENDAR_REDIRECT_URI: "http://localhost:3000/cb", SYLLABUS_AI_PROVIDER: "mock" }).errors).toEqual([])
   })
 
+  it("the extension's store link: https only; a production warning when missing", () => {
+    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://studentos.app" }
+    expect(checkEnv(deploy).warnings.join()).toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL isn't set/)
+    expect(checkEnv({ ...deploy, NEXT_PUBLIC_EXTENSION_STORE_URL: "http://example.com" }).errors.join()).toMatch(/must be the extension's https/)
+    const ok = checkEnv({ ...deploy, NEXT_PUBLIC_EXTENSION_STORE_URL: "https://chromewebstore.google.com/detail/student-os/abcdefghijklmnopabcdefghijklmnop" })
+    expect([...ok.errors, ...ok.warnings].join()).not.toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL/)
+    expect(checkEnv({ ...base }, false).warnings.join()).not.toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL/)
+  })
+
   it("browser extension ids: checked when set; a production warning when not", () => {
     const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://studentos.app" }
     expect(checkEnv(deploy).warnings.join()).toMatch(/STUDENT_OS_EXTENSION_IDS isn't set/)
