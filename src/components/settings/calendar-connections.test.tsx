@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { CalendarIntegrationStatus } from "@/server/integrations/calendar/connections"
 
-// Settings > Integrations > Calendars in a simulated browser. Server actions are
+// Integrations > Calendars in a simulated browser. Server actions are
 // mocked (tested in src/app/actions/calendar-integrations.test.ts).
 
 const mocks = vi.hoisted(() => ({ sync: vi.fn(), disconnect: vi.fn(), connect: vi.fn(), replaceExternalEvents: vi.fn(), refresh: vi.fn() }))
@@ -31,7 +31,7 @@ const connected = { status: "connected" as const, accountEmail: "alex@gmail.com"
 beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
-describe("Calendars in Settings", () => {
+describe("Calendars on the Integrations page", () => {
   it("not connected: Connect for each; not set up on the server: said plainly, no button", () => {
     render(<CalendarConnections calendars={[google(null, false), outlook]} outcomes={{}} timeZone="America/New_York" />)
     const [g, o] = screen.getAllByRole("listitem")

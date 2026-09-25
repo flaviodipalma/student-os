@@ -27,7 +27,7 @@ import type { CalendarSyncResult } from "@/server/integrations/calendar/calendar
 import type { CalendarIntegrationStatus } from "@/server/integrations/calendar/connections"
 import { Logo, Notice, SyncedAgo } from "./integrations-card"
 
-// Settings > Integrations > Calendars: Google Calendar and Outlook. Connecting is
+// Integrations > Calendars: Google Calendar and Outlook. Connecting is
 // always the student's explicit choice (separate from how they log in), gives
 // Student OS read-only access, and brings the events into the one Student OS
 // calendar. Only safe summaries reach this component (no tokens).

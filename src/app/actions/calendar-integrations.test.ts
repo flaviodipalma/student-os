@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm"
 import type { Database } from "@/server/db/types"
 import { createTestDb } from "@/server/test-utils/test-db"
 
-// Connecting Google Calendar / Outlook from Settings: the server actions and the
+// Connecting Google Calendar / Outlook from Integrations: the server actions and the
 // OAuth callback, with the signed-in student from a (mocked) verified session,
 // a real database, and FAKE Google / Microsoft endpoints. Login is never involved.
 
@@ -116,7 +116,7 @@ describe("Connect", () => {
       /^https:\/\/login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize\?/
     )
     mocks.user = null
-    expect(await redirectOf(actions.connectCalendarAction({ error: null }, form({ provider: "google" })))).toBe("/login?next=/settings")
+    expect(await redirectOf(actions.connectCalendarAction({ error: null }, form({ provider: "google" })))).toBe("/login?next=/integrations")
     mocks.user = { id: alex, email: null }
     const secret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET
     delete process.env.GOOGLE_CALENDAR_CLIENT_SECRET
@@ -127,9 +127,9 @@ describe("Connect", () => {
 })
 
 describe("the OAuth callback", () => {
-  it("Google: exchanges the code, stores tokens encrypted, runs a first sync, back to Settings", async () => {
+  it("Google: exchanges the code, stores tokens encrypted, runs a first sync, back to Integrations", async () => {
     const response = await googleCallback(callbackRequest("google-calendar", (state) => `?code=abc&state=${state}`))
-    expect(location(response)).toBe("/settings?google-calendar=connected#integrations")
+    expect(location(response)).toBe("/integrations?google-calendar=connected")
     const [row] = await t.db.select().from(calendarConnections).where(eq(calendarConnections.userId, alex))
     expect(row).toMatchObject({ provider: "google", accountEmail: "alex@gmail.com", status: "connected" })
     expect(row.accessTokenEncrypted).not.toContain("g-at")
@@ -142,7 +142,7 @@ describe("the OAuth callback", () => {
 
   it("Outlook connects the same way, independent of how the student logged in", async () => {
     const response = await outlookCallback(callbackRequest("outlook-calendar", (state) => `?code=abc&state=${state}`))
-    expect(location(response)).toBe("/settings?outlook-calendar=connected#integrations")
+    expect(location(response)).toBe("/integrations?outlook-calendar=connected")
     const [row] = await t.db.select().from(calendarConnections).where(eq(calendarConnections.userId, alex))
     expect(row).toMatchObject({ provider: "outlook", accountEmail: "alex@school.edu" })
   })
@@ -151,18 +151,18 @@ describe("the OAuth callback", () => {
     const forged = new NextRequest("http://localhost:3000/api/integrations/google-calendar/callback?code=abc&state=forged", {
       headers: { cookie: `${oauthStateCookieName("google-calendar")}=nope` },
     })
-    expect(location(await googleCallback(forged))).toBe("/settings?google-calendar=invalid_state#integrations")
+    expect(location(await googleCallback(forged))).toBe("/integrations?google-calendar=invalid_state")
     // A state started by Bob, used in Alex's session.
     expect(location(await googleCallback(callbackRequest("google-calendar", (state) => `?code=abc&state=${state}`, bob)))).toBe(
-      "/settings?google-calendar=invalid_state#integrations"
+      "/integrations?google-calendar=invalid_state"
     )
     // Outlook's cookie can't be used for Google.
     const { state, cookieValue } = createOAuthState({ provider: "outlook-calendar", userId: alex, baseUrl: "" }, getCredentialVault())
     const crossed = new NextRequest(`http://localhost:3000/api/integrations/google-calendar/callback?code=abc&state=${state}`, {
       headers: { cookie: `${oauthStateCookieName("google-calendar")}=${cookieValue}` },
     })
-    expect(location(await googleCallback(crossed))).toBe("/settings?google-calendar=invalid_state#integrations")
-    expect(location(await googleCallback(callbackRequest("google-calendar", () => "?error=access_denied")))).toBe("/settings?google-calendar=denied#integrations")
+    expect(location(await googleCallback(crossed))).toBe("/integrations?google-calendar=invalid_state")
+    expect(location(await googleCallback(callbackRequest("google-calendar", () => "?error=access_denied")))).toBe("/integrations?google-calendar=denied")
     mocks.user = null
     expect(location(await googleCallback(callbackRequest("google-calendar", (s) => `?code=abc&state=${s}`)))).toBe("/login")
     expect(await t.db.select().from(calendarConnections)).toEqual([])
@@ -172,7 +172,7 @@ describe("the OAuth callback", () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ access_token: "g-at", scope: "openid" }), { status: 200 })))
     expect(location(await googleCallback(callbackRequest("google-calendar", (s) => `?code=abc&state=${s}`)))).toBe(
-      "/settings?google-calendar=permission#integrations"
+      "/integrations?google-calendar=permission"
     )
     expect(await t.db.select().from(calendarConnections)).toEqual([])
   })

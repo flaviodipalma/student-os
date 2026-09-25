@@ -9,7 +9,7 @@ connections belong to it.
 **Login is not a calendar connection.** Signing in with Google or Microsoft asks
 only for the student's identity (`openid email profile`). It never connects
 Google Calendar or Outlook, and no calendar or mail scopes are requested. Calendar
-and LMS connections are separate (Settings > Integrations, `src/server/integrations`;
+and LMS connections are separate (the Integrations page, `src/server/integrations`;
 see `docs/calendar-integrations.md`).
 
 ```

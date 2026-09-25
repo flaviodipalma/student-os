@@ -31,7 +31,7 @@ Every text/background pair meets WCAG AA in both (checked in the browser audit).
 - `components/theme/theme-provider.tsx`: `useTheme()`; follows the device live
   while the choice is System; `SavedThemeSync` applies a signed-in student's saved
   choice (`student_preferences.theme`, null = never chosen) on a new device.
-- Settings > Appearance (`components/settings/appearance-card.tsx`): applies at
+- The theme menu in the header (`components/theme/theme-menu.tsx`): applies at
   once and saves to the account.
 - Switching disables transitions for a frame (no half-finished color fades);
   `prefers-reduced-motion` turns animations and transitions off everywhere.

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { LmsSyncResult } from "@/lib/lms/types"
 import type { LmsIntegrationStatus } from "@/server/integrations/lms/connections"
 
-// The Canvas card in Settings > Integrations, rendered in a simulated browser.
+// The Canvas card on the Integrations page, rendered in a simulated browser.
 // Server actions and navigation are mocked: this checks what the student sees
 // and can do, not the sync itself (tested in src/server/integrations).
 
@@ -97,7 +97,7 @@ const result = (overrides: Partial<LmsSyncResult> = {}): LmsSyncResult => ({
 beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
-describe("Canvas in Settings", () => {
+describe("Canvas on the Integrations page", () => {
   it("shows the connection and when it last synced", async () => {
     render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
     expect(screen.getByText("Connected")).toBeTruthy()
@@ -195,7 +195,7 @@ describe("Canvas in Settings", () => {
   })
 })
 
-describe("Blackboard in Settings", () => {
+describe("Blackboard on the Integrations page", () => {
   it("without server sign-in: offers the calendar link only (no admin approval needed)", () => {
     render(<IntegrationsCard integrations={withBlackboard(null, false)} outcomes={{}} timeZone="UTC" />)
     expect(screen.getByLabelText("Your Blackboard calendar link")).toBeTruthy()

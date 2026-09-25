@@ -28,7 +28,7 @@ import {
 import { RATE_LIMITS } from "@/server/rate-limit"
 import { deleteExternalEventsFrom, listExternalEvents } from "@/server/services/external-events"
 
-// Settings > Integrations > Calendars: connect, sync and disconnect Google
+// Integrations > Calendars: connect, sync and disconnect Google
 // Calendar and Outlook. Separate from login: these ask Google / Microsoft for
 // read-only calendar access, for the signed-in student only. No user id or token
 // is ever accepted from, or returned to, the browser.
@@ -51,7 +51,7 @@ export async function connectCalendarAction(_previous: ConnectCalendarState, for
   const parsed = providerSchema.safeParse(form.get("provider"))
   if (!parsed.success) return { error: "Choose a calendar to connect." }
   const user = await getCurrentUser()
-  if (!user) redirect("/login?next=/settings")
+  if (!user) redirect("/login?next=/integrations")
   const provider = getCalendarProvider(parsed.data)
 
   let url: string

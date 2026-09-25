@@ -65,7 +65,7 @@ export async function completeOnboardingAction(): Promise<ActionResult<null>> {
   })
 }
 
-// Settings > Appearance: Light / Dark / System, saved for the signed-in student.
+// Header theme menu: Light / Dark / System, saved for the signed-in student.
 export async function updateThemeAction(theme: unknown): Promise<ActionResult<ThemePreference>> {
   return runAction(({ db, userId }) => saveThemePreference(db, userId, parse(z.enum(themePreferences, { error: "Choose Light, Dark or System." }), theme)))
 }

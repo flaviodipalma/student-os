@@ -20,13 +20,13 @@ import { logger } from "@/server/log"
 //   3. the code is exchanged on the server; tokens stored encrypted
 //   4. a first sync, so the events show straight away (a failure there is
 //      shown on the connection, not as a failed connection)
-// The student lands on Settings with a short outcome code, never a token.
+// The student lands on Integrations with a short outcome code, never a token.
 
 export async function handleCalendarCallback(request: NextRequest, providerId: CalendarProviderId): Promise<NextResponse> {
   const provider = getCalendarProvider(providerId)
   const cookie = oauthStateCookieName(provider.flow)
-  const backToSettings = (outcome: string) => {
-    const response = NextResponse.redirect(new URL(`/settings?${provider.flow}=${outcome}#integrations`, request.url))
+  const backToIntegrations = (outcome: string) => {
+    const response = NextResponse.redirect(new URL(`/integrations?${provider.flow}=${outcome}`, request.url))
     response.cookies.set(cookie, "", { path: oauthCookiePath(provider.flow), maxAge: 0 })
     return response
   }
@@ -36,21 +36,21 @@ export async function handleCalendarCallback(request: NextRequest, providerId: C
 
   const params = request.nextUrl.searchParams
   const error = params.get("error")
-  if (error) return backToSettings(error === "access_denied" || error === "consent_required" ? "denied" : "error")
+  if (error) return backToIntegrations(error === "access_denied" || error === "consent_required" ? "denied" : "error")
 
   let vault
   try {
     vault = getCredentialVault()
   } catch {
-    return backToSettings("not_configured")
+    return backToIntegrations("not_configured")
   }
   const verified = verifyOAuthState(
     { provider: provider.flow, userId: user.id, state: params.get("state"), cookieValue: request.cookies.get(cookie)?.value },
     vault
   )
-  if (!verified) return backToSettings("invalid_state")
+  if (!verified) return backToIntegrations("invalid_state")
   const code = params.get("code")
-  if (!code) return backToSettings("error")
+  if (!code) return backToIntegrations("error")
 
   const db = getDb()
   try {
@@ -64,10 +64,10 @@ export async function handleCalendarCallback(request: NextRequest, providerId: C
     await createCalendarAccess(db, user.id, provider, vault)
   } catch (error) {
     logger.error(`calendar:${provider.id}`, `connecting failed`, { name: error instanceof Error ? error.name : typeof error })
-    if (error instanceof CalendarProviderError && error.kind === "permission") return backToSettings("permission")
-    if (error instanceof CalendarProviderError && error.kind === "not-configured") return backToSettings("not_configured")
-    return backToSettings("error")
+    if (error instanceof CalendarProviderError && error.kind === "permission") return backToIntegrations("permission")
+    if (error instanceof CalendarProviderError && error.kind === "not-configured") return backToIntegrations("not_configured")
+    return backToIntegrations("error")
   }
   await syncCalendarConnection(db, user.id, provider, vault).catch(() => {})
-  return backToSettings("connected")
+  return backToIntegrations("connected")
 }

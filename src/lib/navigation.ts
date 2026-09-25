@@ -5,6 +5,7 @@ import {
   LayoutDashboardIcon,
   ListChecksIcon,
   MessageSquareTextIcon,
+  PlugIcon,
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -56,6 +57,13 @@ export const navItems: NavItem[] = [
     href: "/assistant",
     icon: MessageSquareTextIcon,
     description: "Ask about your plan, deadlines and schedule.",
+  },
+  {
+    title: "Integrations",
+    href: "/integrations",
+    icon: PlugIcon,
+    description: "Connect your calendars and your school's learning management system.",
+    inTabBar: false,
   },
   {
     title: "Settings",

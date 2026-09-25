@@ -37,7 +37,7 @@ import { RATE_LIMITS } from "@/server/rate-limit"
 import { getStudentTimeZone } from "@/server/student-clock"
 import { logger } from "@/server/log"
 
-// Server actions for LMS integrations (Settings > Integrations). The student is
+// Server actions for LMS integrations (the Integrations page). The student is
 // always the signed-in user from the session; no user id or token is ever
 // accepted from, or returned to, the browser.
 

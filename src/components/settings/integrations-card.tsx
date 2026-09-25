@@ -35,10 +35,10 @@ import type { CalendarIntegrationStatus } from "@/server/integrations/calendar/c
 import type { LmsIntegrationStatus } from "@/server/integrations/lms/connections"
 import { CalendarConnections, type CalendarOutcomes } from "./calendar-connections"
 
-// Settings > Integrations. Only safe connection summaries reach this component
+// The Integrations page (/integrations). Only safe connection summaries reach this component
 // (no tokens). Connecting, syncing and disconnecting go through server actions.
 
-// What the LMS's return to Settings means (?canvas=..., ?blackboard=...), as a friendly message.
+// What the LMS's return to Integrations means (?canvas=..., ?blackboard=...), as a friendly message.
 function callbackMessage(name: string, outcome: string): { tone: "success" | "error"; text: string } | undefined {
   const messages: Record<string, { tone: "success" | "error"; text: string }> = {
     connected: { tone: "success", text: `${name} connected. Import your ${name} courses and assignments when you're ready.` },

@@ -13,8 +13,8 @@ calendar items** (`scheduleBetween` in the app store). Each item has a **source*
 | Google Calendar | the student's Google calendars | `external_calendar_events` (`source = google`) | no (read-only) |
 | Outlook | the student's Outlook calendar | `external_calendar_events` (`source = outlook`) | no (read-only) |
 
-Google Calendar and Outlook are connected with OAuth in Settings > Integrations >
-Calendars (separate from login); see `docs/calendar-integrations.md`.
+Google Calendar and Outlook are connected with OAuth on the Integrations page
+(Calendars, separate from login); see `docs/calendar-integrations.md`.
 
 `CalendarEvent.source` is unset for Student OS items and `"canvas"` / `"blackboard"` /
 `"google"` / `"outlook"` for external ones (`EventSource` in `src/lib/types.ts`). Events, tasks and study

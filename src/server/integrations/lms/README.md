@@ -110,7 +110,7 @@ every current course); the calendar feed only contains courses with items.
 - Duplicates are impossible: unique `(user_id, external_source, external_id)`
   on courses and tasks, and matching by those ids first.
 
-**Summary** (`LmsSyncResult`, shown in Settings): courses added / linked / updated /
+**Summary** (`LmsSyncResult`, shown on the Integrations page): courses added / linked / updated /
 skipped, assignments added / linked / updated / skipped / without a due date,
 tasks marked done from the LMS, conflicts (student's value kept), assignments and
 courses no longer in the LMS, safe error messages, and the sync time.
@@ -180,7 +180,7 @@ calendar events, not tasks (`canvasFeedCalendarEvents`; see `src/lib/calendar/RE
 
 ### Sign-in flow (OAuth)
 
-1. Settings > Integrations > Canvas: the student enters their school's Canvas
+1. Integrations > Canvas: the student enters their school's Canvas
    address and clicks **Connect Canvas** (`connectCanvasAction`, a server action).
    The address is validated (`parseCanvasBaseUrl`: HTTPS, an allowed host, no IPs,
    ports or credentials). A random `state` is stored in an encrypted, HttpOnly,
@@ -191,12 +191,12 @@ calendar events, not tasks (`canvasFeedCalendarEvents`; see `src/lib/calendar/RE
    `state`. The route checks the student is signed in, the state matches the
    cookie (constant-time, same student, not expired), deletes the cookie, exchanges
    the code for tokens server-side (`POST /login/oauth2/token`), and saves the
-   connection with tokens encrypted. It redirects to `/settings?canvas=<outcome>`
+   connection with tokens encrypted. It redirects to `/integrations?canvas=<outcome>`
    (a short code, never a token or an error text).
 4. **Import Canvas data / Sync now** (`syncLmsAction`) runs `syncLms` with the
    Canvas adapter: courses (`GET /api/v1/courses?enrollment_type=student&enrollment_state=active`)
    then each course's assignments (`GET /api/v1/courses/:id/assignments?include[]=submission`),
-   following pagination. The summary is shown in Settings; imported tasks appear
+   following pagination. The summary is shown on the Integrations page; imported tasks appear
    everywhere at once.
 5. **Disconnect** (`disconnectLmsAction`) revokes the token at Canvas (best
    effort, `DELETE /login/oauth2/token`) and deletes the connection. Imported
@@ -204,7 +204,7 @@ calendar events, not tasks (`canvasFeedCalendarEvents`; see `src/lib/calendar/RE
 
 Canvas access tokens last about an hour. `token-service.ts` refreshes them before
 they expire (and once after a 401), stores the new token encrypted, and marks the
-connection `needs_reauth` if Canvas rejects the refresh token; Settings then
+connection `needs_reauth` if Canvas rejects the refresh token; Integrations then
 offers **Reconnect**.
 
 Student OS only reads from Canvas: it never submits, grades, comments or edits.
@@ -235,9 +235,9 @@ that school's Canvas. Student OS never creates one itself.
    # only for a self-hosted Canvas: CANVAS_ALLOWED_HOSTS=canvas.myschool.edu
    ```
 2. `npm run db:migrate` (once), then `npm run dev`.
-3. Sign in, open **Settings > Integrations**, enter your Canvas address
+3. Sign in, open **Integrations** (in the sidebar), enter your Canvas address
    (e.g. `myschool.instructure.com`) and click **Connect Canvas**. Approve in Canvas.
-4. Back in Settings ("Canvas connected"), click **Import Canvas data**.
+4. Back on Integrations ("Canvas connected"), click **Import Canvas data**.
 5. Check **Courses** (your Canvas courses), **Tasks** (assignments, marked "From
    Canvas" with **Open in Canvas**), and **Planner** (they're planned like any task).
 6. Change a due date in Canvas (if you can) or in Student OS and **Sync now** to
@@ -271,7 +271,7 @@ Without a developer key, `npm test` covers the whole flow against a fake Canvas
 
 Same architecture as Canvas: `BlackboardProvider` implements `LmsProvider`; the
 connection row, token service, credential vault, OAuth state, sync service,
-matching and conflict rules, summary and Settings UI are all shared. Imported
+matching and conflict rules, summary and Integrations UI are all shared. Imported
 records use `external_source = 'blackboard'` with Learn's primary ids
 (`_215_1`), so they never collide with Canvas records, even with identical ids.
 
@@ -281,7 +281,7 @@ API spec (Developer Portal, v4000.x).
 
 ### Sign-in flow (three-legged OAuth)
 
-1. Settings > Integrations > Blackboard: the student enters their school's
+1. Integrations > Blackboard: the student enters their school's
    Blackboard address and clicks **Connect Blackboard** (`connectBlackboardAction`).
    The address is validated (`parseBlackboardBaseUrl`). A random `state` and PKCE
    verifier go into an encrypted HttpOnly cookie (10 minutes, callback path only),
@@ -330,7 +330,7 @@ items are the student's own Blackboard entries. Class meeting times aren't expos
 
 Blackboard Ultra: **Calendar > Calendar Settings > ⋯ > Share Calendar** gives every
 student a private iCalendar link
-(`https://<school>/webapps/calendar/calendarFeed/<token>/learn.ics`). Settings offers
+(`https://<school>/webapps/calendar/calendarFeed/<token>/learn.ics`). Integrations offers
 it first ("Your Blackboard calendar link"); `connectBlackboardFeedAction` checks it
 (`parseBlackboardFeedUrl`: an allowed Blackboard host, that exact path shape, HTTPS),
 downloads it once, and stores it encrypted (`saveLmsFeedConnection`). Syncs go
@@ -366,7 +366,7 @@ doesn't document it):
    Learn server: *System Admin > Integrations > REST API Integrations > Create
    Integration*, enter the Application ID, choose a user for the integration, and
    allow **End User Access** (required for three-legged OAuth). Until this is done,
-   Blackboard answers the token request with 401 and Settings says "Your school
+   Blackboard answers the token request with 401 and Integrations says "Your school
    hasn't enabled Student OS in Blackboard yet."
 3. Schools with a custom login page must use Learn's `<loginUI:loginForm/>` tag,
    or students get stuck on the Learn landing page after signing in (Blackboard doc
@@ -378,7 +378,7 @@ doesn't document it):
    BLACKBOARD_REDIRECT_URI=http://localhost:3000/api/integrations/blackboard/callback
    # schools on their own domain: BLACKBOARD_ALLOWED_HOSTS=*.blackboard.com,learn.myschool.edu
    ```
-5. In Student OS: Settings > Integrations > Blackboard, enter the school's
+5. In Student OS: Integrations > Blackboard, enter the school's
    address, **Connect Blackboard**, sign in, then **Import Blackboard data**.
 
 Without a registered app and an approving school, `npm test` covers the flow

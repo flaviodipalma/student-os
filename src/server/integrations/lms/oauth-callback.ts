@@ -19,14 +19,14 @@ import { logger } from "@/server/log"
 //   3. The one-time code (with the PKCE verifier from the cookie) is exchanged
 //      for tokens here, on the server.
 //   4. Tokens are stored encrypted; nothing sensitive goes back to the browser.
-// The student lands on Settings with a short outcome code (?canvas=connected,
+// The student lands on Integrations with a short outcome code (?canvas=connected,
 // ?blackboard=denied, ...), never a token or an LMS error message, which the
 // page turns into a friendly message.
 
 export async function handleLmsCallback(request: NextRequest, provider: LmsProviderId): Promise<NextResponse> {
   const cookie = oauthStateCookieName(provider)
-  const backToSettings = (outcome: string) => {
-    const response = NextResponse.redirect(new URL(`/settings?${provider}=${outcome}#integrations`, request.url))
+  const backToIntegrations = (outcome: string) => {
+    const response = NextResponse.redirect(new URL(`/integrations?${provider}=${outcome}`, request.url))
     // The state is single-use, whatever the outcome.
     response.cookies.set(cookie, "", { path: oauthCookiePath(provider), maxAge: 0 })
     return response
@@ -37,22 +37,22 @@ export async function handleLmsCallback(request: NextRequest, provider: LmsProvi
 
   const params = request.nextUrl.searchParams
   const error = params.get("error")
-  if (error) return backToSettings(error === "access_denied" ? "denied" : "error")
+  if (error) return backToIntegrations(error === "access_denied" ? "denied" : "error")
 
   let vault
   try {
     vault = getCredentialVault()
   } catch {
-    return backToSettings("not_configured")
+    return backToIntegrations("not_configured")
   }
 
   const verified = verifyOAuthState(
     { provider, userId: user.id, state: params.get("state"), cookieValue: request.cookies.get(cookie)?.value },
     vault
   )
-  if (!verified) return backToSettings("invalid_state")
+  if (!verified) return backToIntegrations("invalid_state")
   const code = params.get("code")
-  if (!code) return backToSettings("error")
+  if (!code) return backToIntegrations("error")
 
   try {
     const lms = getLmsProvider(provider)
@@ -61,7 +61,7 @@ export async function handleLmsCallback(request: NextRequest, provider: LmsProvi
   } catch (error) {
     // Only the error's type is logged: provider errors can contain tokens.
     logger.error(`${provider}`, `connecting failed`, { name: error instanceof Error ? error.name : typeof error })
-    return backToSettings(error instanceof LmsNotApprovedError ? "not_approved" : "error")
+    return backToIntegrations(error instanceof LmsNotApprovedError ? "not_approved" : "error")
   }
-  return backToSettings("connected")
+  return backToIntegrations("connected")
 }

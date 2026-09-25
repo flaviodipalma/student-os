@@ -388,7 +388,7 @@ export const lmsConnections = pgTable(
 
 // A student's connection to a personal calendar (Google Calendar, Outlook), one
 // per provider. Separate from login: signing in with Google or Microsoft never
-// creates one; the student connects a calendar in Settings > Integrations.
+// creates one; the student connects a calendar on the Integrations page.
 // Tokens are ENCRYPTED with the same credential vault as LMS tokens and never
 // leave the server. Disconnecting deletes the row (and its tokens); the
 // calendar's events are marked removed.

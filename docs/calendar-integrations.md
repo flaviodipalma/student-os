@@ -14,7 +14,7 @@ Open in Outlook**, never the edit form.
 | | Login providers | Calendar connections |
 | --- | --- | --- |
 | What | Google, Microsoft, Apple, email | Google Calendar, Outlook (and Canvas, Blackboard) |
-| Where | Log in / Sign up; Settings > Account | Settings > Integrations > Calendars |
+| Where | Log in / Sign up; Settings > Account | Integrations > Calendars |
 | Who runs OAuth | Supabase Auth | Student OS (`src/server/integrations/calendar`) |
 | Permissions | identity only (`openid email profile`) | read-only calendar access |
 | Stored | Supabase `auth.identities` (no tokens) | `calendar_connections` (tokens encrypted) |
@@ -28,7 +28,7 @@ below).
 ## Architecture
 
 ```
-Settings > Integrations > Calendars (Connect / Sync now / Disconnect)
+Integrations > Calendars (Connect / Sync now / Disconnect)
   -> app/actions/calendar-integrations.ts        signed-in student only
   -> CalendarProvider (integrations/calendar/provider.ts)
        google/google-calendar.ts    Calendar API v3
@@ -164,8 +164,7 @@ tasks, courses and study sessions stay.
    this redirect URI and permissions to it; a separate app keeps login and
    calendar access clearly apart (recommended).
 
-Then run `npm run db:migrate` once and restart the server. Settings >
-Integrations > Calendars shows **Connect Google Calendar** / **Connect Outlook**
+Then run `npm run db:migrate` once and restart the server. The Integrations page (Calendars) shows **Connect Google Calendar** / **Connect Outlook**
 once a provider's settings are present (otherwise "isn't set up on this server yet").
 
 ## Tests
@@ -184,7 +183,7 @@ their APIs.
 - `app/actions/calendar-integrations.test.ts`: Connect, the OAuth callback (state,
   CSRF, cancel, permissions, first sync), Sync now, Disconnect, isolation.
 - `components/settings/calendar-connections.test.tsx`,
-  `components/calendar/calendar-view.test.tsx`: the Settings rows and the calendar.
+  `components/calendar/calendar-view.test.tsx`: the Integrations rows and the calendar.
 
 ## Limitations
 

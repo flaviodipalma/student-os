@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { useThemeChoice } from "./use-theme-choice"
 
 // The theme button next to the notification bell: a small menu with Light /
-// Dark / System. Same choice (and saving) as Settings > Appearance.
+// Dark / System. Saved to the student's account (their other devices).
 
 const options: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
   { value: "light", label: "Light", icon: SunIcon },

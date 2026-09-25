@@ -5,7 +5,7 @@ import { updateThemeAction } from "@/app/actions/settings"
 import type { ThemePreference } from "@/lib/theme"
 import { useTheme } from "./theme-provider"
 
-// Choosing Light / Dark / System (the header menu and Settings > Appearance):
+// Choosing Light / Dark / System (the header theme menu):
 // applies at once on this device, then saves it to the student's account.
 export function useThemeChoice() {
   const theme = useTheme()
