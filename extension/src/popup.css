@@ -244,7 +244,10 @@ input[type="checkbox"]:checked {
 .notice-title { font-weight: 600; margin-bottom: 2px; }
 
 /* ---- Automatic sync switch ---- */
-.auto { padding: 10px 12px; }
+.auto { padding: 10px 12px; display: grid; gap: 6px; }
+.auto-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtle-foreground); }
+.auto-sites { display: grid; }
+.auto-sites .switch-row + .switch-row { border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 8px; }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; font-weight: 400; }
 .switch-text { display: grid; gap: 1px; min-width: 0; }
 .switch-title { font-size: 13px; font-weight: 600; }

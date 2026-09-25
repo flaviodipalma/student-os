@@ -62,20 +62,22 @@ export type SyncSummary = {
   errors: string[]
 }
 
-// Sends what the extension read from Canvas to Student OS, which imports it.
+// Sends what the extension read from Canvas or Blackboard to Student OS, which
+// imports it (/api/extension/<lms>/import).
 export async function sendImport(
   address: string,
-  canvas: { baseUrl: string; courses: unknown[]; assignments: Record<string, unknown[]> },
+  lms: "canvas" | "blackboard",
+  data: { baseUrl: string; courses: unknown[] } & Record<string, unknown>,
   timeZone: string,
   fetchFn: typeof fetch
 ): Promise<SyncSummary> {
   const body = await call(
     address,
-    "/api/extension/canvas/import",
+    `/api/extension/${lms}/import`,
     {
       method: "POST",
       headers: { ...EXTENSION_HEADERS, "Content-Type": "application/json" },
-      body: JSON.stringify({ baseUrl: canvas.baseUrl, timeZone, courses: canvas.courses, assignments: canvas.assignments }),
+      body: JSON.stringify({ ...data, timeZone }),
     },
     fetchFn
   )
@@ -100,15 +102,15 @@ async function call(address: string, path: string, init: RequestInit, fetchFn: t
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
 
 // The sync, in a few short lines (same wording as the Integrations page).
-export function summaryLines(result: SyncSummary, coursesUnreadable: number): string[] {
+export function summaryLines(result: SyncSummary, coursesUnreadable: number, lmsName: string): string[] {
   const lines = [
     result.coursesCreated > 0 && `${plural(result.coursesCreated, "course")} added`,
-    result.coursesLinked > 0 && `${plural(result.coursesLinked, "existing course")} linked to Canvas`,
+    result.coursesLinked > 0 && `${plural(result.coursesLinked, "existing course")} linked to ${lmsName}`,
     result.coursesUpdated > 0 && `${plural(result.coursesUpdated, "course")} updated`,
     result.assignmentsCreated > 0 && `${plural(result.assignmentsCreated, "assignment")} added as tasks`,
-    result.assignmentsLinked > 0 && `${plural(result.assignmentsLinked, "existing task")} linked to Canvas`,
+    result.assignmentsLinked > 0 && `${plural(result.assignmentsLinked, "existing task")} linked to ${lmsName}`,
     result.assignmentsUpdated > 0 && `${plural(result.assignmentsUpdated, "assignment")} updated`,
-    result.assignmentsCompleted > 0 && `${plural(result.assignmentsCompleted, "task")} marked done (submitted in Canvas)`,
+    result.assignmentsCompleted > 0 && `${plural(result.assignmentsCompleted, "task")} marked done (submitted in ${lmsName})`,
     result.assignmentsWithoutDueDate > 0 && `${plural(result.assignmentsWithoutDueDate, "assignment")} without a due date weren't imported`,
     result.coursesSkipped + coursesUnreadable > 0 && `${plural(result.coursesSkipped + coursesUnreadable, "course")} couldn't be read`,
     result.conflicts.length > 0 && `${plural(result.conflicts.length, "change")} of yours kept (see Integrations)`,

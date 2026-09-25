@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { lmsConnections } from "@/server/db/schema"
 import type { Database } from "@/server/db/types"
-import { MAX_IMPORT_BYTES } from "@/server/integrations/extension/canvas-import"
+import { MAX_IMPORT_BYTES } from "@/server/integrations/extension/import-route"
 import { saveLmsFeedConnection } from "@/server/integrations/lms/connections"
 import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
 import { syncCanvasFeed } from "@/server/integrations/lms/canvas/feed-sync"
@@ -144,12 +144,37 @@ describe("POST /api/extension/canvas/import", () => {
     expect(await connectionOf(alex.userId)).toBeUndefined()
   })
 
-  it("only accepts an allowed Canvas address, and keeps no links to other sites", async () => {
+  it("refuses addresses that aren't public HTTPS (plain http, IPs, local names, ports, logins)", async () => {
     const alex = await student("Alex")
-    for (const baseUrl of ["https://evil.example.com", "http://school.instructure.com", "https://127.0.0.1", "not a url"]) {
-      expect((await send(payload({ baseUrl }), alex.userId)).status).toBe(400)
+    const refused = [
+      "http://school.instructure.com",
+      "https://127.0.0.1",
+      "https://[::1]",
+      "https://intranet",
+      "https://canvas.local",
+      "https://canvas.localhost",
+      "https://school.instructure.com:8443",
+      "https://user:pass@school.instructure.com",
+      "javascript:alert(1)",
+      "not a url",
+    ]
+    for (const baseUrl of refused) {
+      expect((await send(payload({ baseUrl }), alex.userId)).status, baseUrl).toBe(400)
     }
     expect(await connectionOf(alex.userId)).toBeUndefined()
+  })
+
+  it("accepts a school's own Canvas domain (any public HTTPS address), and keeps no links to other sites", async () => {
+    const alex = await student("Alex")
+    const own = "https://canvas.myschool.edu"
+    const onOwnDomain = { ...project, html_url: `${own}/courses/215/assignments/1` }
+    expect((await send(payload({ baseUrl: own, assignments: { "215": [onOwnDomain] } }), alex.userId)).status).toBe(200)
+    expect(await connectionOf(alex.userId)).toMatchObject({ method: "extension", baseUrl: own })
+    expect((await listTasks(t.db, alex.userId))[0].source?.url).toBe(`${own}/courses/215/assignments/1`)
+  })
+
+  it("keeps only links on the school's own Canvas", async () => {
+    const alex = await student("Alex")
 
     await send(payload({ assignments: { "215": [project, { ...quiz, html_url: "https://evil.example.com/phish" }] } }), alex.userId)
     const tasks = await listTasks(t.db, alex.userId)

@@ -1,24 +1,25 @@
-import { timeAgo, type AutoSyncState } from "./auto-sync"
+import { LMS_NAMES, timeAgo, type AutoSyncState } from "./auto-sync"
 import {
   importChosen,
-  inCanvas,
   loadAddress,
   loadAutoSync,
   loadChoice,
-  READ_PROBLEMS,
+  NOT_AN_LMS,
+  readCourses,
   saveAddress,
   saveChoice,
-  updateAutoSync,
-} from "./canvas-sync"
+  setLoggedOut,
+  updateSite,
+} from "./lms-sync"
 import { courseOptions, groupByTerm, initialSelection, type CourseOption } from "./courses"
 import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, StudentOsError } from "./student-os"
 
 // The popup. It syncs to the Student OS account logged in in this browser (Chrome
 // sends that login with the extension's requests), so there's nothing to set up:
-// it checks who's logged in, then syncs Canvas from the tab the student is on.
-// Sync reads the course list, lets the student choose (the first time, and when a
-// new semester shows up), then imports those courses. After the first sync, a
-// switch turns on automatic sync (background.ts) when they open Canvas.
+// it checks who's logged in, then syncs Canvas or Blackboard from the tab the
+// student is on. Sync reads the course list, lets the student choose (the first
+// time, and when a new semester shows up), then imports those courses. After a
+// site's first sync, a switch turns on automatic sync (background.ts) for it.
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const checking = $<HTMLDivElement>("checking")
@@ -35,7 +36,6 @@ const importButton = $<HTMLButtonElement>("import-chosen")
 const result = $<HTMLDivElement>("result")
 const syncError = $<HTMLDivElement>("sync-error")
 const autoCard = $<HTMLDivElement>("auto-sync")
-const autoToggle = $<HTMLInputElement>("auto-toggle")
 const newCourses = $<HTMLDivElement>("new-courses")
 
 let address = DEFAULT_ADDRESS
@@ -76,8 +76,7 @@ async function checkLogin() {
     const account = await currentAccount(address, fetch)
     show({ kind: "signed-in", firstName: account.firstName })
     // Logged in again: automatic sync can carry on.
-    const auto = await loadAutoSync()
-    showAutoSync(auto.problem === "logged-out" ? await updateAutoSync({ problem: null }) : auto)
+    showAutoSync(await setLoggedOut(false))
   } catch (error) {
     if (error instanceof StudentOsError && error.loggedOut) show({ kind: "logged-out" })
     else show({ kind: "error", message: error instanceof StudentOsError ? error.message : "Something went wrong. Please try again." })
@@ -86,32 +85,54 @@ async function checkLogin() {
 
 // ---- Automatic sync ------------------------------------------------------------
 
-// Shown once the student has synced by hand (so their Canvas and courses are known).
+// One switch per site the student has synced by hand (so its courses are known).
 function showAutoSync(state: AutoSyncState) {
-  autoCard.hidden = !state.canvasOrigin
-  autoToggle.checked = state.enabled
-  newCourses.hidden = state.problem !== "new-courses"
-  const last = state.lastSuccessAt ? `${state.lastAutomatic ? "Synced automatically" : "Last synced"} · ${timeAgo(state.lastSuccessAt, Date.now())}` : null
-  $("auto-status").textContent = state.enabled
-    ? (last ?? "On · when you open Canvas, every 30 minutes at most")
-    : "Off · turn on to sync whenever you open Canvas"
+  const sites = Object.entries(state.sites)
+  autoCard.hidden = sites.length === 0
+  $("auto-sites").replaceChildren(
+    ...sites.map(([origin, site]) => {
+      const row = document.createElement("label")
+      row.className = "switch-row"
+      row.dataset.site = origin
+      const text = document.createElement("span")
+      text.className = "switch-text"
+      const title = document.createElement("span")
+      title.className = "switch-title"
+      title.textContent = `${LMS_NAMES[site.lms]} · ${origin.replace(/^https?:\/\//, "")}`
+      const status = document.createElement("span")
+      status.className = "caption"
+      const last = site.lastSuccessAt ? `${site.lastAutomatic ? "Synced automatically" : "Last synced"} · ${timeAgo(site.lastSuccessAt, Date.now())}` : null
+      status.textContent = site.enabled ? (last ?? "On · when you open it, every 30 minutes at most") : "Off · turn on to sync whenever you open it"
+      text.append(title, status)
+      const toggle = document.createElement("input")
+      toggle.type = "checkbox"
+      toggle.setAttribute("role", "switch")
+      toggle.className = "switch"
+      toggle.checked = site.enabled
+      toggle.setAttribute("aria-label", `Sync ${LMS_NAMES[site.lms]} automatically`)
+      toggle.addEventListener("change", () => void setAutoSync(origin, site.lms, toggle.checked))
+      row.append(text, toggle)
+      return row
+    })
+  )
+  const withNew = sites.filter(([, site]) => site.newCourses).map(([, site]) => LMS_NAMES[site.lms])
+  newCourses.hidden = withNew.length === 0
+  $("new-courses-title").textContent = `New courses in ${[...new Set(withNew)].join(" and ")}`
 }
 
-autoToggle.addEventListener("change", async () => {
-  const state = await loadAutoSync()
-  if (!state.canvasOrigin) return
-  const origins = [`${state.canvasOrigin}/*`]
-  if (autoToggle.checked) {
-    // Access to the student's Canvas, so the extension can read it without a click.
+async function setAutoSync(origin: string, lms: keyof typeof LMS_NAMES, on: boolean) {
+  const origins = [`${origin}/*`]
+  if (on) {
+    // Access to the student's site, so the extension can read it without a click.
     const granted = await chrome.permissions.request({ origins }).catch(() => false)
-    showAutoSync(await updateAutoSync({ enabled: granted }))
-    if (!granted) setNotice(syncError, "Automatic sync needs access to your Canvas. Turn it on again and choose Allow.")
+    showAutoSync(await updateSite(origin, lms, { enabled: granted }))
+    if (!granted) setNotice(syncError, `Automatic sync needs access to your ${LMS_NAMES[lms]}. Turn it on again and choose Allow.`)
   } else {
-    showAutoSync(await updateAutoSync({ enabled: false }))
+    showAutoSync(await updateSite(origin, lms, { enabled: false }))
     // Give the access back (not possible for addresses the extension always has, like this computer).
     await chrome.permissions.remove({ origins }).catch(() => false)
   }
-})
+}
 
 // ---- The Student OS address --------------------------------------------------------
 
@@ -223,14 +244,14 @@ function chooseCourses(options: CourseOption[], selected: Set<string>): Promise<
 
 // ---- Sync ----------------------------------------------------------------------
 
-async function sync(choose: boolean): Promise<string[] | null> {
+async function sync(choose: boolean): Promise<{ lines: string[]; name: string } | null> {
   const tab = await canvasTab()
-  if (!tab?.id || !/^https?:/.test(tab.url ?? "")) throw new StudentOsError(READ_PROBLEMS["not-canvas"])
+  if (!tab?.id) throw new StudentOsError(NOT_AN_LMS)
 
-  setText(progress, "Reading your Canvas courses…")
-  const list = await inCanvas(tab.id, { kind: "courses" })
-  const options = courseOptions(list.courses)
-  if (options.length === 0) throw new StudentOsError("Canvas doesn't list any active courses for you.")
+  setText(progress, "Reading your courses…")
+  const { lms, list } = await readCourses(tab.id, tab.url)
+  const options = courseOptions(list.choices)
+  if (options.length === 0) throw new StudentOsError(`${lms.name} doesn't list any active courses for you.`)
 
   const saved = await loadChoice(list.baseUrl)
   const { selected, needsReview } = initialSelection(options, saved, Date.now())
@@ -242,12 +263,12 @@ async function sync(choose: boolean): Promise<string[] | null> {
     chosen = picked
     await saveChoice(list.baseUrl, { selected: chosen, seen: options.map((o) => o.id) })
     // Every course has been seen now.
-    if ((await loadAutoSync()).problem === "new-courses") await updateAutoSync({ problem: null })
+    await updateSite(list.baseUrl, lms.id, { newCourses: false })
   }
 
-  const lines = await importChosen(tab.id, address, list, chosen, { automatic: false, onProgress: (message) => setText(progress, message) })
+  const lines = await importChosen(tab.id, address, lms, list, chosen, { automatic: false, onProgress: (message) => setText(progress, message) })
   showAutoSync(await loadAutoSync())
-  return lines
+  return { lines, name: lms.name }
 }
 
 async function runSync(choose: boolean) {
@@ -257,10 +278,11 @@ async function runSync(choose: boolean) {
   syncButton.setAttribute("aria-busy", "true")
   $("sync-label").textContent = "Syncing…"
   try {
-    const lines = await sync(choose)
-    if (!lines) return
+    const synced = await sync(choose)
+    if (!synced) return
+    $("result-title").textContent = `${synced.name} sync complete.`
     $("result-lines").replaceChildren(
-      ...lines.map((line) => {
+      ...synced.lines.map((line) => {
         const item = document.createElement("li")
         item.textContent = line
         return item

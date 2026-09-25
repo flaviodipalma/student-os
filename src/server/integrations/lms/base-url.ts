@@ -35,9 +35,11 @@ export function allowedHostsFrom(value: string | undefined, fallback: string): s
     .filter(Boolean)
 }
 
+// `allowedHosts` "any-https": any public HTTPS address (browser-extension imports,
+// where the server never contacts it; see src/server/integrations/extension/base-url.ts).
 export function parseLmsBaseUrl(
   input: string,
-  allowedHosts: string[],
+  allowedHosts: string[] | "any-https",
   messages: { invalid: string; notAllowed: (host: string) => string }
 ): string {
   const invalid = new LmsError(messages.invalid)
@@ -51,8 +53,10 @@ export function parseLmsBaseUrl(
   }
   const host = url.hostname.toLowerCase()
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) throw invalid
-  if (!host.includes(".") || IPV4.test(host) || host.startsWith("[") || host.endsWith(".local")) throw invalid
-  if (!hostAllowed(host, allowedHosts)) throw new LmsError(messages.notAllowed(host))
+  if (!host.includes(".") || IPV4.test(host) || host.startsWith("[") || host.endsWith(".local") || host.endsWith(".localhost")) {
+    throw invalid
+  }
+  if (allowedHosts !== "any-https" && !hostAllowed(host, allowedHosts)) throw new LmsError(messages.notAllowed(host))
   return `https://${host}`
 }
 

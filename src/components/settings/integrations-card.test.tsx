@@ -97,6 +97,15 @@ const result = (overrides: Partial<LmsSyncResult> = {}): LmsSyncResult => ({
 beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
+describe("Blackboard through the browser extension", () => {
+  it("says how to sync from the extension, with no Sync now button here", () => {
+    render(<IntegrationsCard integrations={withBlackboard({ method: "extension", lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
+    expect(screen.getByText(/Through the browser extension/)).toBeTruthy()
+    expect(screen.getByText(/open Blackboard, click the Student OS extension/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /Sync now|Import Blackboard data/ })).toBeNull()
+  })
+})
+
 describe("Canvas through the browser extension", () => {
   it("says how to sync from the extension, with no Sync now button here", () => {
     render(<IntegrationsCard integrations={canvas({ method: "extension", lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)

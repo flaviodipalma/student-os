@@ -60,7 +60,7 @@ describe("sendImport", () => {
 
   it("posts the Canvas data as the logged-in student, with the browser's time zone", async () => {
     const fetchFn = vi.fn(async () => Response.json({ result })) as unknown as typeof fetch
-    expect(await sendImport("http://localhost:3000", canvas, "America/New_York", fetchFn)).toEqual(result)
+    expect(await sendImport("http://localhost:3000", "canvas", canvas, "America/New_York", fetchFn)).toEqual(result)
     const [url, init] = vi.mocked(fetchFn).mock.calls[0]
     expect(url).toBe("http://localhost:3000/api/extension/canvas/import")
     expect(init).toMatchObject({ method: "POST", credentials: "include" })
@@ -68,15 +68,24 @@ describe("sendImport", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ ...canvas, timeZone: "America/New_York" })
   })
 
+  it("Blackboard goes to its own import address, with its own fields", async () => {
+    const fetchFn = vi.fn(async () => Response.json({ result })) as unknown as typeof fetch
+    const blackboard = { baseUrl: "https://school.blackboard.com", courses: [{ courseId: "_1_1" }], columns: { _1_1: [] }, grades: {}, attempts: {} }
+    await sendImport("http://localhost:3000", "blackboard", blackboard, "UTC", fetchFn)
+    const [url, init] = vi.mocked(fetchFn).mock.calls[0]
+    expect(url).toBe("http://localhost:3000/api/extension/blackboard/import")
+    expect(JSON.parse(String(init?.body))).toEqual({ ...blackboard, timeZone: "UTC" })
+  })
+
   it("logged out is its own error; other problems show Student OS's message", async () => {
     const loggedOut = vi.fn(async () => Response.json({ error: "Log in to Student OS in this browser, then try again.", loggedOut: true }, { status: 401 })) as unknown as typeof fetch
-    await expect(sendImport("http://localhost:3000", canvas, "UTC", loggedOut)).rejects.toMatchObject({ loggedOut: true })
+    await expect(sendImport("http://localhost:3000", "canvas", canvas, "UTC", loggedOut)).rejects.toMatchObject({ loggedOut: true })
     const limited = vi.fn(async () => Response.json({ error: "You're doing that a lot right now." }, { status: 429 })) as unknown as typeof fetch
-    await expect(sendImport("http://localhost:3000", canvas, "UTC", limited)).rejects.toMatchObject({ loggedOut: false, message: "You're doing that a lot right now." })
+    await expect(sendImport("http://localhost:3000", "canvas", canvas, "UTC", limited)).rejects.toMatchObject({ loggedOut: false, message: "You're doing that a lot right now." })
     const offline = vi.fn(async () => {
       throw new TypeError("Failed to fetch")
     }) as unknown as typeof fetch
-    await expect(sendImport("http://localhost:3000", canvas, "UTC", offline)).rejects.toThrow(/Can't reach Student OS/)
+    await expect(sendImport("http://localhost:3000", "canvas", canvas, "UTC", offline)).rejects.toThrow(/Can't reach Student OS/)
   })
 })
 
@@ -88,15 +97,19 @@ describe("summaryLines", () => {
   }
 
   it("says what changed, in the Integrations page's words", () => {
-    expect(summaryLines({ ...empty, coursesCreated: 4, assignmentsCreated: 31, assignmentsCompleted: 6 }, 0)).toEqual([
+    expect(summaryLines({ ...empty, coursesCreated: 4, assignmentsCreated: 31, assignmentsCompleted: 6 }, 0, "Canvas")).toEqual([
       "4 courses added",
       "31 assignments added as tasks",
       "6 tasks marked done (submitted in Canvas)",
     ])
-    expect(summaryLines({ ...empty, assignmentsUpdated: 1, coursesSkipped: 1 }, 1)).toEqual(["1 assignment updated", "2 courses couldn't be read"])
+    expect(summaryLines({ ...empty, assignmentsUpdated: 1, coursesSkipped: 1 }, 1, "Canvas")).toEqual(["1 assignment updated", "2 courses couldn't be read"])
+    expect(summaryLines({ ...empty, assignmentsCompleted: 1, assignmentsLinked: 2 }, 0, "Blackboard")).toEqual([
+      "2 existing tasks linked to Blackboard",
+      "1 task marked done (submitted in Blackboard)",
+    ])
   })
 
   it("nothing changed: says so", () => {
-    expect(summaryLines(empty, 0)).toEqual(["Everything was already up to date."])
+    expect(summaryLines(empty, 0, "Canvas")).toEqual(["Everything was already up to date."])
   })
 })

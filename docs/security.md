@@ -100,7 +100,10 @@ users. Details for each area live next to the code (linked below).
   their browser (the extension reads Canvas in the Canvas tab); the extension keeps
   only the Student OS address and the chosen course ids. It reads only the Canvas
   fields Student OS uses (no grades or scores), and the server validates all of it
-  like an OAuth sync (allowed Canvas host, same-host links, size limits).
+  like an OAuth sync (same-host links, size limits). The school's address may be any
+  public HTTPS address (schools run Canvas and Blackboard on their own domains): unlike
+  OAuth, where the server sends secrets to it and only allowlisted hosts are accepted,
+  an extension import never makes the server contact it. No IPs, ports or local names.
   Automatic sync is opt-in and asks Chrome for access to the student's Canvas address
   only (never all sites); turning it off gives that access back.
 - External links (Open in Canvas / Google / Outlook) must be `https` (and, when

@@ -185,8 +185,10 @@ pairing, no secrets stored.
    the student from the Student OS session; the extension check in
    `src/server/integrations/extension/http.ts` (required header, extension Origin,
    optional `STUDENT_OS_EXTENSION_IDS`); size limits (2 MB, 100 courses, 500
-   assignments per course) and the Sync now rate limit; the Canvas address through
-   the same allowlist as OAuth; every course and assignment through the same
+   assignments per course) and the Sync now rate limit (shared route:
+   `extension/import-route.ts`); the Canvas address must be a public HTTPS address
+   (`extension/base-url.ts`: any school domain, since the server never contacts it
+   here; no IPs, ports or local names); every course and assignment through the same
    validators (`canvas/mapping.ts`); then `runSync`
    (`src/server/integrations/extension/canvas-import.ts`). The connection is saved
    with method `extension`.
@@ -369,6 +371,26 @@ graded/submitted while the task isn't done; never un-completed.
 `GET v1/calendars/items` returns gradebook items (already imported above),
 institution and personal events, only in windows of at most 16 weeks, and personal
 items are the student's own Blackboard entries. Class meeting times aren't exposed.
+
+### Browser extension
+
+The same as Canvas's (see Canvas > Browser extension), reading Learn's REST API
+inside the student's Blackboard tab with their own login (Blackboard's Ultra pages
+use the same API): `v1/users/me`, `v1/users/{id}/courses?expand=course`, `v1/terms`
+(for the course list by semester; optional), then for the chosen courses
+`v1/courses/{id}/users?role=Instructor&expand=user` (instructors' names only, the
+course's professor; optional, and unlike the OAuth adapter, which leaves it empty),
+`v2/courses/{id}/gradebook/columns`, `v2/courses/{id}/gradebook/users/{id}` and, for
+recent attempt-graded columns (at most 25 per course), their `attempts`.
+`POST /api/extension/blackboard/import`
+(`src/server/integrations/extension/blackboard-import.ts`) reuses this adapter's
+mapping (`blackboard/mapping.ts`): courses taken as a student, real work columns, a
+real grade or a turned-in attempt means done, "unknown" otherwise.
+
+Switching from the calendar link links the tasks it imported (the feed's gradable
+items use the same column ids), so nothing is duplicated, and hides the link's
+calendar events. Known limitation: those tasks stay in the link's "Blackboard"
+course, because a sync never moves a linked task to another course.
 
 ### Calendar link (no school approval)
 

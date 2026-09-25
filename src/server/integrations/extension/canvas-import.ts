@@ -4,11 +4,11 @@ import { z } from "zod"
 import type { LmsAssignment, LmsCourse, LmsSyncResult } from "@/lib/lms/types"
 import { isValidTimeZone } from "@/lib/time-zone"
 import type { Database } from "../../db/types"
-import { canvasAllowedHosts, parseCanvasBaseUrl } from "../lms/canvas/config"
 import { canvasAssignmentToLms, canvasCourseToLms } from "../lms/canvas/mapping"
 import { getLmsConnectionMethod, saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
+import { parseExtensionLmsBaseUrl } from "./base-url"
 import { removeExternalEventsFrom } from "../../services/external-events"
 
 // A Canvas import sent by the Student OS browser extension. The extension reads
@@ -16,11 +16,10 @@ import { removeExternalEventsFrom } from "../../services/external-events"
 //   GET /api/v1/courses?enrollment_type=student&enrollment_state=active&include[]=teachers&include[]=term
 //   GET /api/v1/courses/:id/assignments?include[]=submission&order_by=due_at
 // and sends the raw JSON here, for the courses the student chose. None of it is
-// trusted: the Canvas address must be an allowed Canvas host, and every course and
-// assignment goes through the same validation as the OAuth adapter
-// (canvas/mapping.ts), then the same sync.
+// trusted: the Canvas address must be a public HTTPS address (base-url.ts), links
+// must stay on it, and every course and assignment goes through the same validation
+// as the OAuth adapter (canvas/mapping.ts), then the same sync.
 
-export const MAX_IMPORT_BYTES = 2 * 1024 * 1024
 export const MAX_IMPORT_COURSES = 100
 export const MAX_IMPORT_ASSIGNMENTS_PER_COURSE = 500
 
@@ -43,7 +42,7 @@ export async function importCanvasFromExtension(
   const parsed = importSchema.safeParse(payload)
   if (!parsed.success) throw new LmsError("That doesn't look like Canvas data. Update the extension and try again.")
   const data = parsed.data
-  const baseUrl = parseCanvasBaseUrl(data.baseUrl, canvasAllowedHosts())
+  const baseUrl = parseExtensionLmsBaseUrl(data.baseUrl, "Canvas")
   const timeZone = isValidTimeZone(data.timeZone) ? data.timeZone : undefined
 
   const courses = data.courses.map((raw) => canvasCourseToLms(raw, baseUrl)).filter((course): course is LmsCourse => course !== null)

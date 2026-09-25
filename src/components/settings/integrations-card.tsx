@@ -250,18 +250,7 @@ function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatu
       {needsAttention && connection.lastSyncError && <Notice tone="error">{connection.lastSyncError}</Notice>}
 
       {viaExtension ? (
-        // Only the extension can read Canvas for this connection (with the student's own login).
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            To sync, open Canvas, click the Student OS extension, then click{" "}
-            <span className="font-medium text-foreground">Sync now</span>. You choose which courses come in.
-          </p>
-          <DisconnectButton
-            provider="canvas"
-            name="Canvas"
-            description="Student OS will stop syncing with Canvas until you click Sync now in the extension again. Courses and tasks you already imported stay in Student OS."
-          />
-        </div>
+        <ExtensionConnection provider="canvas" name="Canvas" />
       ) : !connection ? (
         <div className="space-y-4">
           <ConnectCanvasFeedForm />
@@ -291,6 +280,7 @@ function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatu
 function BlackboardRow({ integration, timeZone }: { integration: LmsIntegrationStatus; timeZone: string | undefined }) {
   const connection = integration.connection
   const viaFeed = connection?.method === "calendar_feed"
+  const viaExtension = connection?.method === "extension"
   const needsAttention = connection && connection.status !== "connected"
 
   return (
@@ -299,12 +289,14 @@ function BlackboardRow({ integration, timeZone }: { integration: LmsIntegrationS
         integration={integration}
         timeZone={timeZone}
         pitch="Bring in your Blackboard assignment deadlines."
-        method={viaFeed ? "Through your calendar link" : "Signed in with Blackboard"}
+        method={viaExtension ? "Through the browser extension" : viaFeed ? "Through your calendar link" : "Signed in with Blackboard"}
       />
 
       {needsAttention && connection.lastSyncError && <Notice tone="error">{connection.lastSyncError}</Notice>}
 
-      {!connection ? (
+      {viaExtension ? (
+        <ExtensionConnection provider="blackboard" name="Blackboard" />
+      ) : !connection ? (
         <div className="space-y-4">
           <ConnectBlackboardFeedForm />
           {integration.configured && (
@@ -325,6 +317,24 @@ function BlackboardRow({ integration, timeZone }: { integration: LmsIntegrationS
       ) : (
         <ConnectedActions provider="blackboard" name="Blackboard" firstSync={!connection.lastSyncedAt} />
       )}
+    </div>
+  )
+}
+
+// A connection through the browser extension: only the extension can read the LMS
+// for it (with the student's own login), so there's no Sync now here.
+function ExtensionConnection({ provider, name }: { provider: LmsProviderId; name: string }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        To sync, open {name}, click the Student OS extension, then click{" "}
+        <span className="font-medium text-foreground">Sync now</span>. You choose which courses come in.
+      </p>
+      <DisconnectButton
+        provider={provider}
+        name={name}
+        description={`Student OS will stop syncing with ${name} until you click Sync now in the extension again. Courses and tasks you already imported stay in Student OS.`}
+      />
     </div>
   )
 }
