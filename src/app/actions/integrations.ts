@@ -152,6 +152,11 @@ export async function syncLmsAction(provider: unknown): Promise<ActionResult<Lms
     const options = { timeZone: await getStudentTimeZone() }
     // The student's own connection decides how to read: calendar feed or OAuth.
     const method = await getLmsConnectionMethod(db, userId, id)
+    // Only the browser extension can read the LMS for an extension connection
+    // (it uses the student's own LMS session, which the server never has).
+    if (method === "extension") {
+      throw new LmsError("This connection syncs from the Student OS browser extension. Open your LMS and click Sync now in the extension.")
+    }
     const result =
       method === "calendar_feed"
         ? id === "canvas"

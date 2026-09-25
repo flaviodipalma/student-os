@@ -47,11 +47,12 @@ export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "
 // Learning management systems Student OS can import from (see src/server/integrations/lms).
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
-// How Student OS reads the LMS: OAuth + API, or the student's private calendar feed link.
 // Where an external calendar event comes from: an LMS calendar feed or a personal calendar.
 export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook"])
 export const calendarProvider = pgEnum("calendar_provider", ["google", "outlook"])
-export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed"])
+// How Student OS reads the LMS: OAuth + API, the student's private calendar feed link,
+// or the Student OS browser extension (reads the LMS with the student's own browser session).
+export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed", "extension"])
 export const notificationType = pgEnum("notification_type", [
   "task_due_soon",
   "task_overdue",

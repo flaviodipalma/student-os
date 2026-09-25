@@ -28,6 +28,9 @@ with sample data. Real accounts always start empty.
   `src/app/actions/` are the server actions the UI calls.
 - **Browser state:** `src/lib/app-store.tsx` starts from the user's data and saves every change
   through a server action.
+- **Browser extension:** `extension/` syncs Canvas with the student's own Canvas login, to the
+  Student OS account logged in in the same browser. Build with `npm run build:extension`, then load
+  `extension/dist` in `chrome://extensions` ([extension/README.md](extension/README.md)).
 
 ## Database changes
 

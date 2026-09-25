@@ -235,6 +235,7 @@ function ProviderHeader({
 function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatus; timeZone: string | undefined }) {
   const connection = integration.connection
   const viaFeed = connection?.method === "calendar_feed"
+  const viaExtension = connection?.method === "extension"
   const needsAttention = connection && connection.status !== "connected"
 
   return (
@@ -243,12 +244,25 @@ function CanvasRow({ integration, timeZone }: { integration: LmsIntegrationStatu
         integration={integration}
         timeZone={timeZone}
         pitch="Bring in your Canvas courses and assignment deadlines."
-        method={viaFeed ? "Through your calendar feed" : "Signed in with Canvas"}
+        method={viaExtension ? "Through the browser extension" : viaFeed ? "Through your calendar feed" : "Signed in with Canvas"}
       />
 
       {needsAttention && connection.lastSyncError && <Notice tone="error">{connection.lastSyncError}</Notice>}
 
-      {!connection ? (
+      {viaExtension ? (
+        // Only the extension can read Canvas for this connection (with the student's own login).
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            To sync, open Canvas, click the Student OS extension, then click{" "}
+            <span className="font-medium text-foreground">Sync now</span>. You choose which courses come in.
+          </p>
+          <DisconnectButton
+            provider="canvas"
+            name="Canvas"
+            description="Student OS will stop syncing with Canvas until you click Sync now in the extension again. Courses and tasks you already imported stay in Student OS."
+          />
+        </div>
+      ) : !connection ? (
         <div className="space-y-4">
           <ConnectCanvasFeedForm />
           {integration.configured && (
@@ -601,7 +615,7 @@ function SyncSummary({ result, name }: { result: LmsSyncResult; name: string }) 
 
 const fieldLabel = { title: "title", description: "description", dueDate: "due date", dueTime: "due time" } as const
 
-function DisconnectButton({ provider, name }: { provider: LmsProviderId; name: string }) {
+function DisconnectButton({ provider, name, description }: { provider: LmsProviderId; name: string; description?: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -628,8 +642,8 @@ function DisconnectButton({ provider, name }: { provider: LmsProviderId; name: s
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Student OS will stop syncing with {name} and forget its access. Courses and tasks you already imported
-              stay in Student OS.
+              {description ??
+                `Student OS will stop syncing with ${name} and forget its access. Courses and tasks you already imported stay in Student OS.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

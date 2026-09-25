@@ -1,19 +1,22 @@
 # LMS integrations (Canvas, Blackboard)
 
-**Status:** Canvas is implemented, read-only, two ways: the student's private
-calendar feed (no school approval needed) or OAuth 2.0 + the REST API (needs a
-developer key from the school).
+**Status:** Canvas is implemented, read-only, three ways: the Student OS browser
+extension (no school approval needed; see "Browser extension" below), the
+student's private calendar feed (no school approval needed), or OAuth 2.0 + the
+REST API (needs a developer key from the school).
 Blackboard Learn is implemented, read-only, two ways: the student's private
 calendar link ("Share Calendar", no school approval needed) or three-legged OAuth
 2.0 + the Learn REST API (needs an app registered on the Anthology Developer Portal
 **and approved by the student's school**). Canvas and Blackboard can be connected
 at the same time.
 
-**What students use today: the calendar feeds only.** Full API access (courses,
-assignment details, submission status) needs each university to approve Student OS,
-which hasn't happened yet. A calendar connection is NOT full Canvas/Blackboard API
-access: it brings in assignment due dates (as tasks) and calendar events (as
-read-only events on the Calendar), nothing more. Calendar events are described in
+**What students use today: the browser extension for Canvas, and the calendar
+feeds.** OAuth API access needs each university to approve Student OS, which hasn't
+happened yet. The extension gets the same data as OAuth (course names, instructors,
+submission status) by reading Canvas with the student's own login in their browser.
+A calendar connection is NOT full Canvas/Blackboard API access: it brings in
+assignment due dates (as tasks) and calendar events (as read-only events on the
+Calendar), nothing more. Calendar events are described in
 `src/lib/calendar/README.md`.
 
 ## Layers
@@ -96,7 +99,8 @@ are counted in `assignmentsMissing` for the student to review.
 
 **Courses the LMS stops listing** (term ended, dropped, deleted): reported in
 `missingCourses`, kept with their tasks. Only an OAuth sync can tell (it lists
-every current course); the calendar feed only contains courses with items.
+every current course); the calendar feed only contains courses with items, and the
+extension sends only the courses the student chose.
 
 **Reliability:**
 - Everything the LMS returns is read first; then all saving happens in one
@@ -117,9 +121,11 @@ courses no longer in the LMS, safe error messages, and the sync time.
 
 ## Security review
 
-- Connections use the student's private calendar feed link or OAuth 2.0. No LMS
-  passwords or personal access tokens are asked for or stored; no scraping or
-  browser automation. Feed links are treated like tokens (encrypted, never shown).
+- Connections use the student's private calendar feed link, OAuth 2.0, or the
+  browser extension. No LMS passwords or personal access tokens are asked for or
+  stored; no scraping. Feed links are treated like tokens (encrypted, never shown).
+  An extension connection stores no LMS secret at all (the student's Canvas login
+  never leaves their browser).
 - Tokens are encrypted (AES-256-GCM, key `LMS_TOKEN_ENCRYPTION_KEY`) and bound to
   `<user id>:<provider>`, so a copied ciphertext won't decrypt for another student.
   Without the key, tokens can't be stored at all (no plain-text fallback).
@@ -147,15 +153,48 @@ courses no longer in the LMS, safe error messages, and the sync time.
 
 ## Canvas
 
-Two ways to connect, one sync. Both read the same Canvas course and
-assignment ids, so a student can start with the feed and switch to a sign-in
-later without duplicates (saving one replaces the other on the connection).
+Three ways to connect, one sync. All read the same Canvas course and
+assignment ids, so a student can switch between them without duplicates (saving
+one replaces the other on the connection; switching from the feed to the extension
+hides the feed's calendar events, which would no longer update).
 
-| | Calendar feed (default) | Sign in with Canvas (OAuth) |
-| --- | --- | --- |
-| Needs | nothing from the school | a developer key from the school's Canvas admin |
-| Student does | pastes their private Calendar Feed link once | signs in to Canvas |
-| Gets | assignments with due dates (title, course code, due time, link) | + course names, instructors, submission status |
+| | Browser extension | Calendar feed | Sign in with Canvas (OAuth) |
+| --- | --- | --- | --- |
+| Needs | nothing from the school | nothing from the school | a developer key from the school's Canvas admin |
+| Student does | installs the extension, clicks Sync now on Canvas, chooses courses | pastes their private Calendar Feed link once | signs in to Canvas |
+| Gets | course names, instructors, assignments, submission status (chosen courses) | assignments with due dates (title, course code, due time, link) | course names, instructors, assignments, submission status (all active courses) |
+| Syncs | when the student clicks Sync now in the extension | Sync now on the Integrations page | Sync now on the Integrations page |
+
+### Browser extension
+
+The Student OS Chrome extension (`extension/`, see `extension/README.md`) reads
+Canvas's own API **inside the student's Canvas tab**, with their Canvas login, then
+sends the data to Student OS, logged in as that student in the same browser. No
+pairing, no secrets stored.
+
+1. The student opens Canvas, clicks the extension, then **Sync now**. It reads the
+   active courses with their term (`GET /api/v1/courses?enrollment_type=student&
+   enrollment_state=active&include[]=teachers&include[]=term`) and shows them by
+   semester; current-semester courses start checked. The choice is remembered in
+   the extension; a course it hasn't seen before brings the list back.
+2. It reads the chosen courses' assignments (`GET /api/v1/courses/:id/assignments?
+   include[]=submission&order_by=due_at`), following pagination on the same host,
+   a few courses at a time. Only the fields Student OS uses are kept (no grades,
+   scores or points).
+3. `POST /api/extension/canvas/import` (`src/app/api/extension/canvas/import`):
+   the student from the Student OS session; the extension check in
+   `src/server/integrations/extension/http.ts` (required header, extension Origin,
+   optional `STUDENT_OS_EXTENSION_IDS`); size limits (2 MB, 100 courses, 500
+   assignments per course) and the Sync now rate limit; the Canvas address through
+   the same allowlist as OAuth; every course and assignment through the same
+   validators (`canvas/mapping.ts`); then `runSync`
+   (`src/server/integrations/extension/canvas-import.ts`). The connection is saved
+   with method `extension`.
+
+A course the student unchecks stops syncing; its tasks stay (never reported as
+missing). The Integrations page shows "Through the browser extension" with no Sync
+now button (only the extension can read Canvas for this connection); Disconnect
+deletes the connection until the next Sync now in the extension.
 
 ### Calendar feed
 

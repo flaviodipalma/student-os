@@ -89,6 +89,15 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
   if (group(env, report, "Canvas sign-in", ["CANVAS_CLIENT_ID", "CANVAS_CLIENT_SECRET", "CANVAS_REDIRECT_URI"])) redirects.push("CANVAS_REDIRECT_URI")
   if (group(env, report, "Blackboard sign-in", ["BLACKBOARD_CLIENT_ID", "BLACKBOARD_CLIENT_SECRET", "BLACKBOARD_REDIRECT_URI"])) redirects.push("BLACKBOARD_REDIRECT_URI")
 
+  // ---- Browser extension: which Chrome extensions may use a student's login
+  // (src/server/integrations/extension/http.ts). Unset = any extension.
+  const extensionIds = (env.STUDENT_OS_EXTENSION_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean)
+  if (extensionIds.some((id) => !/^[a-p]{32}$/.test(id))) {
+    report.errors.push("STUDENT_OS_EXTENSION_IDS must be Chrome extension ids (32 letters a-p), comma-separated.")
+  } else if (production && extensionIds.length === 0) {
+    report.warnings.push("STUDENT_OS_EXTENSION_IDS isn't set: any Chrome extension can ask to sync with a student's login. Set it to the published extension's id.")
+  }
+
   // ---- Production URLs: HTTPS, the real domain, no localhost
   if (production) {
     if (!env.SITE_URL) report.warnings.push("SITE_URL isn't set: sign-in redirects use each request's own address. Set it to https://<your domain>.")

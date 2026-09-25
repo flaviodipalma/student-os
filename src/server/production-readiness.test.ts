@@ -84,6 +84,15 @@ describe("environment checks (server start and `npm run check:env`)", () => {
     // The same values on a laptop (no APP_ENV) are only warnings or fine.
     expect(checkEnv({ ...deploy, APP_ENV: undefined, GOOGLE_CALENDAR_REDIRECT_URI: "http://localhost:3000/cb", SYLLABUS_AI_PROVIDER: "mock" }).errors).toEqual([])
   })
+
+  it("browser extension ids: checked when set; a production warning when not", () => {
+    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://studentos.app" }
+    expect(checkEnv(deploy).warnings.join()).toMatch(/STUDENT_OS_EXTENSION_IDS isn't set/)
+    expect(checkEnv({ ...base, SITE_URL: "https://studentos.app" }, false).warnings.join()).not.toMatch(/STUDENT_OS_EXTENSION_IDS/)
+    const ok = checkEnv({ ...deploy, STUDENT_OS_EXTENSION_IDS: "abcdefghijklmnopabcdefghijklmnop" })
+    expect([...ok.errors, ...ok.warnings].join()).not.toMatch(/STUDENT_OS_EXTENSION_IDS/)
+    expect(checkEnv({ ...deploy, STUDENT_OS_EXTENSION_IDS: "chrome-extension://abc" }).errors.join()).toMatch(/must be Chrome extension ids/)
+  })
 })
 
 describe("health checks", () => {

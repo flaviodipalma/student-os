@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Database } from "@/server/db/types"
+import { lmsConnections } from "@/server/db/schema"
 import { listLmsConnections, saveLmsConnection } from "@/server/integrations/lms/connections"
 import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
 import { verifyOAuthState } from "@/server/integrations/lms/oauth-state"
@@ -125,6 +126,25 @@ describe("Canvas server actions", () => {
     expect(await syncLmsAction("canvas")).toMatchObject({ ok: false, code: "not-found" })
     expect(await disconnectLmsAction("canvas")).toMatchObject({ ok: false, code: "not-found" })
     expect(await listLmsConnections(t.db, alice)).toHaveLength(1)
+  })
+
+  it("a browser-extension connection isn't synced by the server (only the extension can read Canvas)", async () => {
+    const user = await t.addUser("Alice")
+    await t.db.insert(lmsConnections).values({ userId: user, provider: "canvas", method: "extension", baseUrl: BASE })
+    session.userId = user
+    const outcome = await syncLmsAction("canvas")
+    expect(outcome).toMatchObject({ ok: false, code: "validation" })
+    if (outcome.ok) throw new Error("expected a refusal")
+    expect(outcome.error).toMatch(/browser extension/)
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+
+  it("disconnects a browser-extension connection", async () => {
+    const user = await t.addUser("Alice")
+    await t.db.insert(lmsConnections).values({ userId: user, provider: "canvas", method: "extension", baseUrl: BASE })
+    session.userId = user
+    expect(await disconnectLmsAction("canvas")).toMatchObject({ ok: true })
+    expect(await listLmsConnections(t.db, user)).toEqual([])
   })
 
   it("reject an unknown provider", async () => {

@@ -56,7 +56,8 @@ Full list with explanations: `.env.example`. For production:
 | `ANTHROPIC_API_KEY` | yes | Server-only; optional `SYLLABUS_AI_MODEL`, `ASSISTANT_AI_MODEL` |
 | `LMS_TOKEN_ENCRYPTION_KEY` | for any integration | `openssl rand -base64 32`; **back it up** (losing it = every student reconnects) |
 | `GOOGLE_CALENDAR_*`, `OUTLOOK_CALENDAR_*` | optional | Client id, secret, `https://<domain>/api/integrations/<google\|outlook>-calendar/callback` |
-| `CANVAS_*`, `BLACKBOARD_*` | optional | OAuth apps (only with a school's approval); calendar feeds need none |
+| `CANVAS_*`, `BLACKBOARD_*` | optional | OAuth apps (only with a school's approval); calendar feeds and the browser extension need none |
+| `STUDENT_OS_EXTENSION_IDS` | recommended | The published Chrome extension's id: only it may use a student's login (`extension/README.md`) |
 
 Never give a secret a `NEXT_PUBLIC_` name (the startup check refuses it).
 
@@ -206,6 +207,7 @@ on the deployment / provider side.
 | Health checks (`/api/health`, `/api/health/ready`) | code | done |
 | Uptime monitor on readiness | infra | to do |
 | Rate limiting (per instance) | code | done |
+| Browser extension published; `STUDENT_OS_EXTENSION_IDS` set; its default address is the production domain | infra + code | to do |
 | Shared rate limiting across instances / WAF | infra | to do if scaling out |
 | Security headers (CSP, frame, nosniff, …) | code | done |
 | Production build succeeds | code | done |

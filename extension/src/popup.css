@@ -1,0 +1,87 @@
+/* Colors follow Student OS (src/app/globals.css), light and dark. */
+:root {
+  color-scheme: light dark;
+  --background: oklch(0.982 0.003 270);
+  --foreground: oklch(0.21 0.018 272);
+  --card: oklch(1 0 0);
+  --muted-foreground: oklch(0.47 0.018 272);
+  --primary: oklch(0.5 0.2 277);
+  --primary-foreground: oklch(0.99 0.004 277);
+  --border: oklch(0.91 0.006 272);
+  --danger: oklch(0.5 0.19 27);
+  --success: oklch(0.55 0.14 155);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.16 0.01 272);
+    --foreground: oklch(0.93 0.006 272);
+    --card: oklch(0.2 0.011 272);
+    --muted-foreground: oklch(0.74 0.012 272);
+    --primary: oklch(0.7 0.15 277);
+    --primary-foreground: oklch(0.17 0.03 277);
+    --border: oklch(1 0 0 / 12%);
+    --danger: oklch(0.76 0.14 25);
+    --success: oklch(0.75 0.14 155);
+  }
+}
+
+* { box-sizing: border-box; }
+/* `hidden` must win over the display rules below (form is a grid). */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  width: 320px;
+  background: var(--background);
+  color: var(--foreground);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { padding: 16px; }
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+h1 { margin: 0; font-size: 15px; font-weight: 600; }
+.mark {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px;
+  background: var(--primary); color: var(--primary-foreground); font-weight: 700; font-size: 13px;
+}
+p { margin: 0 0 10px; }
+a { color: var(--primary); }
+.muted { color: var(--muted-foreground); font-size: 13px; }
+form { display: grid; gap: 6px; }
+label { font-weight: 500; font-size: 13px; margin-top: 4px; }
+input {
+  width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--card); color: var(--foreground); font: inherit;
+}
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in oklch, var(--primary), transparent 50%); outline-offset: 1px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+button {
+  margin-top: 8px; padding: 7px 12px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--primary); color: var(--primary-foreground); font: inherit; font-weight: 500;
+}
+button:disabled { opacity: 0.6; cursor: default; }
+button.secondary { background: transparent; color: var(--foreground); border: 1px solid var(--border); }
+.error { color: var(--danger); font-size: 13px; margin: 4px 0 0; }
+.status { display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+footer .muted { font-size: 12px; }
+#address-form { margin-top: 8px; }
+#sync { width: 100%; }
+.result {
+  margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px;
+  background: color-mix(in oklch, var(--success), transparent 88%); border: 1px solid color-mix(in oklch, var(--success), transparent 60%);
+}
+.result-title { font-weight: 600; margin: 0 0 4px; }
+.result ul { margin: 0; padding-left: 18px; }
+.links { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; margin: 12px 0 0; }
+.picker-title { font-weight: 600; margin: 12px 0 2px; }
+.picker-groups { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; background: var(--card); }
+fieldset { border: 0; margin: 0; padding: 6px 0; }
+fieldset + fieldset { border-top: 1px solid var(--border); }
+/* Floated, so a legend sits inside its fieldset instead of on the border line. */
+legend { float: left; width: 100%; margin-bottom: 2px; font-weight: 600; font-size: 12px; padding: 0; color: var(--muted-foreground); }
+.course { clear: both; }
+.badge { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px; color: var(--success); background: color-mix(in oklch, var(--success), transparent 85%); }
+.course { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 13px; font-weight: 400; margin: 0; cursor: pointer; }
+.course input { width: auto; margin: 2px 0 0; accent-color: var(--primary); }
+

@@ -3,7 +3,7 @@ import "server-only"
 import { and, eq } from "drizzle-orm"
 import type { LmsCredentials } from "@/lib/lms/types"
 import { lmsProviderNames, type LmsProviderId } from "@/lib/types"
-import { lmsConnections } from "../../db/schema"
+import { lmsConnectionMethod, lmsConnections } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { NotFoundError } from "../../errors"
 import { credentialContext, CredentialVaultError, type CredentialVault } from "./credential-vault"
@@ -15,11 +15,14 @@ import { listLmsProviders } from "./registry"
 // student's row. Tokens go in encrypted and only come out through
 // loadLmsCredentials, for the sync service on the server.
 
+// "oauth" (signed in with the LMS), "calendar_feed" (the student's feed link) or
+// "extension" (the browser extension imports with the student's own LMS session).
+export type LmsConnectionMethod = (typeof lmsConnectionMethod.enumValues)[number]
+
 // What the app may show about a connection: no tokens, no ids from the LMS.
 export type LmsConnectionSummary = {
   provider: LmsProviderId
-  // "oauth" (signed in with the LMS) or "calendar_feed" (the student's feed link)
-  method: "oauth" | "calendar_feed"
+  method: LmsConnectionMethod
   status: "connected" | "needs_reauth" | "error"
   connectedAt: string
   lastSyncedAt: string | null
@@ -220,6 +223,32 @@ export async function saveLmsFeedConnection(
   return summary
 }
 
+// ---- Browser-extension connections --------------------------------------------------
+
+// Records (or switches to) a connection through the Student OS browser extension.
+// The server holds no LMS secret for it: the extension reads the LMS with the
+// student's own browser session and sends the data. Replaces OAuth tokens or a feed link.
+export async function saveLmsExtensionConnection(
+  db: Database,
+  userId: string,
+  provider: LmsProviderId,
+  baseUrl: string
+): Promise<void> {
+  const values = {
+    method: "extension" as const,
+    baseUrl,
+    feedUrlEncrypted: null,
+    externalUserId: null,
+    accessTokenEncrypted: null,
+    refreshTokenEncrypted: null,
+    tokenExpiresAt: null,
+  }
+  await db
+    .insert(lmsConnections)
+    .values({ userId, provider, ...values })
+    .onConflictDoUpdate({ target: [lmsConnections.userId, lmsConnections.provider], set: values })
+}
+
 // The student's own feed link, decrypted on the server for a sync. Never returned to the browser.
 export async function loadLmsFeed(
   db: Database,
@@ -237,7 +266,7 @@ export async function getLmsConnectionMethod(
   db: Database,
   userId: string,
   provider: LmsProviderId
-): Promise<"oauth" | "calendar_feed"> {
+): Promise<LmsConnectionMethod> {
   const [row] = await db
     .select({ method: lmsConnections.method })
     .from(lmsConnections)

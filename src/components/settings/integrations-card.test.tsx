@@ -97,6 +97,25 @@ const result = (overrides: Partial<LmsSyncResult> = {}): LmsSyncResult => ({
 beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
+describe("Canvas through the browser extension", () => {
+  it("says how to sync from the extension, with no Sync now button here", () => {
+    render(<IntegrationsCard integrations={canvas({ method: "extension", lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)
+    expect(screen.getByText(/Through the browser extension/)).toBeTruthy()
+    expect(screen.getByText(/click the Student OS extension/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /Sync now|Import Canvas data/ })).toBeNull()
+  })
+
+  it("Disconnect explains how syncing starts again", async () => {
+    const user = userEvent.setup()
+    mocks.disconnectLmsAction.mockResolvedValue({ ok: true, data: null })
+    render(<IntegrationsCard integrations={canvas({ method: "extension" })} outcomes={{}} timeZone="UTC" />)
+    await user.click(screen.getByRole("button", { name: "Disconnect" }))
+    expect(screen.getByText(/until you click Sync now in the extension again/)).toBeTruthy()
+    await user.click(screen.getAllByRole("button", { name: "Disconnect" }).at(-1)!)
+    expect(mocks.disconnectLmsAction).toHaveBeenCalledWith("canvas")
+  })
+})
+
 describe("Canvas on the Integrations page", () => {
   it("shows the connection and when it last synced", async () => {
     render(<IntegrationsCard integrations={canvas({ lastSyncedAt: new Date().toISOString() })} outcomes={{}} timeZone="UTC" />)

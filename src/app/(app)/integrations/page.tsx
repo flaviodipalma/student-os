@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/app-shell/page-header"
+import { ExtensionCard } from "@/components/settings/extension-card"
 import type { CalendarOutcomes } from "@/components/settings/calendar-connections"
 import { IntegrationsCard, type IntegrationOutcomes } from "@/components/settings/integrations-card"
 import { getNavItem } from "@/lib/navigation"
@@ -53,16 +54,21 @@ export default async function IntegrationsPage({ searchParams }: PageProps<"/int
     if (typeof outcome === "string") calendarOutcomes[provider] = outcome
   }
 
+  const timeZone = await getStudentTimeZone()
+
   return (
     <>
       <PageHeader title={section.title} description={section.description} />
-      <IntegrationsCard
-        integrations={integrations}
-        outcomes={outcomes}
-        timeZone={await getStudentTimeZone()}
-        calendars={calendars}
-        calendarOutcomes={calendarOutcomes}
-      />
+      <div className="space-y-6">
+        <IntegrationsCard
+          integrations={integrations}
+          outcomes={outcomes}
+          timeZone={timeZone}
+          calendars={calendars}
+          calendarOutcomes={calendarOutcomes}
+        />
+        <ExtensionCard />
+      </div>
     </>
   )
 }

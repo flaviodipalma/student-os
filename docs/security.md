@@ -13,6 +13,18 @@ users. Details for each area live next to the code (linked below).
   pages and API routes. The user id always comes from the verified session; no
   action or route accepts a user id from the browser.
 - Redirects after sign-in only go to in-app paths (`safeNextPath`).
+- **The browser extension** (`extension/`) uses the same login: Chrome sends the
+  Student OS session cookies with the extension's requests because it has
+  permission for the Student OS address. Its endpoints (`/api/extension/*`) check
+  the session like everything else and also require the extension
+  (`src/server/integrations/extension/http.ts`): the `X-Student-OS-Extension`
+  header (a website can't add it to a cross-site request: no CORS headers are
+  sent), and an Origin, when present, of a Chrome extension (in production, only
+  the ids in `STUDENT_OS_EXTENSION_IDS`). Chrome omits Origin on the extension's
+  GETs, so a missing Origin is accepted only for GET; a website's POST always has
+  one. With the SameSite=Lax cookies, other websites can't use a student's login
+  here (checked in a real browser from another site: blocked or 403, nothing
+  written).
 - Social login and account linking: `docs/authentication.md` (Supabase's PKCE +
   state; automatic linking only between verified emails; manual linking only for
   a signed-in student).
@@ -84,6 +96,11 @@ users. Details for each area live next to the code (linked below).
   browser or logged. Disconnecting deletes them (Google tokens are also revoked).
 - **Login providers**: secrets live in Supabase; Student OS stores no provider
   tokens for login.
+- **Browser extension**: stores nothing secret. The student's Canvas login stays in
+  their browser (the extension reads Canvas in the Canvas tab); the extension keeps
+  only the Student OS address and the chosen course ids. It reads only the Canvas
+  fields Student OS uses (no grades or scores), and the server validates all of it
+  like an OAuth sync (allowed Canvas host, same-host links, size limits).
 - External links (Open in Canvas / Google / Outlook) must be `https` (and, when
   synced, on the provider's own host); reminder links must be in-app paths (a
   database constraint).
@@ -121,7 +138,8 @@ are mapped (`src/server/errors.ts`) and never returned raw.
 ## Rate limits (`src/server/rate-limit.ts`)
 
 Assistant (20/min, 300/day), syllabus import (10/hour), Sync now for any
-integration (20/hour), per student, in server memory. Login, sign-up and
+integration, including the browser extension's imports (20/hour), per student, in
+server memory. Login, sign-up and
 password reset are limited by Supabase Auth.
 
 ## Production checklist (not done in development)
@@ -136,6 +154,9 @@ password reset are limited by Supabase Auth.
   reviewed, database backups / point-in-time recovery on.
 - OAuth apps: production redirect URIs only; Google consent screen verified;
   Microsoft/Apple secrets' expiry dates tracked.
+- Browser extension: publish it, then set `STUDENT_OS_EXTENSION_IDS` to its id so
+  only it can use a student's login (the config check warns in production until
+  it's set). Point its default address at the production domain.
 - **Rate limiting across instances**: the in-memory limiter is per server; with
   several instances use a shared store (Redis) or the platform's WAF/rate limiting.
 - Error reporting and monitoring that respect the logging policy (no payloads).

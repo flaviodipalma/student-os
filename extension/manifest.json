@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Student OS",
+  "version": "0.1.0",
+  "description": "Bring your Canvas courses and assignments into Student OS, using your own Canvas login.",
+  "action": {
+    "default_title": "Student OS",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "minimum_chrome_version": "120"
+}

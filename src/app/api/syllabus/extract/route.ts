@@ -7,6 +7,7 @@ import { processSyllabus } from "@/lib/syllabus/importer"
 import { MAX_FILE_BYTES } from "@/lib/syllabus/pdf"
 import type { ExtractMessage } from "@/lib/syllabus/protocol"
 import { logger } from "@/server/log"
+import { readLimited } from "@/server/read-limited"
 
 // POST /api/syllabus/extract (multipart form: "file" = the PDF, "today" = YYYY-MM-DD)
 //
@@ -22,31 +23,6 @@ export const maxDuration = 300
 
 // Room for the multipart wrapper and the "today" field around the PDF.
 const FORM_OVERHEAD_BYTES = 64 * 1024
-
-// The request body, read up to `limit` bytes (then abandoned).
-async function readLimited(request: Request, limit: number): Promise<Uint8Array<ArrayBuffer> | "too-large"> {
-  if (!request.body) return new Uint8Array(new ArrayBuffer(0))
-  const reader = request.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > limit) {
-      await reader.cancel().catch(() => {})
-      return "too-large"
-    }
-    chunks.push(value)
-  }
-  const body = new Uint8Array(new ArrayBuffer(total))
-  let offset = 0
-  for (const chunk of chunks) {
-    body.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return body
-}
 
 function errorResponse(error: SyllabusImportError, status: number) {
   const body: ExtractMessage = { type: "error", code: error.code, message: error.userMessage }

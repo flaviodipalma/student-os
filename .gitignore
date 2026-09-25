@@ -19,6 +19,8 @@
 
 # production
 /build
+# the built browser extension (npm run build:extension)
+/extension/dist
 
 # misc
 .DS_Store

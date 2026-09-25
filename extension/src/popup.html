@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Student OS</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script type="module" src="popup.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="mark" aria-hidden="true">S</span>
+        <h1>Student OS</h1>
+      </header>
+
+      <p id="checking" class="muted" role="status">Checking your Student OS login…</p>
+
+      <section id="logged-out" hidden>
+        <p id="logged-out-message">Log in to Student OS in this browser. The extension syncs to that account.</p>
+        <div class="row">
+          <button type="button" id="log-in">Log in to Student OS</button>
+          <button type="button" id="check-again" class="secondary">Check again</button>
+        </div>
+      </section>
+
+      <section id="signed-in" hidden>
+        <p class="status"><span class="dot" aria-hidden="true"></span><span>Syncing to <strong id="first-name"></strong>’s account</span></p>
+        <p class="muted">Open your Canvas in this tab, then sync your courses and assignments.</p>
+        <button type="button" id="sync">Sync now</button>
+        <p id="progress" class="muted" role="status" hidden></p>
+        <form id="picker" hidden>
+          <p class="picker-title">Which courses do you want in Student OS?</p>
+          <p class="muted">Courses in the current semester are checked. Student OS remembers your choice.</p>
+          <div id="picker-groups" class="picker-groups"></div>
+          <div class="row">
+            <button type="submit" id="import-chosen">Import courses</button>
+            <button type="button" id="cancel-pick" class="secondary">Cancel</button>
+          </div>
+        </form>
+        <div id="result" class="result" role="status" hidden>
+          <p class="result-title">Canvas sync complete.</p>
+          <ul id="result-lines"></ul>
+        </div>
+        <p id="sync-error" class="error" role="alert" hidden></p>
+        <p class="links">
+          <a href="#" id="choose-courses">Choose courses</a>
+          <a href="#" id="open-student-os">Open Student OS</a>
+        </p>
+      </section>
+
+      <p id="connection-error" class="error" role="alert" hidden></p>
+
+      <footer>
+        <span class="muted">Student OS: <span id="address-label"></span></span>
+        <a href="#" id="change-address">Change</a>
+      </footer>
+      <form id="address-form" hidden novalidate>
+        <label for="address">Student OS address</label>
+        <input id="address" name="address" autocomplete="url" inputmode="url" spellcheck="false" />
+        <div class="row">
+          <button type="submit" id="save-address">Save</button>
+          <button type="button" id="cancel-address" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>
