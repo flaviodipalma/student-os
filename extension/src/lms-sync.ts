@@ -185,6 +185,27 @@ export async function importChosen(
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const summary = await sendImport(address, lms.id, { baseUrl: list.baseUrl, courses, ...read.value.data }, timeZone, fetch)
   await updateSite(list.baseUrl, lms.id, { lastSuccessAt: Date.now(), lastAutomatic: options.automatic })
+  await tellStudentOsTabs(address)
   return summaryLines(summary, read.value.coursesUnreadable, lms.name)
+}
+
+// Open Student OS tabs show the import right away: a "student-os-synced" event on
+// their page (it reloads the courses). Only an event, with no data; tabs the
+// extension can't reach simply catch up when the student returns to them.
+async function tellStudentOsTabs(address: string) {
+  try {
+    const tabs = await chrome.tabs.query({ url: `${address}/*` })
+    await Promise.all(
+      tabs.map((tab) =>
+        tab.id
+          ? chrome.scripting
+              .executeScript({ target: { tabId: tab.id }, func: () => void document.dispatchEvent(new CustomEvent("student-os-synced")) })
+              .catch(() => {})
+          : null
+      )
+    )
+  } catch {
+    // No access to the Student OS address: the page refreshes when it's next focused.
+  }
 }
 

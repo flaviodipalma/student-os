@@ -72,7 +72,7 @@ export async function importBlackboardFromExtension(
   const timeZone = isValidTimeZone(data.timeZone) ? data.timeZone : undefined
 
   const courses = data.courses
-    .map((raw) => blackboardCourseToLms(raw, baseUrl))
+    .map((raw) => blackboardCourseToLms(raw, baseUrl, timeZone))
     .filter((course): course is LmsCourse => course !== null)
     // Co-taught courses list every instructor ("Jane Smith, Ali Khan").
     .map((course) => ({ ...course, instructor: own(data.instructors, course.externalId)?.join(", ") || null }))

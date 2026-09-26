@@ -51,7 +51,7 @@ type CourseView =
 // Courses still without class times that the student wasn't asked about yet.
 function needClassTimes(courses: Course[], commitments: RecurringCommitment[], asked: Set<string> | null): Course[] {
   const withTimes = new Set(commitments.map((commitment) => commitment.courseId))
-  return courses.filter((course) => !withTimes.has(course.id) && !asked?.has(course.id))
+  return courses.filter((course) => !course.online && !withTimes.has(course.id) && !asked?.has(course.id))
 }
 
 function courseHeading(view: CourseView): { title: string; description: string } {

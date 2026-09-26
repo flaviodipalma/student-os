@@ -45,7 +45,7 @@ export function CourseCard({ course }: { course: Course }) {
             {course.professor && <p className="mt-0.5 text-sm text-muted-foreground">{course.professor}</p>}
             <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted-foreground">
               <CalendarClockIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-              {classTimes.length > 0 ? classTimes.map(describeClassTime).join("; ") : "No class times"}
+              {course.online ? "Online" : classTimes.length > 0 ? classTimes.map(describeClassTime).join("; ") : "No class times"}
             </p>
           </div>
           <ChevronRightIcon

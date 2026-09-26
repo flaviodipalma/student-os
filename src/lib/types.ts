@@ -31,9 +31,14 @@ export type Course = {
   color: CourseColor
   // Only on courses imported from an LMS.
   source?: ExternalSource
+  // The semester's first and last day, when the LMS gives them.
+  termStart?: string
+  termEnd?: string
+  // No class meetings (no class times).
+  online?: boolean
 }
 
-export type CourseInput = Omit<Course, "id" | "color" | "source">
+export type CourseInput = Omit<Course, "id" | "color" | "source" | "termStart" | "termEnd" | "online">
 
 export type Priority = "low" | "medium" | "high" | "critical"
 

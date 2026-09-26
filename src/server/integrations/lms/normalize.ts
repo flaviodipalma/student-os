@@ -32,3 +32,19 @@ export function utcToLocalDue(dueAt: string, timeZone: string | undefined): { du
   const mm = String(local.getMinutes()).padStart(2, "0")
   return { dueDate: toDateKey(local), dueTime: `${hh}:${mm}` }
 }
+
+// A course's semester from the LMS's term (or course) start and end instants, as
+// local dates. Only a believable semester is kept: both days valid, in order, and
+// at most about a year apart (a "default term" spanning decades says nothing).
+export function termDates(
+  startAt: string | null | undefined,
+  endAt: string | null | undefined,
+  timeZone: string | undefined
+): { termStart: string; termEnd: string } | null {
+  const day = (at: string | null | undefined) => (at ? (utcToLocalDue(at, timeZone)?.dueDate ?? null) : null)
+  const termStart = day(startAt)
+  const termEnd = day(endAt)
+  if (!termStart || !termEnd || termEnd < termStart) return null
+  const days = (Date.parse(termEnd) - Date.parse(termStart)) / 86_400_000
+  return days <= 370 ? { termStart, termEnd } : null
+}

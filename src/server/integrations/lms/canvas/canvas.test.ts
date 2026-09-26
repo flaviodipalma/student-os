@@ -50,6 +50,21 @@ describe("mapping Canvas data", () => {
     expect(canvasCourseToLms("not an object")).toBeNull()
   })
 
+  it("the course's semester: the term's dates (local days), else the course's own; a decades-long default term says nothing", () => {
+    const withTerm = canvasCourseToLms(
+      course(215, { term: { name: "Fall 2026", start_at: "2026-08-31T04:00:00Z", end_at: "2026-12-19T04:59:59Z" } }),
+      undefined,
+      "America/New_York"
+    )
+    expect(withTerm).toMatchObject({ termStart: "2026-08-31", termEnd: "2026-12-18" })
+    const ownDates = canvasCourseToLms(course(216, { term: { name: "Default Term" }, start_at: "2026-09-01T12:00:00Z", end_at: "2026-12-15T12:00:00Z" }))
+    expect(ownDates).toMatchObject({ termStart: "2026-09-01", termEnd: "2026-12-15" })
+    const forever = canvasCourseToLms(course(217, { term: { start_at: "2000-01-01T00:00:00Z", end_at: "2100-01-01T00:00:00Z" } }))
+    expect(forever).not.toHaveProperty("termStart")
+    const backwards = canvasCourseToLms(course(218, { start_at: "2026-12-15T12:00:00Z", end_at: "2026-09-01T12:00:00Z" }))
+    expect(backwards).not.toHaveProperty("termStart")
+  })
+
   it("maps an assignment: local due date/time, plain-text description, link, type", () => {
     const context = { baseUrl: BASE, timeZone: "America/New_York" }
     expect(canvasAssignmentToLms(assignment(7, 215), "215", context)).toEqual({

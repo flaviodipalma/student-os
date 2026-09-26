@@ -2,6 +2,7 @@ import { connection } from "next/server"
 import { redirect } from "next/navigation"
 import { AppProviders } from "@/components/app-shell/app-providers"
 import { Brand } from "@/components/app-shell/brand"
+import { LiveCourseSync } from "@/components/courses/live-course-sync"
 import { DatabaseError } from "@/components/app-shell/database-error"
 import { MobileNav } from "@/components/app-shell/mobile-nav"
 import { NotificationBell } from "@/components/notifications/notification-center"
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <AppProviders data={app.data} wallClock={app.wallClock} timeZone={app.timeZone}>
       <SavedThemeSync saved={app.theme} />
+      <LiveCourseSync />
       <div className="flex min-h-svh">
         <Sidebar account={account} />
         <div className="flex min-w-0 flex-1 flex-col">

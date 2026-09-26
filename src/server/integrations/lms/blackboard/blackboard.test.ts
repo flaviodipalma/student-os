@@ -16,6 +16,16 @@ import { attemptsStatus, blackboardAssignmentToLms, blackboardCourseToLms, grade
 const NOW = new Date("2026-09-23T12:00:00Z")
 
 describe("mapping Blackboard data", () => {
+  it("the course's semester, from the term the extension adds", () => {
+    const course = blackboardCourseToLms(
+      bbMembership("_9_1", {}, { term: { start_at: "2026-08-31T04:00:00.000Z", end_at: "2026-12-19T04:59:59.000Z" } }),
+      BASE,
+      "America/New_York"
+    )
+    expect(course).toMatchObject({ termStart: "2026-08-31", termEnd: "2026-12-18" })
+    expect(blackboardCourseToLms(bbMembership("_10_1", {}, {}), BASE)).not.toHaveProperty("termStart")
+  })
+
   it("imports the courses the student takes; skips organizations, teaching roles and unavailable courses", () => {
     expect(blackboardCourseToLms(bbMembership("_215_1", {}, { courseId: "BIO-101", name: "Biology" }), BASE)).toEqual({
       provider: "blackboard",

@@ -150,9 +150,13 @@ export function SyncTutorial({ provider, onSynced }: { provider: LmsProviderId; 
     }
     void check()
     const timer = setInterval(() => void check(), 3000)
+    // The extension also says when a sync is done (extension/src/lms-sync.ts).
+    const onSyncEvent = () => void check()
+    document.addEventListener("student-os-synced", onSyncEvent)
     return () => {
       active = false
       clearInterval(timer)
+      document.removeEventListener("student-os-synced", onSyncEvent)
     }
   }, [provider, onSynced])
 

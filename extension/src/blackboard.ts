@@ -144,13 +144,24 @@ export async function readBlackboard(
         // Some schools don't let students list terms.
       }
 
-      const courses = eligible.map((membership) => ({
-        ...pick(membership, ["courseId", "courseRoleId", "availability"]),
-        course: pick(membership.course, ["id", "courseId", "name", "description", "organization", "availability", "externalAccessUrl"]),
-      }))
+      const termOf = (membership: Record<string, unknown>) => {
+        const termId = record(membership.course).termId
+        return typeof termId === "string" ? terms.get(termId) : undefined
+      }
+      const courses = eligible.map((membership) => {
+        const term = termOf(membership)
+        return {
+          ...pick(membership, ["courseId", "courseRoleId", "availability"]),
+          course: {
+            ...pick(membership.course, ["id", "courseId", "name", "description", "organization", "availability", "externalAccessUrl"]),
+            // The semester's dates (class times in Student OS default to them).
+            ...(term ? { term: { start_at: term.start_at, end_at: term.end_at } } : {}),
+          },
+        }
+      })
       const choices = eligible.map((membership) => {
         const course = record(membership.course)
-        const term = typeof course.termId === "string" ? terms.get(course.termId) : undefined
+        const term = termOf(membership)
         return { id: course.id, name: course.name, course_code: course.courseId, ...(term ? { term } : {}) }
       })
       return { ok: true, kind: "courses", baseUrl: origin, courses, choices }

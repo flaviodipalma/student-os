@@ -74,7 +74,7 @@ function CourseForm({ course, onDone }: { course?: Course; onDone: () => void })
       (other) => other.id !== course?.id && normalizeCourseCode(other.code) === normalizeCourseCode(code)
     )
     if (clash) return fields.set("code", `You already have a course with the code ${clash.code}.`)
-    const checkedTimes = checkDraft(classTimes, today)
+    const checkedTimes = checkDraft(classTimes)
     if (!course && !checkedTimes.ok) return setError(checkedTimes.error)
     setError(null)
 

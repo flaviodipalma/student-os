@@ -136,11 +136,11 @@ export async function runSync(
         const saved = await each(action.lms.courseName, async (sp) => {
           if (action.kind === "create") {
             courseId = (await createCourse(sp, userId, action.fields)).id
-            await setCourseSource(sp, userId, courseId, source, action.fields, now)
+            await setCourseSource(sp, userId, courseId, source, action.fields, now, action.lms)
             return
           }
           if (action.kind === "update") await updateCourse(sp, userId, action.courseId, action.changes)
-          await setCourseSource(sp, userId, action.courseId, source, action.synced, now)
+          await setCourseSource(sp, userId, action.courseId, source, action.synced, now, action.lms)
           courseId = action.courseId
         })
         // Counted only once saved.
@@ -243,7 +243,8 @@ async function setCourseSource(
   courseId: string,
   source: ExternalSource,
   synced: SyncedCourseFields,
-  now: Date
+  now: Date,
+  lms: LmsCourse
 ) {
   await db
     .update(courses)
@@ -253,6 +254,8 @@ async function setCourseSource(
       externalUrl: source.url ?? null,
       externalSynced: synced,
       externalSyncedAt: now,
+      // The semester, when the LMS gives it (kept from before when it doesn't).
+      ...(lms.termStart && lms.termEnd ? { termStart: lms.termStart, termEnd: lms.termEnd } : {}),
     })
     .where(and(eq(courses.id, courseId), eq(courses.userId, userId)))
 }

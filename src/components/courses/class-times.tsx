@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CalendarClockIcon, MapPinIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react"
+import { CalendarClockIcon, LaptopIcon, MapPinIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
 import { Field } from "@/components/form-fields"
 import { DayPicker } from "@/components/preferences/commitments-editor"
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -26,17 +27,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useAppStore } from "@/lib/app-store"
 import { markCoursesAsked, useAskedCourseIds } from "@/lib/class-times-asked"
-import { classTimesOf, likelySemesterEnd } from "@/lib/class-times"
+import { classTimesOf, likelySemesterEnd, likelySemesterStart } from "@/lib/class-times"
 import { formatTime, fromDateKey } from "@/lib/format"
 import { formatDays } from "@/lib/recurring"
-import type { ClassTimeInput, Course, RecurringCommitment } from "@/lib/types"
+import { lmsProviderNames, type ClassTimeInput, type Course, type RecurringCommitment } from "@/lib/types"
 import { classTimesSchema, firstIssue } from "@/lib/validation"
 
 // A course's class times: when and where it meets each week (one or more times,
 // e.g. a lecture Mon/Wed/Fri and a lab on Tuesday). They're "class" recurring
-// commitments, so they show on the calendar and the Planner keeps them free.
+// commitments, so they show on the calendar and the Planner keeps them free. They
+// run for the whole semester (back to its first day), from the LMS's term dates or
+// a best guess. An online course has none.
 //
 // - ClassTimesFields: the editor (used by the forms below and the course form)
 // - ClassTimesCard: on the course page
@@ -51,11 +55,10 @@ export type ClassTimeRow = {
   startTime: string
   endTime: string
   location: string
-  // Kept from a saved class time (new ones start today).
-  startDate?: string
 }
-// `until`: the last day classes repeat (shared by the course's class times).
-export type ClassTimesDraft = { rows: ClassTimeRow[]; until: string }
+// `from` / `until`: the semester's first and last day (shared by the course's class
+// times). `datesFrom`: where those came from, for the hint under them.
+export type ClassTimesDraft = { rows: ClassTimeRow[]; from: string; until: string; datesFrom: "saved" | "lms" | "guess" }
 
 let rowCount = 0
 export const newClassTimeRow = (): ClassTimeRow => ({
@@ -66,29 +69,34 @@ export const newClassTimeRow = (): ClassTimeRow => ({
   location: "",
 })
 
-export function draftFrom(times: RecurringCommitment[], today: string, blankRow = false): ClassTimesDraft {
+// The course's saved class times as a draft. The dates: the saved ones, else the
+// course's semester from the LMS, else a guess for the current semester.
+export function draftFrom(times: RecurringCommitment[], today: string, course?: Course, blankRow = false): ClassTimesDraft {
   const rows = times.map((time) => ({
     key: `class-time-${++rowCount}`,
     daysOfWeek: time.daysOfWeek,
     startTime: time.startTime,
     endTime: time.endTime,
     location: time.location ?? "",
-    startDate: time.startDate,
   }))
-  return {
-    rows: rows.length === 0 && blankRow ? [newClassTimeRow()] : rows,
-    until: times.find((time) => time.endDate)?.endDate ?? likelySemesterEnd(today),
-  }
+  const saved = times.find((time) => time.startDate || time.endDate)
+  const lms = course?.termStart && course.termEnd ? { from: course.termStart, until: course.termEnd } : null
+  const dates = saved
+    ? { from: saved.startDate ?? "", until: saved.endDate ?? "", datesFrom: "saved" as const }
+    : lms
+      ? { ...lms, datesFrom: "lms" as const }
+      : { from: likelySemesterStart(today), until: likelySemesterEnd(today), datesFrom: "guess" as const }
+  return { rows: rows.length === 0 && blankRow ? [newClassTimeRow()] : rows, ...dates }
 }
 
 // The draft as the server takes it, or the first problem (e.g. "Class time 2: Pick at least one day.").
-export function checkDraft(draft: ClassTimesDraft, today: string): { ok: true; times: ClassTimeInput[] } | { ok: false; error: string } {
+export function checkDraft(draft: ClassTimesDraft): { ok: true; times: ClassTimeInput[] } | { ok: false; error: string } {
   const times = draft.rows.map((row) => ({
     daysOfWeek: [...row.daysOfWeek].sort((a, b) => a - b),
     startTime: row.startTime,
     endTime: row.endTime,
     location: row.location.trim() || undefined,
-    startDate: row.startDate ?? (draft.until && draft.until < today ? undefined : today),
+    startDate: draft.from || undefined,
     endDate: draft.until || undefined,
   }))
   const parsed = classTimesSchema.safeParse(times)
@@ -102,10 +110,13 @@ export function ClassTimesFields({
   id,
   value,
   onChange,
+  course,
 }: {
   id: string
   value: ClassTimesDraft
   onChange: (draft: ClassTimesDraft) => void
+  // For the dates' hint ("From your Canvas semester").
+  course?: Course
 }) {
   const setRow = (key: string, changes: Partial<ClassTimeRow>) =>
     onChange({ ...value, rows: value.rows.map((row) => (row.key === key ? { ...row, ...changes } : row)) })
@@ -170,11 +181,22 @@ export function ClassTimesFields({
       </Button>
 
       {value.rows.length > 0 && (
-        <div className="grid gap-1.5 sm:max-w-xs">
-          <Field label="Classes repeat until" htmlFor={`${id}-until`}>
-            <Input id={`${id}-until`} type="date" value={value.until} onChange={(e) => onChange({ ...value, until: e.target.value })} />
-          </Field>
-          <p className="text-xs text-muted-foreground">Around the end of your semester. Change it if yours ends on another day.</p>
+        <div className="grid gap-1.5">
+          <div className="grid grid-cols-2 gap-4 sm:max-w-md">
+            <Field label="First day of classes" htmlFor={`${id}-from`}>
+              <Input id={`${id}-from`} type="date" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} />
+            </Field>
+            <Field label="Last day of classes" htmlFor={`${id}-until`}>
+              <Input id={`${id}-until`} type="date" value={value.until} onChange={(e) => onChange({ ...value, until: e.target.value })} />
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {value.datesFrom === "lms" && course?.source
+              ? `Your semester's dates from ${lmsProviderNames[course.source.provider]}.`
+              : value.datesFrom === "guess"
+                ? "Our best guess for this semester. Change them if yours starts or ends on other days."
+                : "Your classes show on the calendar every week between these days."}
+          </p>
         </div>
       )}
     </div>
@@ -194,6 +216,7 @@ export function ClassTimesCard({ course }: { course: Course }) {
   const times = classTimesOf(recurringCommitments, course.id)
   const [editing, setEditing] = useState(false)
   const until = times.find((time) => time.endDate)?.endDate
+  const from = times.find((time) => time.startDate)?.startDate
 
   return (
     <Card>
@@ -204,14 +227,21 @@ export function ClassTimesCard({ course }: { course: Course }) {
             Class times
           </CardTitle>
           <CardDescription className="mt-1">
-            {times.length === 0
-              ? "No class times yet. This course isn't on your calendar, and the Planner may schedule study time during class."
-              : `On your calendar every week${until ? ` until ${shortDate(until)}` : ""}. The Planner keeps these times free.`}
+            {course.online ? (
+              <span className="flex items-center gap-1.5">
+                <LaptopIcon aria-hidden className="size-3.5" />
+                Online course: no class meetings.
+              </span>
+            ) : times.length === 0 ? (
+              "No class times yet. This course isn't on your calendar, and the Planner may schedule study time during class."
+            ) : (
+              `On your calendar every week${from && until ? `, ${shortDate(from)} – ${shortDate(until)}` : until ? ` until ${shortDate(until)}` : ""}. The Planner keeps these times free.`
+            )}
           </CardDescription>
         </div>
-        <Button variant={times.length === 0 ? "default" : "outline"} size="sm" onClick={() => setEditing(true)}>
-          {times.length === 0 ? <PlusIcon data-icon="inline-start" /> : <PencilIcon data-icon="inline-start" />}
-          {times.length === 0 ? "Add class times" : "Edit"}
+        <Button variant={times.length === 0 && !course.online ? "default" : "outline"} size="sm" onClick={() => setEditing(true)}>
+          {times.length === 0 && !course.online ? <PlusIcon data-icon="inline-start" /> : <PencilIcon data-icon="inline-start" />}
+          {times.length === 0 && !course.online ? "Add class times" : "Edit"}
         </Button>
       </CardHeader>
       {times.length > 0 && (
@@ -260,16 +290,17 @@ export function ClassTimesDialog({
 
 function ClassTimesEditForm({ course, onDone }: { course: Course; onDone: () => void }) {
   const { today, recurringCommitments, setClassTimes } = useAppStore()
-  const [draft, setDraft] = useState(() => draftFrom(classTimesOf(recurringCommitments, course.id), today, true))
+  const [draft, setDraft] = useState(() => draftFrom(classTimesOf(recurringCommitments, course.id), today, course, true))
+  const [online, setOnline] = useState(course.online ?? false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    const checked = checkDraft(draft, today)
+    const checked = online ? { ok: true as const, times: [] as ClassTimeInput[] } : checkDraft(draft)
     if (!checked.ok) return setError(checked.error)
     setSaving(true)
-    const result = await setClassTimes(course.id, checked.times)
+    const result = await setClassTimes(course.id, checked.times, { online })
     setSaving(false)
     if (!result.ok) return setError(result.error)
     markCoursesAsked([course.id])
@@ -278,8 +309,9 @@ function ClassTimesEditForm({ course, onDone }: { course: Course; onDone: () => 
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid gap-4">
-      <ClassTimesFields id={`class-times-${course.id}`} value={draft} onChange={setDraft} />
-      {draft.rows.length === 0 && (
+      <OnlineChoice id={`class-times-${course.id}-online`} checked={online} onChange={setOnline} />
+      {!online && <ClassTimesFields id={`class-times-${course.id}`} value={draft} onChange={setDraft} course={course} />}
+      {!online && draft.rows.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Saving with no class times takes {course.code} off your calendar.
         </p>
@@ -310,7 +342,7 @@ export function ClassTimesSteps({ courses, onDone }: { courses: Course[]; onDone
   // The list is fixed when the steps start (saving changes which courses lack times).
   const [queue] = useState(courses)
   const [index, setIndex] = useState(0)
-  const [draft, setDraft] = useState(() => draftFrom([], today, true))
+  const [draft, setDraft] = useState(() => draftFrom([], today, courses[0], true))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirmSkip, setConfirmSkip] = useState(false)
@@ -324,16 +356,16 @@ export function ClassTimesSteps({ courses, onDone }: { courses: Course[]; onDone
     setConfirmSkip(false)
     if (last) return onDone()
     setIndex(index + 1)
-    setDraft(draftFrom([], today, true))
+    setDraft(draftFrom([], today, queue[index + 1], true))
     window.scrollTo?.({ top: 0 })
   }
 
-  async function save() {
-    if (draft.rows.length === 0) return setConfirmSkip(true)
-    const checked = checkDraft(draft, today)
+  async function save(online = false) {
+    if (!online && draft.rows.length === 0) return setConfirmSkip(true)
+    const checked = online ? { ok: true as const, times: [] as ClassTimeInput[] } : checkDraft(draft)
     if (!checked.ok) return setError(checked.error)
     setSaving(true)
-    const result = await setClassTimes(course.id, checked.times, { quiet: true })
+    const result = await setClassTimes(course.id, checked.times, { quiet: true, online })
     setSaving(false)
     if (!result.ok) return setError(result.error)
     next()
@@ -351,13 +383,17 @@ export function ClassTimesSteps({ courses, onDone }: { courses: Course[]; onDone
         </h2>
         {course.professor && <p className="text-sm text-muted-foreground">{course.professor}</p>}
       </div>
-      <ClassTimesFields key={course.id} id={`class-steps-${course.id}`} value={draft} onChange={setDraft} />
+      <ClassTimesFields key={course.id} id={`class-steps-${course.id}`} value={draft} onChange={setDraft} course={course} />
       {error && (
         <p role="alert" className="text-sm font-medium text-destructive">
           {error}
         </p>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button type="button" variant="outline" className="sm:mr-auto" onClick={() => void save(true)} disabled={saving}>
+          <LaptopIcon data-icon="inline-start" />
+          It&apos;s online (no class meetings)
+        </Button>
         <Button type="button" variant="ghost" onClick={() => setConfirmSkip(true)} disabled={saving}>
           Skip
         </Button>
@@ -392,7 +428,7 @@ export function useCoursesToAsk(): Course[] {
   const asked = useAskedCourseIds()
   if (!asked) return []
   const withTimes = new Set(recurringCommitments.map((commitment) => commitment.courseId).filter(Boolean))
-  return courses.filter((course) => !withTimes.has(course.id) && !asked.has(course.id))
+  return courses.filter((course) => !course.online && !withTimes.has(course.id) && !asked.has(course.id))
 }
 
 // ---- The notice ----------------------------------------------------------------------------------
@@ -438,5 +474,17 @@ export function ClassTimesNotice() {
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function OnlineChoice({ id, checked, onChange }: { id: string; checked: boolean; onChange: (online: boolean) => void }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg bg-muted/60 px-3 py-2.5">
+      <Checkbox id={id} checked={checked} onCheckedChange={(value) => onChange(value === true)} className="mt-0.5" />
+      <Label htmlFor={id} className="grid gap-0.5 font-normal">
+        <span className="font-medium">Online course</span>
+        <span className="text-xs text-muted-foreground">No class meetings, so nothing goes on your calendar.</span>
+      </Label>
+    </div>
   )
 }

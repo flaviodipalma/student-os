@@ -130,18 +130,22 @@ export async function replaceRecurringCommitments(
 // ---- Class times ----------------------------------------------------------------------
 
 // Replaces a course's class times with `times` (none = the course isn't on the
-// calendar). Each is a "class" commitment named after the course.
+// calendar). Each is a "class" commitment named after the course. `online`: the
+// course has no class meetings (so no class times).
 export async function setClassTimes(
   db: Database,
   userId: string,
   courseId: string,
-  times: ClassTimeInput[]
+  times: ClassTimeInput[],
+  online = false
 ): Promise<RecurringCommitment[]> {
+  if (online && times.length > 0) throw new ValidationError("An online course has no class times.")
   return db.transaction(async (tx) => {
     const [course] = await tx
-      .select({ code: courses.courseCode, name: courses.courseName })
-      .from(courses)
+      .update(courses)
+      .set({ online })
       .where(and(eq(courses.id, courseId), eq(courses.userId, userId)))
+      .returning({ code: courses.courseCode, name: courses.courseName })
     if (!course) throw new NotFoundError("course")
     await tx
       .delete(recurringCommitments)

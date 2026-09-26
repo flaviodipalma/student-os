@@ -4,7 +4,7 @@ import { z } from "zod"
 import type { LmsAssignment, LmsCourse, LmsSubmissionStatus } from "@/lib/lms/types"
 import type { TaskType } from "@/lib/types"
 import { sameOriginUrl } from "../base-url"
-import { htmlToText, utcToLocalDue } from "../normalize"
+import { htmlToText, termDates, utcToLocalDue } from "../normalize"
 
 // Canvas API objects -> Student OS's normalized LMS types. Only the fields
 // Student OS uses are read (per the Canvas Courses and Assignments API docs),
@@ -21,6 +21,10 @@ const canvasCourse = z.object({
   access_restricted_by_date: z.boolean().nullish(),
   public_description: z.string().nullish(),
   teachers: z.array(z.object({ display_name: z.string().nullish() }).passthrough()).nullish(),
+  // The semester: the term's dates, or the course's own when the term has none.
+  start_at: z.string().nullish(),
+  end_at: z.string().nullish(),
+  term: z.object({ start_at: z.string().nullish(), end_at: z.string().nullish() }).passthrough().nullish(),
 })
 
 const canvasAssignment = z.object({
@@ -51,7 +55,7 @@ export function canvasCourseUrl(baseUrl: string, courseId: string): string | nul
 }
 
 // Courses the student can actually use: not deleted, not hidden by date.
-export function canvasCourseToLms(raw: unknown, baseUrl?: string): LmsCourse | null {
+export function canvasCourseToLms(raw: unknown, baseUrl?: string, timeZone?: string): LmsCourse | null {
   const parsed = canvasCourse.safeParse(raw)
   if (!parsed.success) return null
   const course = parsed.data
@@ -67,6 +71,7 @@ export function canvasCourseToLms(raw: unknown, baseUrl?: string): LmsCourse | n
     description: course.public_description ? htmlToText(course.public_description) || null : null,
     instructor: course.teachers?.map((t) => t.display_name?.trim()).find(Boolean) ?? null,
     url: baseUrl ? canvasCourseUrl(baseUrl, course.id) : null,
+    ...(termDates(course.term?.start_at, course.term?.end_at, timeZone) ?? termDates(course.start_at, course.end_at, timeZone) ?? {}),
   }
 }
 

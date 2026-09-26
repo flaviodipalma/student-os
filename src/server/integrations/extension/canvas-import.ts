@@ -44,7 +44,7 @@ export async function importCanvasFromExtension(
   const baseUrl = parseExtensionLmsBaseUrl(data.baseUrl, "Canvas")
   const timeZone = isValidTimeZone(data.timeZone) ? data.timeZone : undefined
 
-  const courses = data.courses.map((raw) => canvasCourseToLms(raw, baseUrl)).filter((course): course is LmsCourse => course !== null)
+  const courses = data.courses.map((raw) => canvasCourseToLms(raw, baseUrl, timeZone)).filter((course): course is LmsCourse => course !== null)
   const assignmentsFor = (courseId: string): LmsAssignment[] => {
     // Own property only: a course id like "__proto__" or "constructor" isn't a list.
     const raw = Object.hasOwn(data.assignments, courseId) ? data.assignments[courseId] : undefined

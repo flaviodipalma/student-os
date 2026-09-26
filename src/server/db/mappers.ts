@@ -32,6 +32,9 @@ export function toCourse(row: typeof courses.$inferSelect): Course {
     description: row.description,
     color: row.color,
     source: sourceOf(row),
+    ...(row.termStart ? { termStart: row.termStart } : {}),
+    ...(row.termEnd ? { termEnd: row.termEnd } : {}),
+    ...(row.online ? { online: true } : {}),
   }
 }
 

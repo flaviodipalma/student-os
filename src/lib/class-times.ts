@@ -18,9 +18,17 @@ export function withCourseTitles(commitments: RecurringCommitment[], courses: Co
   })
 }
 
-// When classes stop repeating, if the student doesn't say: the likely end of the
-// current semester (US calendar): Dec 20 for fall, May 20 for spring, Aug 15 for
-// summer. Always editable.
+// The semester's first and last day when the LMS doesn't say: a best guess from
+// today (US calendar): fall Aug 25 – Dec 20, spring Jan 15 – May 20, summer
+// Jun 1 – Aug 15. Always editable.
+export function likelySemesterStart(today: string): string {
+  const year = Number(today.slice(0, 4))
+  const month = Number(today.slice(5, 7))
+  if (month >= 8) return `${year}-08-25`
+  if (month <= 5) return `${year}-01-15`
+  return `${year}-06-01`
+}
+
 export function likelySemesterEnd(today: string): string {
   const year = Number(today.slice(0, 4))
   const month = Number(today.slice(5, 7))

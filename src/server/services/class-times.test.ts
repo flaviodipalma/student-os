@@ -4,8 +4,9 @@ import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import { commitmentsOn } from "@/lib/recurring"
 import { classTimesSchema } from "@/lib/validation"
 import { recurringCommitments } from "../db/schema"
+import { importCanvasFromExtension } from "../integrations/extension/canvas-import"
 import { createTestDb } from "../test-utils/test-db"
-import { createCourse, deleteCourse, updateCourse } from "./courses"
+import { createCourse, deleteCourse, getCourseForUser, listCourses, updateCourse } from "./courses"
 import { saveOnboardingDetails } from "./onboarding"
 import { createRecurringCommitment, listRecurringCommitments, setClassTimes } from "./recurring-commitments"
 
@@ -82,11 +83,36 @@ describe("class times", () => {
     expect((await listRecurringCommitments(t.db, user)).map((c) => c.title).sort()).toEqual(["CSC 215 · Data Structures", "Work"])
   })
 
+  it("an online course: no class times, and remembered on the course; adding times makes it in-person again", async () => {
+    const { user, course } = await studentWithCourse()
+    await setClassTimes(t.db, user, course.id, [LECTURE])
+    expect(await setClassTimes(t.db, user, course.id, [], true)).toEqual([])
+    expect(await listRecurringCommitments(t.db, user)).toEqual([])
+    expect((await getCourseForUser(t.db, user, course.id)).online).toBe(true)
+    await expect(setClassTimes(t.db, user, course.id, [LAB], true)).rejects.toThrow(/online course has no class times/)
+    await setClassTimes(t.db, user, course.id, [LAB])
+    expect((await getCourseForUser(t.db, user, course.id)).online).toBeUndefined()
+  })
+
   it("the database keeps them classes, with a sensible room", async () => {
     const { user, course } = await studentWithCourse()
     const [row] = await setClassTimes(t.db, user, course.id, [LECTURE])
     await expect(t.db.update(recurringCommitments).set({ type: "sports" }).where(eq(recurringCommitments.id, row.id))).rejects.toThrow()
     await expect(t.db.update(recurringCommitments).set({ location: "x".repeat(101) }).where(eq(recurringCommitments.id, row.id))).rejects.toThrow()
+  })
+})
+
+describe("semester dates from Canvas", () => {
+  it("an imported course keeps its semester's dates (for its class times)", async () => {
+    const user = await t.addUser("Alex")
+    await importCanvasFromExtension(t.db, user, {
+      baseUrl: "https://school.instructure.com",
+      timeZone: "America/New_York",
+      courses: [{ id: 215, name: "Data Structures", course_code: "CSC 215", term: { name: "Fall 2026", start_at: "2026-08-31T04:00:00Z", end_at: "2026-12-19T04:59:59Z" } }],
+      assignments: { "215": [] },
+    })
+    const [course] = await listCourses(t.db, user)
+    expect(course).toMatchObject({ code: "CSC 215", termStart: "2026-08-31", termEnd: "2026-12-18" })
   })
 })
 

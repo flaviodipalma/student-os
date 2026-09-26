@@ -72,12 +72,18 @@ describe("class times on the course page", () => {
     fireEvent.change(screen.getByLabelText("Ends"), { target: { value: "14:15" } })
     await user.click(screen.getByRole("button", { name: /Add another time/ }))
     await user.click(screen.getAllByRole("button", { name: "Fri" })[1])
+    // Back to the start of the semester (a best guess here: no dates from an LMS).
+    expect(screen.getByText(/Our best guess for this semester/)).toBeTruthy()
     await user.click(screen.getByRole("button", { name: "Save class times" }))
     expect(dialog).toBeTruthy()
-    expect(state.setClassTimes).toHaveBeenCalledWith("c1", [
-      { daysOfWeek: [2, 4], startTime: "13:00", endTime: "14:15", startDate: "2026-09-25", endDate: "2026-12-20" },
-      { daysOfWeek: [5], startTime: "09:00", endTime: "09:50", startDate: "2026-09-25", endDate: "2026-12-20" },
-    ])
+    expect(state.setClassTimes).toHaveBeenCalledWith(
+      "c1",
+      [
+        { daysOfWeek: [2, 4], startTime: "13:00", endTime: "14:15", startDate: "2026-08-25", endDate: "2026-12-20" },
+        { daysOfWeek: [5], startTime: "09:00", endTime: "09:50", startDate: "2026-08-25", endDate: "2026-12-20" },
+      ],
+      { online: false }
+    )
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   })
 
@@ -90,6 +96,26 @@ describe("class times on the course page", () => {
     await user.click(screen.getByRole("button", { name: "Save class times" }))
     expect(screen.getByRole("alert").textContent).toMatch(/End time must be after the start time/)
     expect(state.setClassTimes).not.toHaveBeenCalled()
+  })
+})
+
+describe("online courses", () => {
+  it("marking a course online saves no class times; its card says so", async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<ClassTimesCard course={DS} />)
+    await user.click(screen.getByRole("button", { name: "Add class times" }))
+    await user.click(await screen.findByRole("checkbox", { name: /Online course/ }))
+    expect(screen.queryByRole("button", { name: "Mon" })).toBeNull()
+    await user.click(screen.getByRole("button", { name: "Save class times" }))
+    expect(state.setClassTimes).toHaveBeenCalledWith("c1", [], { online: true })
+    rerender(<ClassTimesCard course={{ ...DS, online: true }} />)
+    expect(screen.getByText(/Online course: no class meetings/)).toBeTruthy()
+  })
+
+  it("the notice doesn't ask about online courses", () => {
+    state.courses = [{ ...CALC, online: true }]
+    const { container } = render(<ClassTimesNotice />)
+    expect(container.textContent).toBe("")
   })
 })
 

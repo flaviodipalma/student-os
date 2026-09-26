@@ -1,5 +1,6 @@
 "use server"
 
+import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import type { CalendarEvent, Course, RecurringCommitment, StudySessionRecord, Task } from "@/lib/types"
 import {
@@ -48,9 +49,12 @@ export async function loadCoursesAction(): Promise<ActionResult<{ courses: Cours
   return runAction(async ({ db, userId }) => ({ courses: await listCourses(db, userId), tasks: await listTasks(db, userId) }))
 }
 
-// A course's class times, all together (an empty list takes the course off the calendar).
-export async function setClassTimesAction(courseId: unknown, times: unknown): Promise<ActionResult<RecurringCommitment[]>> {
-  return runAction(({ db, userId }) => setClassTimes(db, userId, parse(idSchema, courseId), parse(classTimesSchema, times)))
+// A course's class times, all together (an empty list takes the course off the
+// calendar). `online`: no class meetings at all.
+export async function setClassTimesAction(courseId: unknown, times: unknown, online?: unknown): Promise<ActionResult<RecurringCommitment[]>> {
+  return runAction(({ db, userId }) =>
+    setClassTimes(db, userId, parse(idSchema, courseId), parse(classTimesSchema, times), parse(z.boolean().default(false), online))
+  )
 }
 
 // ---- Tasks

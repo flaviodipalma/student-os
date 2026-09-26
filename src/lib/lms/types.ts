@@ -19,6 +19,9 @@ export type LmsCourse = {
   description: string | null
   instructor: string | null
   url: string | null
+  // The course's semester ("YYYY-MM-DD"), when the LMS has its dates.
+  termStart?: string | null
+  termEnd?: string | null
 }
 
 // Where the student stands on the assignment in the LMS. Recorded for

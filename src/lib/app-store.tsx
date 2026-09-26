@@ -101,7 +101,12 @@ type AppStore = {
   deleteCourse: (id: string) => Promise<boolean>
   // Replaces a course's class times (none = the course isn't on the calendar).
   // `quiet`: no confirmation message (the one-course-at-a-time screens show their own progress).
-  setClassTimes: (courseId: string, times: ClassTimeInput[], options?: { quiet?: boolean }) => Promise<ActionResult<RecurringCommitment[]>>
+  // `online`: the course has no class meetings (times must be empty).
+  setClassTimes: (
+    courseId: string,
+    times: ClassTimeInput[],
+    options?: { quiet?: boolean; online?: boolean }
+  ) => Promise<ActionResult<RecurringCommitment[]>>
   // Loads the courses and tasks again (after the browser extension imported some).
   reloadCourses: () => Promise<Course[] | null>
   addTask: (input: TaskInput) => void
@@ -292,10 +297,14 @@ export function AppStoreProvider({
       return ok
     },
     setClassTimes: async (courseId, times, options) => {
-      const result = await call(setClassTimesAction(courseId, times))
+      const online = options?.online ?? false
+      const result = await call(setClassTimesAction(courseId, times, online))
       if (result.ok) {
         setRecurringCommitments((prev) => [...prev.filter((commitment) => commitment.courseId !== courseId), ...result.data])
-        if (!options?.quiet) showSuccess(times.length > 0 ? "Class times saved. They're on your calendar." : "Class times removed.")
+        setCourses((prev) => prev.map((course) => (course.id === courseId ? { ...course, online: online || undefined } : course)))
+        if (!options?.quiet) {
+          showSuccess(online ? "Marked as an online course." : times.length > 0 ? "Class times saved. They're on your calendar." : "Class times removed.")
+        }
       }
       return result
     },

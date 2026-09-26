@@ -232,6 +232,11 @@ export const courses = pgTable(
     professor: text("professor").notNull().default(""),
     description: text("description").notNull().default(""),
     color: courseColor("color").notNull(),
+    // The course's semester, when the LMS gives its dates (class times default to it).
+    termStart: date("term_start"),
+    termEnd: date("term_end"),
+    // Online: no class meetings (so no class times, and nobody asks for them).
+    online: boolean("online").notNull().default(false),
     // Where the course was imported from (null = added by the student or from a syllabus).
     ...externalSourceColumns,
     ...timestamps,

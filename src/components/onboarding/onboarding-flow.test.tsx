@@ -236,13 +236,35 @@ describe("class times, one course at a time", () => {
     expect(mocks.setClassTimes).toHaveBeenCalledWith(
       "c1",
       [
-        { daysOfWeek: [1, 3, 5], startTime: "09:00", endTime: "09:50", location: "Tator Hall 120", startDate: "2026-09-25", endDate: "2026-12-20" },
-        { daysOfWeek: [2], startTime: "09:00", endTime: "09:50", startDate: "2026-09-25", endDate: "2026-12-20" },
+        { daysOfWeek: [1, 3, 5], startTime: "09:00", endTime: "09:50", location: "Tator Hall 120", startDate: "2026-08-25", endDate: "2026-12-20" },
+        { daysOfWeek: [2], startTime: "09:00", endTime: "09:50", startDate: "2026-08-25", endDate: "2026-12-20" },
       ],
-      { quiet: true }
+      { quiet: true, online: false }
     )
     expect(await screen.findByText("Course 2 of 2")).toBeTruthy()
     expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it("'It's online': saved as an online course (no class times), and on to the next", async () => {
+    const user = userEvent.setup()
+    await synced(user)
+    await user.click(screen.getByRole("button", { name: /It's online/ }))
+    expect(mocks.setClassTimes).toHaveBeenCalledWith("c1", [], { quiet: true, online: true })
+    expect(await screen.findByText("Course 2 of 2")).toBeTruthy()
+  })
+
+  it("the semester's dates: from the LMS when it gave them", async () => {
+    const user = userEvent.setup()
+    mocks.reloadCourses.mockResolvedValue([{ ...COURSES[0], termStart: "2026-08-31", termEnd: "2026-12-18", source: { provider: "canvas", externalId: "215" } }])
+    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 1 } })
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    await user.click(screen.getByRole("button", { name: "Connect Canvas" }))
+    await screen.findByRole("heading", { name: "Add your class times" }, { timeout: 5000 })
+    expect(screen.getByLabelText("First day of classes")).toHaveProperty("value", "2026-08-31")
+    expect(screen.getByLabelText("Last day of classes")).toHaveProperty("value", "2026-12-18")
+    expect(screen.getByText("Your semester's dates from Canvas.")).toBeTruthy()
   })
 
   it("no day picked: explains, and nothing is saved", async () => {
