@@ -4,6 +4,7 @@ import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
 import { BookOpenIcon, CheckIcon, CircleAlertIcon, FileUpIcon, GraduationCapIcon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
+import { ClassTimesSteps } from "@/components/courses/class-times"
 import { CourseFormDialog } from "@/components/courses/course-form-dialog"
 import { CommitmentsEditor, type EditableCommitment } from "@/components/preferences/commitments-editor"
 import { ProfileFields } from "@/components/preferences/profile-fields"
@@ -13,8 +14,9 @@ import { Button } from "@/components/ui/button"
 import { ChooseSchool, GetExtension, SyncTutorial } from "./connect-school"
 import { OnboardingIntro } from "./onboarding-intro"
 import { useAppStore } from "@/lib/app-store"
+import { useAskedCourseIds } from "@/lib/class-times-asked"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import { lmsProviderNames, type LmsProviderId, type ProfileInput, type StudentPreferences } from "@/lib/types"
+import { lmsProviderNames, type Course, type LmsProviderId, type ProfileInput, type RecurringCommitment, type StudentPreferences } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 
@@ -23,7 +25,8 @@ import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 // 1-3 are saved together when leaving step 3 (so they survive a reload). Step 4
 // brings in courses: connect Canvas or Blackboard through the browser extension
 // (get it, then a short tutorial that waits for the first sync), or, skipping
-// that, a syllabus or courses added by hand. Reaching the Dashboard marks
+// that, a syllabus or courses added by hand. Then each new course's class times,
+// one course at a time (skippable, with a warning). Reaching the Dashboard marks
 // onboarding complete. Uses the same fields, validation and server actions as the
 // Settings page.
 
@@ -38,7 +41,18 @@ const steps = [
 ]
 
 // Step 4's views.
-type CourseView = { kind: "choose" } | { kind: "extension"; provider: LmsProviderId } | { kind: "tutorial"; provider: LmsProviderId } | { kind: "manual" }
+type CourseView =
+  | { kind: "choose" }
+  | { kind: "extension"; provider: LmsProviderId }
+  | { kind: "tutorial"; provider: LmsProviderId }
+  | { kind: "manual" }
+  | { kind: "classTimes"; courses: Course[] }
+
+// Courses still without class times that the student wasn't asked about yet.
+function needClassTimes(courses: Course[], commitments: RecurringCommitment[], asked: Set<string> | null): Course[] {
+  const withTimes = new Set(commitments.map((commitment) => commitment.courseId))
+  return courses.filter((course) => !withTimes.has(course.id) && !asked?.has(course.id))
+}
 
 function courseHeading(view: CourseView): { title: string; description: string } {
   if (view.kind === "extension") {
@@ -46,6 +60,9 @@ function courseHeading(view: CourseView): { title: string; description: string }
   }
   if (view.kind === "tutorial") {
     return { title: `Sync your ${lmsProviderNames[view.provider]} courses`, description: "Three quick steps. This page continues on its own." }
+  }
+  if (view.kind === "classTimes") {
+    return { title: "Add your class times", description: "When each class meets, so it's on your calendar and the Planner keeps it free." }
   }
   if (view.kind === "manual") return { title: "Add your courses", description: "Upload a syllabus or add your classes by hand." }
   return { title: "Connect your school", description: "Bring in your courses and assignments from Canvas or Blackboard." }
@@ -64,11 +81,14 @@ export function OnboardingFlow() {
     schoolDomain: store.student.schoolDomain,
   })
   const [preferences, setPreferences] = useState<StudentPreferences>(store.preferences)
-  const [commitments, setCommitments] = useState<EditableCommitment[]>(store.recurringCommitments)
+  const [commitments, setCommitments] = useState<EditableCommitment[]>(() =>
+    store.recurringCommitments.filter((commitment) => !commitment.courseId)
+  )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [courseDialogOpen, setCourseDialogOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const asked = useAskedCourseIds()
 
   const go = (to: number) => {
     setError(null)
@@ -108,7 +128,7 @@ export function OnboardingFlow() {
     })
     setBusy(false)
     if (!result.ok) return setError(result.error)
-    setCommitments(result.data.recurringCommitments) // now with their saved ids
+    setCommitments(result.data.recurringCommitments.filter((commitment) => !commitment.courseId)) // now with their saved ids
     go(3)
   }
 
@@ -130,10 +150,25 @@ export function OnboardingFlow() {
   const onInstalled = useCallback(() => {
     setCourseView((view) => (view.kind === "extension" ? { kind: "tutorial", provider: view.provider } : view))
   }, [])
-  // The first sync is in: a moment to see "Your courses are in!", then the Dashboard.
+  // Before the Dashboard: class times for the courses that came in (if any need them).
+  const askClassTimesOrFinish = useCallback(
+    (courses: Course[]) => {
+      const toAsk = needClassTimes(courses, store.recurringCommitments, asked)
+      if (toAsk.length === 0) return void finish()
+      setError(null)
+      setCourseView({ kind: "classTimes", courses: toAsk })
+      window.scrollTo({ top: 0 })
+    },
+    [store.recurringCommitments, asked, finish]
+  )
+  // The first sync is in: a moment to see "Your courses are in!", then their class times.
   const onSynced = useCallback(() => {
-    setTimeout(() => void finish(), 1500)
-  }, [finish])
+    setTimeout(async () => {
+      const courses = await store.reloadCourses()
+      if (courses) askClassTimesOrFinish(courses)
+      else void finish()
+    }, 1500)
+  }, [store, askClassTimesOrFinish, finish])
 
   const current = step === 3 ? courseHeading(courseView) : steps[step]
 
@@ -201,6 +236,9 @@ export function OnboardingFlow() {
           )}
           {step === 3 && courseView.kind === "extension" && <GetExtension provider={courseView.provider} onInstalled={onInstalled} />}
           {step === 3 && courseView.kind === "tutorial" && <SyncTutorial provider={courseView.provider} onSynced={onSynced} />}
+          {step === 3 && courseView.kind === "classTimes" && (
+            <ClassTimesSteps courses={courseView.courses} onDone={() => void finish()} />
+          )}
           {step === 3 &&
             courseView.kind === "manual" &&
             (importing ? (
@@ -226,7 +264,7 @@ export function OnboardingFlow() {
           </p>
         )}
 
-        {!importing && (
+        {!importing && courseView.kind !== "classTimes" && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
             {/* No "Back" on the first step (there's nothing to go back to). */}
             {step > 0 ? (
@@ -265,7 +303,7 @@ export function OnboardingFlow() {
                 </Button>
               )}
               {step === 3 && courseView.kind === "manual" && (
-                <Button onClick={() => void finish()} disabled={busy}>
+                <Button onClick={() => askClassTimesOrFinish(store.courses)} disabled={busy}>
                   {busy ? "Finishing…" : store.courses.length === 0 ? "Skip and finish" : "Finish setup"}
                 </Button>
               )}

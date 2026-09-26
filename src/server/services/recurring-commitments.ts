@@ -1,8 +1,9 @@
 import "server-only"
 
-import { and, asc, eq } from "drizzle-orm"
-import type { RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
-import { recurringCommitments } from "../db/schema"
+import { and, asc, eq, isNull } from "drizzle-orm"
+import { classTitle } from "@/lib/class-times"
+import type { ClassTimeInput, RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
+import { courses, recurringCommitments } from "../db/schema"
 import type { Database } from "../db/types"
 import { NotFoundError, ValidationError } from "../errors"
 import { hasChanges } from "./util"
@@ -46,16 +47,20 @@ function toCommitment(row: typeof recurringCommitments.$inferSelect): RecurringC
     description: row.description ?? undefined,
     startDate: row.startDate ?? undefined,
     endDate: row.endDate ?? undefined,
+    courseId: row.courseId ?? undefined,
+    location: row.location ?? undefined,
   }
 }
 
+// Class times are named after their course as it's called now (it may have been renamed).
 export async function listRecurringCommitments(db: Database, userId: string): Promise<RecurringCommitment[]> {
   const rows = await db
-    .select()
+    .select({ row: recurringCommitments, code: courses.courseCode, name: courses.courseName })
     .from(recurringCommitments)
+    .leftJoin(courses, eq(courses.id, recurringCommitments.courseId))
     .where(eq(recurringCommitments.userId, userId))
     .orderBy(asc(recurringCommitments.startTime), asc(recurringCommitments.createdAt))
-  return rows.map(toCommitment)
+  return rows.map(({ row, code, name }) => ({ ...toCommitment(row), ...(code && name ? { title: classTitle(code, name) } : {}) }))
 }
 
 export async function createRecurringCommitment(
@@ -106,15 +111,60 @@ export async function deleteRecurringCommitment(db: Database, userId: string, co
   if (deleted.length === 0) throw new NotFoundError("recurring commitment")
 }
 
-// Replaces all of a student's weekly commitments (used when onboarding saves its list).
+// Replaces a student's own weekly commitments (used when onboarding saves its list).
+// Class times belong to their courses and stay.
 export async function replaceRecurringCommitments(
   db: Database,
   userId: string,
   commitments: RecurringCommitmentInput[]
 ): Promise<RecurringCommitment[]> {
-  await db.delete(recurringCommitments).where(eq(recurringCommitments.userId, userId))
+  await db
+    .delete(recurringCommitments)
+    .where(and(eq(recurringCommitments.userId, userId), isNull(recurringCommitments.courseId)))
   if (commitments.length > 0) {
     await db.insert(recurringCommitments).values(commitments.map((commitment) => ({ ...toRow(commitment), userId })))
   }
   return listRecurringCommitments(db, userId)
+}
+
+// ---- Class times ----------------------------------------------------------------------
+
+// Replaces a course's class times with `times` (none = the course isn't on the
+// calendar). Each is a "class" commitment named after the course.
+export async function setClassTimes(
+  db: Database,
+  userId: string,
+  courseId: string,
+  times: ClassTimeInput[]
+): Promise<RecurringCommitment[]> {
+  return db.transaction(async (tx) => {
+    const [course] = await tx
+      .select({ code: courses.courseCode, name: courses.courseName })
+      .from(courses)
+      .where(and(eq(courses.id, courseId), eq(courses.userId, userId)))
+    if (!course) throw new NotFoundError("course")
+    await tx
+      .delete(recurringCommitments)
+      .where(and(eq(recurringCommitments.userId, userId), eq(recurringCommitments.courseId, courseId)))
+    if (times.length === 0) return []
+    const title = classTitle(course.code, course.name)
+    const rows = await tx
+      .insert(recurringCommitments)
+      .values(
+        times.map((time) => ({
+          userId,
+          courseId,
+          title,
+          type: "class" as const,
+          daysOfWeek: [...new Set(time.daysOfWeek)].sort((a, b) => a - b),
+          startTime: time.startTime,
+          endTime: time.endTime,
+          location: orNull(time.location),
+          startDate: orNull(time.startDate),
+          endDate: orNull(time.endDate),
+        }))
+      )
+      .returning()
+    return rows.map(toCommitment).sort((a, b) => a.startTime.localeCompare(b.startTime))
+  })
 }

@@ -1,8 +1,9 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-result"
-import type { CalendarEvent, Course, StudySessionRecord, Task } from "@/lib/types"
+import type { CalendarEvent, Course, RecurringCommitment, StudySessionRecord, Task } from "@/lib/types"
 import {
+  classTimesSchema,
   createCourseSchema,
   createEventSchema,
   createSessionSchema,
@@ -14,10 +15,11 @@ import {
   updateTaskSchema,
 } from "@/lib/validation"
 import { parse, runAction } from "@/server/actions"
-import { createCourse, deleteCourse, updateCourse } from "@/server/services/courses"
+import { createCourse, deleteCourse, listCourses, updateCourse } from "@/server/services/courses"
 import { createEvent, deleteEvent, updateEvent } from "@/server/services/events"
+import { setClassTimes } from "@/server/services/recurring-commitments"
 import { createStudySession, deleteStudySession, updateStudySession } from "@/server/services/study-sessions"
-import { createTask, deleteTask, updateTask } from "@/server/services/tasks"
+import { createTask, deleteTask, listTasks, updateTask } from "@/server/services/tasks"
 
 // Server actions for everything the student edits. Each one runs on the server,
 // finds the signed-in user from the verified session, validates the input and only
@@ -39,6 +41,16 @@ export async function deleteCourseAction(id: unknown): Promise<ActionResult<null
     await deleteCourse(db, userId, parse(idSchema, id))
     return null
   })
+}
+
+// The student's courses and tasks as saved now (e.g. after the extension imported some).
+export async function loadCoursesAction(): Promise<ActionResult<{ courses: Course[]; tasks: Task[] }>> {
+  return runAction(async ({ db, userId }) => ({ courses: await listCourses(db, userId), tasks: await listTasks(db, userId) }))
+}
+
+// A course's class times, all together (an empty list takes the course off the calendar).
+export async function setClassTimesAction(courseId: unknown, times: unknown): Promise<ActionResult<RecurringCommitment[]>> {
+  return runAction(({ db, userId }) => setClassTimes(db, userId, parse(idSchema, courseId), parse(classTimesSchema, times)))
 }
 
 // ---- Tasks

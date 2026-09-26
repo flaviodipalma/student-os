@@ -11,6 +11,8 @@ import {
   deleteEventAction,
   deleteStudySessionAction,
   deleteTaskAction,
+  loadCoursesAction,
+  setClassTimesAction,
   updateCourseAction,
   updateEventAction,
   updateStudySessionAction,
@@ -32,6 +34,7 @@ import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
+import { withCourseTitles } from "@/lib/class-times"
 import { pickCourseColor } from "@/lib/course-colors"
 import { useNow } from "@/lib/clock"
 import { useFeedback } from "@/lib/feedback"
@@ -40,6 +43,7 @@ import { scheduleBetween } from "@/lib/recurring"
 import {
   DEFAULT_LEARNING_SETTINGS,
   type CalendarEvent,
+  type ClassTimeInput,
   type Course,
   type CourseInput,
   type EventInput,
@@ -79,6 +83,7 @@ type AppStore = {
   preferences: StudentPreferences
   // Adaptive planning on/off, and since when history counts.
   learning: LearningSettings
+  // Including courses' class times (with a courseId), named after the course.
   recurringCommitments: RecurringCommitment[]
   // Read-only copies of Canvas / Blackboard calendar events (hidden ones included).
   externalEvents: ExternalEventRecord[]
@@ -94,6 +99,11 @@ type AppStore = {
   addCourse: (input: CourseInput) => Promise<Course | null>
   updateCourse: (id: string, changes: Partial<CourseInput>) => void
   deleteCourse: (id: string) => Promise<boolean>
+  // Replaces a course's class times (none = the course isn't on the calendar).
+  // `quiet`: no confirmation message (the one-course-at-a-time screens show their own progress).
+  setClassTimes: (courseId: string, times: ClassTimeInput[], options?: { quiet?: boolean }) => Promise<ActionResult<RecurringCommitment[]>>
+  // Loads the courses and tasks again (after the browser extension imported some).
+  reloadCourses: () => Promise<Course[] | null>
   addTask: (input: TaskInput) => void
   updateTask: (id: string, changes: Partial<TaskInput>) => void
   deleteTask: (id: string) => void
@@ -175,7 +185,8 @@ export function AppStoreProvider({
   const [student, setStudent] = useState(initial.student)
   const [preferences, setPreferences] = useState(initial.preferences)
   const [learning, setLearning] = useState(initial.learning ?? DEFAULT_LEARNING_SETTINGS)
-  const [recurringCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
+  const [savedCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
+  const recurringCommitments = useMemo(() => withCourseTitles(savedCommitments, courses), [savedCommitments, courses])
   const [externalEvents, setExternalEvents] = useState(initial.externalEvents ?? [])
 
   // Awaits a server action; runs onOk with the saved record (and confirms with
@@ -258,12 +269,13 @@ export function AppStoreProvider({
     },
     // Deleting a course deletes its tasks and their study sessions too.
     deleteCourse: async (id) => {
-      const snapshot = { courses, tasks, studySessions, events }
+      const snapshot = { courses, tasks, studySessions, events, savedCommitments }
       const taskIds = new Set(tasks.filter((task) => task.courseId === id).map((task) => task.id))
       setCourses((prev) => withoutId(prev, id))
       setTasks((prev) => prev.filter((task) => task.courseId !== id))
       setStudySessions((prev) => prev.filter((session) => !taskIds.has(session.taskId)))
       setEvents((prev) => prev.map((event) => (event.courseId === id ? { ...event, courseId: undefined } : event)))
+      setRecurringCommitments((prev) => prev.filter((commitment) => commitment.courseId !== id))
       let ok = false
       await save(
         deleteCourseAction(id),
@@ -273,10 +285,26 @@ export function AppStoreProvider({
           setTasks(snapshot.tasks)
           setStudySessions(snapshot.studySessions)
           setEvents(snapshot.events)
+          setRecurringCommitments(snapshot.savedCommitments)
         },
         "Course deleted."
       )
       return ok
+    },
+    setClassTimes: async (courseId, times, options) => {
+      const result = await call(setClassTimesAction(courseId, times))
+      if (result.ok) {
+        setRecurringCommitments((prev) => [...prev.filter((commitment) => commitment.courseId !== courseId), ...result.data])
+        if (!options?.quiet) showSuccess(times.length > 0 ? "Class times saved. They're on your calendar." : "Class times removed.")
+      }
+      return result
+    },
+    reloadCourses: async () => {
+      const result = await call(loadCoursesAction())
+      if (!result.ok) return null
+      setCourses(result.data.courses)
+      setTasks(result.data.tasks)
+      return result.data.courses
     },
 
     // ---- Tasks

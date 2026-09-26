@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { RepeatIcon, Trash2Icon } from "lucide-react"
+import Link from "next/link"
+import { MapPinIcon, RepeatIcon, Trash2Icon } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +15,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Field, SimpleSelect, useFieldErrors } from "@/components/form-fields"
 import { DayPicker } from "@/components/preferences/commitments-editor"
-import { Button } from "@/components/ui/button"
+import { describeClassTime } from "@/components/courses/class-times"
+import { CourseTag } from "@/components/course-tag"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -47,6 +50,7 @@ const typeOptions = eventTypes.map((value) => ({ value, label: eventTypeLabel[va
 // - repeating events (weekly commitments): the form edits the rule, so every week
 //   changes together; there are no per-week copies to get out of sync
 // - study sessions (from the Planner): can only be moved or removed
+// - a course's class times: shown here, edited on the course page
 export function EventFormDialog({
   open,
   onOpenChange,
@@ -60,6 +64,7 @@ export function EventFormDialog({
 }) {
   const { getCommitment } = useCommitments()
   const commitment = event?.commitmentId ? getCommitment(event.commitmentId) : undefined
+  if (commitment?.courseId) return <ClassDialog open={open} onOpenChange={onOpenChange} commitment={commitment} />
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -340,5 +345,58 @@ function EventForm({
         </AlertDialog>
       )}
     </form>
+  )
+}
+
+function ClassDialog({
+  open,
+  onOpenChange,
+  commitment,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  commitment: RecurringCommitment
+}) {
+  const { getCourse } = useCourses()
+  const course = commitment.courseId ? getCourse(commitment.courseId) : undefined
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Class</DialogTitle>
+          <DialogDescription>Every week. Class times are part of the course.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-1.5">
+          {course ? (
+            <p className="flex flex-wrap items-center gap-x-2 font-medium">
+              <CourseTag code={course.code} color={course.color} />
+              {course.name}
+            </p>
+          ) : (
+            <p className="font-medium">{commitment.title}</p>
+          )}
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <RepeatIcon aria-hidden className="size-3.5" />
+            {describeClassTime(commitment)}
+          </p>
+          {commitment.location && (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPinIcon aria-hidden className="size-3.5" />
+              {commitment.location}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          {course && (
+            <Link href={`/courses/${course.id}`} className={buttonVariants()} onClick={() => onOpenChange(false)}>
+              Edit class times
+            </Link>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

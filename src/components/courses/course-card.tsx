@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronRightIcon, CircleAlertIcon } from "lucide-react"
+import { CalendarClockIcon, ChevronRightIcon, CircleAlertIcon } from "lucide-react"
+import { describeClassTime } from "./class-times"
 import { courseColorClass } from "@/components/course-tag"
 import { useAppStore } from "@/lib/app-store"
+import { classTimesOf } from "@/lib/class-times"
 import { formatDuration } from "@/lib/format"
 import { completedMinutesFor } from "@/lib/planner"
 import { useTasks } from "@/lib/task-store"
@@ -16,7 +18,8 @@ export function CourseCard({ course }: { course: Course }) {
   const courseTasks = tasksForCourse(tasks, course.id)
   const open = courseTasks.filter((task) => !isDone(task)).length
   const next = upcomingDeadlines(courseTasks, today)[0]
-  const { calendarItems } = useAppStore()
+  const { calendarItems, recurringCommitments } = useAppStore()
+  const classTimes = classTimesOf(recurringCommitments, course.id)
   const workload = courseWorkload(courseTasks, today, (taskId) => completedMinutesFor(taskId, calendarItems))
 
   return (
@@ -40,6 +43,10 @@ export function CourseCard({ course }: { course: Course }) {
             </p>
             <h2 className="mt-0.5 text-lg font-semibold leading-snug">{course.name}</h2>
             {course.professor && <p className="mt-0.5 text-sm text-muted-foreground">{course.professor}</p>}
+            <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <CalendarClockIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+              {classTimes.length > 0 ? classTimes.map(describeClassTime).join("; ") : "No class times"}
+            </p>
           </div>
           <ChevronRightIcon
             aria-hidden

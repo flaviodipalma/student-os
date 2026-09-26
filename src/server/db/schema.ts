@@ -192,10 +192,23 @@ export const recurringCommitments = pgTable(
     // Optional first and last day it happens (inclusive). Null = no limit.
     startDate: date("start_date"),
     endDate: date("end_date"),
+    // Set on a course's class times (type "class"); managed from the course, not Settings.
+    courseId: uuid("course_id"),
+    // Where it happens, e.g. a classroom. Null = not given.
+    location: text("location"),
     ...timestamps,
   },
   (t) => [
     index("recurring_commitments_user_id_idx").on(t.userId),
+    index("recurring_commitments_course_id_idx").on(t.courseId),
+    // The course must be the same student's. Deleting a course deletes its class times.
+    foreignKey({
+      name: "recurring_commitments_course_owner_fk",
+      columns: [t.courseId, t.userId],
+      foreignColumns: [courses.id, courses.userId],
+    }).onDelete("cascade"),
+    check("recurring_commitments_class_times", sql`${t.courseId} is null or ${t.type} = 'class'`),
+    check("recurring_commitments_location_length", sql`char_length(${t.location}) between 1 and 100`),
     check("recurring_commitments_dates", sql`${t.endDate} is null or ${t.startDate} is null or ${t.endDate} >= ${t.startDate}`),
     check("recurring_commitments_description_length", sql`char_length(${t.description}) <= 500`),
     check("recurring_commitments_end_after_start", sql`${t.endTime} > ${t.startTime}`),

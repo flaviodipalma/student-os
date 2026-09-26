@@ -173,6 +173,8 @@ function DayColumn({
         const end = toMinutes(event.endTime)
         const height = Math.max(((end - start) / 60) * HOUR_PX - 2, 20)
         const compact = height < 40
+        // Under about an hour (e.g. a 50-minute class): the title keeps to one line so the time still shows.
+        const short = height < 56
         const time = `${formatTime(fromDateKey(date, event.startTime))} – ${formatTime(fromDateKey(date, event.endTime))}`
         const academic = event.type === "class" || event.type === "study"
         // External events say where they're from; the student's own items don't need a label on the grid.
@@ -205,12 +207,13 @@ function DayColumn({
               </p>
             ) : (
               <>
-                <p className={cn("line-clamp-2", academic ? "font-semibold" : "font-medium")}>
+                <p className={cn(short ? "truncate" : "line-clamp-2", academic ? "font-semibold" : "font-medium")}>
                   {event.commitmentId && <RepeatMark />}
                   {event.title}
                 </p>
                 <p className="mt-0.5 truncate opacity-75">
                   {time}
+                  {event.location && !sourceName && <span> · {event.location}</span>}
                   {sourceName && <span className="font-medium"> · {sourceName}</span>}
                 </p>
               </>

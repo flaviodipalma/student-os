@@ -69,11 +69,12 @@ export function SettingsView() {
           <CardTitle className="text-lg font-semibold">Recurring commitments</CardTitle>
           <CardDescription>
             Things you do every week. They show on your calendar, and the Planner never schedules study over them.
+            Class times are set on each course, in Courses.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <CommitmentsEditor
-            commitments={store.recurringCommitments}
+            commitments={store.recurringCommitments.filter((commitment) => !commitment.courseId)}
             onAdd={async (input) => toMessage(await store.addCommitment(input))}
             onUpdate={async (id, input) => toMessage(await store.updateCommitment(id, input))}
             onDelete={store.deleteCommitment}

@@ -249,9 +249,24 @@ export type RecurringCommitment = {
   // Optional first and last day (inclusive); unset = no limit.
   startDate?: string
   endDate?: string
+  // Set on a course's class times (type "class"), which are edited from the course.
+  courseId?: string
+  // Where it happens, e.g. a classroom.
+  location?: string
 }
 
-export type RecurringCommitmentInput = Omit<RecurringCommitment, "id">
+export type RecurringCommitmentInput = Omit<RecurringCommitment, "id" | "courseId" | "location">
+
+// One weekly meeting of a course, e.g. the lecture Mon/Wed/Fri 10:00–10:50 or the lab
+// Tue 14:00–16:50. Stored as a "class" recurring commitment linked to the course.
+export type ClassTimeInput = {
+  daysOfWeek: number[]
+  startTime: string
+  endTime: string
+  location?: string
+  startDate?: string
+  endDate?: string
+}
 
 // ---- Notifications & reminders (see src/lib/notifications/README.md) ----------------
 

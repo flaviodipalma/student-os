@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "lucide-react"
 import { courseColorClass } from "@/components/course-tag"
 import { NewTaskButton } from "@/components/tasks/new-task-button"
 import { SourceBadge } from "@/components/tasks/task-badges"
+import { ClassTimesCard } from "./class-times"
 import { CourseActions } from "./course-actions"
 import { TaskList } from "@/components/tasks/task-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -91,6 +92,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           </dl>
         </div>
       </header>
+
+      <ClassTimesCard course={course} />
 
       {/* Only groups with work in them; one friendly line when nothing is open. */}
       {open.length === 0 ? (

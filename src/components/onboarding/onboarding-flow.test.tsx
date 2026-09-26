@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 
 // Onboarding in a simulated browser: the intro, the three detail steps, and step 4
-// (connect Canvas or Blackboard through the extension, or a syllabus / by hand).
+// (connect Canvas or Blackboard through the extension, or a syllabus / by hand), then
+// the new courses' class times, one course at a time.
 // The app store, navigation, server action and heavy children are mocked.
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   saveOnboarding: vi.fn(),
   completeOnboarding: vi.fn(),
   lmsSyncStatusAction: vi.fn(),
+  reloadCourses: vi.fn(),
+  setClassTimes: vi.fn(),
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }))
 vi.mock("@/app/actions/integrations", () => ({ lmsSyncStatusAction: mocks.lmsSyncStatusAction }))
@@ -24,6 +27,9 @@ vi.mock("@/components/courses/course-form-dialog", () => ({
 }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
+    today: "2026-09-25",
+    reloadCourses: mocks.reloadCourses,
+    setClassTimes: mocks.setClassTimes,
     student: { firstName: "Alex", lastName: "", schoolName: "", schoolDomain: null },
     preferences: DEFAULT_STUDENT_PREFERENCES,
     recurringCommitments: [],
@@ -33,6 +39,15 @@ vi.mock("@/lib/app-store", () => ({
   }),
 }))
 
+// Node's own localStorage (off without --localstorage-file) hides jsdom's: an in-memory one.
+const stored = new Map<string, string>()
+vi.stubGlobal("localStorage", {
+  getItem: (key: string) => stored.get(key) ?? null,
+  setItem: (key: string, value: string) => void stored.set(key, value),
+  removeItem: (key: string) => void stored.delete(key),
+  clear: () => stored.clear(),
+})
+
 const { OnboardingFlow } = await import("./onboarding-flow")
 
 beforeEach(() => {
@@ -40,6 +55,9 @@ beforeEach(() => {
   mocks.saveOnboarding.mockResolvedValue({ ok: true, data: { recurringCommitments: [] } })
   mocks.completeOnboarding.mockResolvedValue({ ok: true, data: null })
   mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: null, courses: 0 } })
+  mocks.reloadCourses.mockResolvedValue([])
+  mocks.setClassTimes.mockImplementation(async (courseId: string, times: unknown[]) => ({ ok: true, data: times.map((t, i) => ({ id: `${courseId}-${i}`, courseId })) }))
+  localStorage.clear()
   delete document.documentElement.dataset.studentOsExtension
   window.scrollTo = vi.fn()
 })
@@ -156,7 +174,7 @@ describe("connecting through the extension", () => {
     expect(await screen.findByRole("heading", { name: "Sync your Canvas courses" })).toBeTruthy()
   })
 
-  it("waits for the first sync, then 'Your courses are in!' and the Dashboard", async () => {
+  it("waits for the first sync, then 'Your courses are in!' and (no course needing class times) the Dashboard", async () => {
     document.documentElement.dataset.studentOsExtension = "0.1.0"
     const user = userEvent.setup()
     render(<OnboardingFlow />)
@@ -182,5 +200,78 @@ describe("connecting through the extension", () => {
     await user.click(screen.getByRole("button", { name: "Connect Canvas" }))
     await user.click(await screen.findByRole("button", { name: "I'll do this later" }))
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"))
+  })
+})
+
+const COURSES = [
+  { id: "c1", code: "CSC 215", name: "Data Structures", professor: "Dr. Lee", description: "", color: "sky" },
+  { id: "c2", code: "MAT 141", name: "Calculus I", professor: "", description: "", color: "rose" },
+]
+
+describe("class times, one course at a time", () => {
+  async function synced(user: ReturnType<typeof userEvent.setup>) {
+    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    mocks.reloadCourses.mockResolvedValue(COURSES)
+    mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 2 } })
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    await user.click(screen.getByRole("button", { name: "Connect Canvas" }))
+    await screen.findByRole("heading", { name: "Add your class times" }, { timeout: 5000 })
+  }
+
+  it("after the sync: each course in turn; days (several a week), times and room are saved", async () => {
+    const user = userEvent.setup()
+    await synced(user)
+    expect(screen.getByText("Course 1 of 2")).toBeTruthy()
+    expect(screen.getByText("Data Structures")).toBeTruthy()
+    await user.click(screen.getByRole("button", { name: "Mon" }))
+    await user.click(screen.getByRole("button", { name: "Wed" }))
+    await user.click(screen.getByRole("button", { name: "Fri" }))
+    await user.type(screen.getByLabelText(/Room/), "Tator Hall 120")
+    // A lab on Tuesday too.
+    await user.click(screen.getByRole("button", { name: /Add another time/ }))
+    await user.click(screen.getAllByRole("button", { name: "Tue" })[1])
+    await user.click(screen.getByRole("button", { name: "Save and next" }))
+
+    expect(mocks.setClassTimes).toHaveBeenCalledWith(
+      "c1",
+      [
+        { daysOfWeek: [1, 3, 5], startTime: "09:00", endTime: "09:50", location: "Tator Hall 120", startDate: "2026-09-25", endDate: "2026-12-20" },
+        { daysOfWeek: [2], startTime: "09:00", endTime: "09:50", startDate: "2026-09-25", endDate: "2026-12-20" },
+      ],
+      { quiet: true }
+    )
+    expect(await screen.findByText("Course 2 of 2")).toBeTruthy()
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it("no day picked: explains, and nothing is saved", async () => {
+    const user = userEvent.setup()
+    await synced(user)
+    await user.click(screen.getByRole("button", { name: "Save and next" }))
+    expect(screen.getByRole("alert").textContent).toMatch(/Pick at least one day/)
+    expect(mocks.setClassTimes).not.toHaveBeenCalled()
+  })
+
+  it("Skip warns that the course won't be on the calendar; 'Add times' goes back, 'Skip anyway' moves on; then the Dashboard", async () => {
+    const user = userEvent.setup()
+    await synced(user)
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    const warning = await screen.findByRole("alertdialog")
+    expect(warning.textContent).toMatch(/Skip class times for CSC 215\?/)
+    expect(warning.textContent).toMatch(/won.t be on your calendar, and the Planner may schedule study time/)
+    await user.click(screen.getByRole("button", { name: "Add times" }))
+    expect(screen.getByText("Course 1 of 2")).toBeTruthy()
+
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    await user.click(await screen.findByRole("button", { name: "Skip anyway" }))
+    expect(await screen.findByText("Course 2 of 2")).toBeTruthy()
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    await user.click(await screen.findByRole("button", { name: "Skip anyway" }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"))
+    expect(mocks.completeOnboarding).toHaveBeenCalledOnce()
+    expect(mocks.setClassTimes).not.toHaveBeenCalled()
+    // Answered: the Dashboard notice won't ask about them again.
+    expect(JSON.parse(localStorage.getItem("student-os:class-times-asked") ?? "[]")).toEqual(["c1", "c2"])
   })
 })

@@ -211,6 +211,20 @@ export const onboardingDetailsSchema = z.object({
     .max(30),
 })
 
+// A course's class times, saved together (they replace the course's previous ones).
+export const classTimeSchema = z
+  .object({
+    daysOfWeek: commitmentFields.shape.daysOfWeek,
+    startTime: timeOfDay,
+    endTime: timeOfDay,
+    location: z.string().trim().max(100, "Keep the room under 100 characters.").optional(),
+    startDate: dateKey.optional(),
+    endDate: dateKey.optional(),
+  })
+  .refine(endAfterStart, endAfterStartIssue)
+  .refine(datesInOrder, datesInOrderIssue)
+export const classTimesSchema = z.array(classTimeSchema).max(10, "A course can have up to 10 class times.")
+
 // One weekly commitment as entered in a form (no id yet).
 export const commitmentInputSchema = commitmentFields
   .refine(endAfterStart, endAfterStartIssue)

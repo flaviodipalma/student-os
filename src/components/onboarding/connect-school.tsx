@@ -190,7 +190,7 @@ export function SyncTutorial({ provider, onSynced }: { provider: LmsProviderId; 
         {courses ? (
           <>
             <CheckIcon aria-hidden className="size-4" />
-            Your courses are in! {courses} {courses === 1 ? "course" : "courses"} from {name}. Opening your dashboard…
+            Your courses are in! {courses} {courses === 1 ? "course" : "courses"} from {name}.
           </>
         ) : (
           <>

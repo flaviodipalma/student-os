@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { FileUpIcon } from "lucide-react"
 import { PageHeader } from "@/components/app-shell/page-header"
+import { ClassTimesNotice } from "@/components/courses/class-times"
 import { CourseGrid } from "@/components/courses/course-grid"
 import { NewCourseButton } from "@/components/courses/new-course-button"
 import { buttonVariants } from "@/components/ui/button"
@@ -27,7 +28,10 @@ export default function CoursesPage() {
           </div>
         }
       />
-      <CourseGrid />
+      <div className="space-y-4">
+        <ClassTimesNotice />
+        <CourseGrid />
+      </div>
     </>
   )
 }

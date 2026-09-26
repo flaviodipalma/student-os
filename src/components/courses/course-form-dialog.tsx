@@ -13,12 +13,17 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { checkDraft, ClassTimesFields, draftFrom } from "./class-times"
+import { useAppStore } from "@/lib/app-store"
+import { markCoursesAsked } from "@/lib/class-times-asked"
 import { useCourses } from "@/lib/course-store"
+import { useFeedback } from "@/lib/feedback"
 import { normalizeCourseCode } from "@/lib/syllabus/duplicates"
 import type { Course } from "@/lib/types"
 import { courseFields } from "@/lib/validation"
 
-// Create a course (no `course`) or edit one (pass `course`).
+// Create a course (no `course`), with its class times, or edit one (pass `course`;
+// its class times are edited on the course page).
 export function CourseFormDialog({
   open,
   onOpenChange,
@@ -45,6 +50,9 @@ export function CourseFormDialog({
 
 function CourseForm({ course, onDone }: { course?: Course; onDone: () => void }) {
   const { courses, addCourse, updateCourse } = useCourses()
+  const { today, setClassTimes } = useAppStore()
+  const { showError } = useFeedback()
+  const [classTimes, setClassTimesDraft] = useState(() => draftFrom([], today))
   const [code, setCode] = useState(course?.code ?? "")
   const [name, setName] = useState(course?.name ?? "")
   const [professor, setProfessor] = useState(course?.professor ?? "")
@@ -66,12 +74,24 @@ function CourseForm({ course, onDone }: { course?: Course; onDone: () => void })
       (other) => other.id !== course?.id && normalizeCourseCode(other.code) === normalizeCourseCode(code)
     )
     if (clash) return fields.set("code", `You already have a course with the code ${clash.code}.`)
+    const checkedTimes = checkDraft(classTimes, today)
+    if (!course && !checkedTimes.ok) return setError(checkedTimes.error)
     setError(null)
 
     const input = parsed.data
     if (course) updateCourse(course.id, input)
-    else addCourse(input)
+    else void addWithClassTimes(input, checkedTimes.ok ? checkedTimes.times : [])
     onDone()
+  }
+
+  async function addWithClassTimes(input: Parameters<typeof addCourse>[0], times: Parameters<typeof setClassTimes>[1]) {
+    const saved = await addCourse(input)
+    if (!saved) return
+    // The class times question was answered here (with or without times).
+    markCoursesAsked([saved.id])
+    if (times.length === 0) return
+    const result = await setClassTimes(saved.id, times, { quiet: true })
+    if (!result.ok) showError(`The course was added, but its class times weren't saved: ${result.error}`)
   }
 
   return (
@@ -112,6 +132,18 @@ function CourseForm({ course, onDone }: { course?: Course; onDone: () => void })
           onChange={(e) => setDescription(e.target.value)}
         />
       </Field>
+      {!course && (
+        <div className="grid gap-2">
+          <p className="text-sm font-medium">
+            Class times <span className="font-normal text-muted-foreground">(optional)</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            When the class meets each week. Without them, the course isn&apos;t on your calendar and the Planner may
+            schedule study time during class.
+          </p>
+          <ClassTimesFields id="course-form-class-times" value={classTimes} onChange={setClassTimesDraft} />
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-sm font-medium text-destructive">
           {error}

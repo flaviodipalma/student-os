@@ -30,6 +30,8 @@ export function commitmentsOn(commitments: RecurringCommitment[], date: string):
       endTime: commitment.endTime,
       type: commitment.type,
       description: commitment.description,
+      ...(commitment.courseId ? { courseId: commitment.courseId } : {}),
+      ...(commitment.location ? { location: commitment.location } : {}),
     }))
 }
 
