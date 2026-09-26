@@ -45,6 +45,62 @@ describe("isCurrent", () => {
     const [openEnded] = courseOptions([{ id: 9, name: "Lab", start_at: "2026-09-01T00:00:00Z" }])
     expect(isCurrent(openEnded, NOW)).toBe(true)
   })
+
+  it("a term with no end date is only current if it started within about a semester (not last year's)", () => {
+    const [fall2026, fall2025] = courseOptions([
+      { id: 20, name: "Operating Systems", term: { id: 12, name: "Fall 2026", start_at: "2026-08-25T04:00:00Z", end_at: null } },
+      { id: 21, name: "Discrete Math", term: { id: 8, name: "Fall 2025", start_at: "2025-08-25T04:00:00Z", end_at: null } },
+    ])
+    expect(isCurrent(fall2026, NOW)).toBe(true)
+    expect(isCurrent(fall2025, NOW)).toBe(false)
+    // Same with only the course's own start date.
+    const [oldCourse] = courseOptions([{ id: 22, name: "Old", start_at: "2025-08-25T04:00:00Z" }])
+    expect(isCurrent(oldCourse, NOW)).toBe(false)
+    // Only an end date: current if it ends within about a semester.
+    const [endsSoon, endsLater] = courseOptions([
+      { id: 23, name: "A", end_at: "2026-12-15T00:00:00Z" },
+      { id: 24, name: "B", end_at: "2028-05-15T00:00:00Z" },
+    ])
+    expect(isCurrent(endsSoon, NOW)).toBe(true)
+    expect(isCurrent(endsLater, NOW)).toBe(false)
+  })
+
+  it("terms kept open long after they end (this school's real dates): only the latest is current", () => {
+    const options = courseOptions([
+      { id: 30, name: "Organization", term: { id: 1, name: "Organizations", start_at: null, end_at: null } },
+      { id: 31, name: "Operating Systems", term: { id: 12, name: "Fall 2026", start_at: "2026-08-17T04:00:00Z", end_at: "2027-12-13T04:00:00Z" }, start_at: "2026-08-24T04:00:00Z", end_at: null },
+      { id: 32, name: "Discrete Math", term: { id: 8, name: "Fall 2025", start_at: "2025-08-18T04:00:00Z", end_at: "2026-12-14T04:00:00Z" }, start_at: "2025-08-25T04:00:00Z", end_at: null },
+    ])
+    expect(groupByTerm(options, NOW).map((g) => [g.name, g.current])).toEqual([
+      ["Fall 2026", true],
+      ["Fall 2025", false],
+      ["Organizations", false],
+    ])
+    expect([...initialSelection(options, null, NOW).selected]).toEqual(["31"])
+    // A new Fall 2025 course showing up later isn't checked either.
+    const later = initialSelection([...options, { ...options[2], id: "33" }], { selected: ["31"], seen: ["30", "31", "32"] }, NOW)
+    expect([...later.selected]).toEqual(["31"])
+  })
+
+  it("a session that started a few weeks after the full term is current together with it", () => {
+    const options = courseOptions([
+      { id: 40, name: "Full term", term: { id: 12, name: "Fall 2026", start_at: "2026-08-25T04:00:00Z", end_at: "2026-12-20T05:00:00Z" } },
+      { id: 41, name: "Second half", term: { id: 13, name: "Fall 2026 Session 2", start_at: "2026-09-20T04:00:00Z", end_at: "2026-12-20T05:00:00Z" } },
+    ])
+    expect([...initialSelection(options, null, NOW).selected].sort()).toEqual(["40", "41"])
+  })
+
+  it("the picker: only Fall 2026 is marked current, and only its courses start checked", () => {
+    const options = courseOptions([
+      { id: 20, name: "Operating Systems", term: { id: 12, name: "Fall 2026", start_at: "2026-08-25T04:00:00Z", end_at: null } },
+      { id: 21, name: "Discrete Math", term: { id: 8, name: "Fall 2025", start_at: "2025-08-25T04:00:00Z", end_at: null } },
+    ])
+    expect(groupByTerm(options, NOW).map((g) => [g.name, g.current])).toEqual([
+      ["Fall 2026", true],
+      ["Fall 2025", false],
+    ])
+    expect([...initialSelection(options, null, NOW).selected]).toEqual(["20"])
+  })
 })
 
 describe("groupByTerm", () => {

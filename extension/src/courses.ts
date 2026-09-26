@@ -47,13 +47,41 @@ export function courseOptions(courses: Record<string, unknown>[]): CourseOption[
   })
 }
 
+// About a semester: how far a date can be from today when the other one is missing.
+const SEMESTER_MS = 183 * 24 * 60 * 60 * 1000
+
 // Current: today is within the term's dates, or (no term dates) the course's own.
-// Unknown dates are never "current".
+// Unknown dates are never "current". With only one date known (schools often leave
+// an old term's end date empty), it has to be within about a semester of today:
+// a term that started more than ~6 months ago and never "ended" is an old one.
 export function isCurrent(option: CourseOption, now: number): boolean {
   const start = option.term?.start ?? option.start
   const end = option.term?.end ?? option.end
   if (start === null && end === null) return false
-  return (start === null || start <= now) && (end === null || now <= end)
+  if (end === null) return start! <= now && now - start! <= SEMESTER_MS
+  if (start === null) return now <= end && end - now <= SEMESTER_MS
+  return start <= now && now <= end
+}
+
+// Some schools keep terms open long after they end (e.g. Fall 2025 "ends" in
+// December 2026, so students keep access), so several terms can include today.
+// Only the latest one is the current semester, with any that started up to ~4
+// months before it (e.g. a first-half session): the courses returned here.
+const OVERLAP_MS = 120 * 24 * 60 * 60 * 1000
+
+export function currentCourseIds(options: CourseOption[], now: number): Set<string> {
+  const candidates = options.filter((option) => isCurrent(option, now))
+  const startOf = (option: CourseOption) => option.term?.start ?? option.start
+  const starts = candidates.map(startOf).filter((start): start is number => start !== null)
+  const latest = starts.length > 0 ? Math.max(...starts) : null
+  return new Set(
+    candidates
+      .filter((option) => {
+        const start = startOf(option)
+        return start === null || latest === null || latest - start <= OVERLAP_MS
+      })
+      .map((option) => option.id)
+  )
 }
 
 // Grouped by term: current semester first, then newest to oldest, then courses
@@ -61,6 +89,7 @@ export function isCurrent(option: CourseOption, now: number): boolean {
 export function groupByTerm(options: CourseOption[], now: number): TermGroup[] {
   const groups = new Map<string, TermGroup>()
   const starts = new Map<string, number>()
+  const current = currentCourseIds(options, now)
   for (const option of options) {
     const key = option.term?.key ?? "none"
     let group = groups.get(key)
@@ -71,7 +100,7 @@ export function groupByTerm(options: CourseOption[], now: number): TermGroup[] {
       starts.set(key, option.term?.start ?? option.start ?? -Infinity)
     }
     group.courses.push(option)
-    if (isCurrent(option, now)) group.current = true
+    if (current.has(option.id)) group.current = true
   }
   return [...groups.values()].sort((a, b) => {
     if (a.current !== b.current) return a.current ? -1 : 1
@@ -89,10 +118,11 @@ export function initialSelection(
   saved: CourseChoice | null,
   now: number
 ): { selected: Set<string>; needsReview: boolean } {
-  if (!saved) return { selected: new Set(options.filter((o) => isCurrent(o, now)).map((o) => o.id)), needsReview: true }
+  const current = currentCourseIds(options, now)
+  if (!saved) return { selected: current, needsReview: true }
   const seen = new Set(saved.seen)
   const unseen = options.filter((o) => !seen.has(o.id))
   const selected = new Set(saved.selected.filter((id) => options.some((o) => o.id === id)))
-  for (const option of unseen) if (isCurrent(option, now)) selected.add(option.id)
+  for (const option of unseen) if (current.has(option.id)) selected.add(option.id)
   return { selected, needsReview: unseen.length > 0 }
 }
