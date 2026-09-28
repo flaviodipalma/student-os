@@ -4,8 +4,10 @@ import { useEffect, useRef } from "react"
 import { RepeatIcon } from "lucide-react"
 import { formatTime, formatWeekday, fromDateKey } from "@/lib/format"
 import { eventTypeLabel, eventsOn, layoutDay, toMinutes } from "@/lib/events"
+import { academicKindLabel, type AcademicDayItem } from "@/lib/academic-calendar"
 import { eventSourceNames, type CalendarEvent } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { academicKindStyle } from "./academic-style"
 import { eventStyle } from "./event-style"
 
 const HOUR_PX = 52
@@ -27,9 +29,12 @@ export function TimeGrid({
   onSelectDay,
   onSelectSlot,
   onSelectEvent,
+  allDay,
 }: {
   days: string[]
   events: CalendarEvent[]
+  // The academic calendar's items per day (breaks, exams, a semester's first and last day).
+  allDay?: (date: string) => AcademicDayItem[]
   today: string
   nowMinutes: number
   onSelectDay?: (date: string) => void
@@ -100,6 +105,28 @@ export function TimeGrid({
               </div>
             )
           })}
+          {/* All-day row: only when one of the days has something. */}
+          {allDay && days.some((date) => allDay(date).length > 0) && (
+            <>
+              <div className="sticky left-0 z-10 flex items-start justify-end bg-card pt-1.5 pr-2 text-[11px] text-muted-foreground">
+                All day
+              </div>
+              {days.map((date) => (
+                <ul key={date} aria-label={`All day, ${formatWeekday(fromDateKey(date))}`} className="grid content-start gap-1 border-l p-1">
+                  {allDay(date).map((item) => (
+                    <li
+                      key={item.id}
+                      title={`${academicKindLabel[item.kind]}: ${item.label}`}
+                      className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-medium", academicKindStyle[item.kind])}
+                    >
+                      <span className="sr-only">{academicKindLabel[item.kind]}: </span>
+                      {item.label}
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Hours and events */}

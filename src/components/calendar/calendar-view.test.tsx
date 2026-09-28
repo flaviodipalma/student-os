@@ -22,6 +22,7 @@ vi.mock("@/lib/app-store", () => ({
     const items = () => [...state.events, ...externalEventsAsCalendarItems(state.externalEvents, NY)]
     return {
       externalEvents: state.externalEvents,
+      academicEvents: [],
       timeZone: NY,
       setExternalEventHidden: state.setExternalEventHidden,
       scheduleBetween: (from: string, to: string) => scheduleBetween(items(), [], from, to),

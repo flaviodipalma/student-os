@@ -11,6 +11,7 @@ import { events as eventsTable, externalCalendarEvents, notifications, studySess
 import { AppError, ValidationError } from "../errors"
 import { createTestDb } from "../test-utils/test-db"
 import { loadAppData } from "../services/app-data"
+import { replaceAcademicEvents } from "../services/academic-calendar"
 import { createCourse } from "../services/courses"
 import { createEvent } from "../services/events"
 import { savePreferences } from "../services/preferences"
@@ -209,6 +210,24 @@ describe("read tools: answers come from Student OS and the Planner", () => {
     const { json } = call(ctx, "getNotifications")
     expect(json.reminders[0].reason).toBe("Sent 30 minutes before the task's due time (the student's reminder setting).")
     expect(json.reminders[0].relatedTask.title).toBe("Psychology Reading")
+  })
+
+  it("the academic calendar: the current semester and what's coming (none yet: says where to add it)", async () => {
+    expect(call(await contextFor(), "getAcademicCalendar").json).toMatchObject({ calendar: "none", note: expect.stringMatching(/Settings > Academic calendar/) })
+    const sam = await t.addUser("Sam")
+    await replaceAcademicEvents(t.db, sam, [
+      { kind: "term", title: "Fall 2026", startDate: "2026-08-24", endDate: "2026-12-12", term: "Fall 2026" },
+      { kind: "no_classes", title: "Labor Day", startDate: "2026-09-07", endDate: "2026-09-07", term: "Fall 2026" },
+      { kind: "no_classes", title: "Thanksgiving recess", startDate: "2026-11-23", endDate: "2026-11-28", term: "Fall 2026" },
+      { kind: "exams", title: "Final examination period", startDate: "2026-12-07", endDate: "2026-12-12", term: "Fall 2026" },
+      { kind: "no_classes", title: "Spring recess", startDate: "2027-03-15", endDate: "2027-03-20", term: "Spring 2027" },
+    ])
+    const { json } = call(await contextFor(sam), "getAcademicCalendar")
+    expect(json.currentSemester).toMatchObject({ name: "Fall 2026" })
+    const titles = json.dates.map((d: { title: string }) => d.title)
+    // From today on: Labor Day (past) is left out; spring recess is within 6 months.
+    expect(titles).toEqual(["Fall 2026", "Thanksgiving recess", "Final examination period", "Spring recess"])
+    expect(json.dates[1]).toMatchObject({ kind: "No classes", semester: "Fall 2026" })
   })
 
   it("preferences and courses (no professor = null, not a guess)", async () => {

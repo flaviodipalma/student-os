@@ -30,11 +30,18 @@ import {
   updatePreferencesAction,
   updateProfileAction,
 } from "@/app/actions/settings"
+import {
+  confirmAcademicCalendarAction,
+  createAcademicEventAction,
+  deleteAcademicEventAction,
+  updateAcademicEventAction,
+} from "@/app/actions/academic-calendar"
 import { setExternalEventHiddenAction } from "@/app/actions/integrations"
 import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { sessionsAsCalendarItems } from "@/lib/calendar-items"
+import { sortAcademicEvents, withAcademicCalendar } from "@/lib/academic-calendar"
 import { withCourseTitles } from "@/lib/class-times"
 import { pickCourseColor } from "@/lib/course-colors"
 import { useNow } from "@/lib/clock"
@@ -43,6 +50,8 @@ import { toDateKey } from "@/lib/format"
 import { scheduleBetween } from "@/lib/recurring"
 import {
   DEFAULT_LEARNING_SETTINGS,
+  type AcademicEvent,
+  type AcademicEventInput,
   type CalendarEvent,
   type ClassTimeInput,
   type Course,
@@ -89,6 +98,15 @@ type AppStore = {
   recurringCommitments: RecurringCommitment[]
   // Read-only copies of Canvas / Blackboard calendar events (hidden ones included).
   externalEvents: ExternalEventRecord[]
+  // The school's semesters, breaks, exams and deadlines (sorted by date). Class times
+  // skip the days without classes.
+  academicEvents: AcademicEvent[]
+  addAcademicEvent: (input: AcademicEventInput) => Promise<ActionResult<AcademicEvent>>
+  updateAcademicEvent: (id: string, input: AcademicEventInput) => Promise<ActionResult<AcademicEvent>>
+  deleteAcademicEvent: (id: string) => void
+  // The student confirmed a calendar (from their school's website, a link or a PDF):
+  // it replaces the whole academic calendar.
+  replaceAcademicCalendar: (events: AcademicEventInput[]) => Promise<ActionResult<AcademicEvent[]>>
   // The student's time zone (external events are shown at local times in it).
   timeZone: string | undefined
   // Events, visible external events and study sessions as calendar items (one-time things).
@@ -195,7 +213,11 @@ export function AppStoreProvider({
   const [preferences, setPreferences] = useState(initial.preferences)
   const [learning, setLearning] = useState(initial.learning ?? DEFAULT_LEARNING_SETTINGS)
   const [savedCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
-  const recurringCommitments = useMemo(() => withCourseTitles(savedCommitments, courses), [savedCommitments, courses])
+  const [academicEvents, setAcademicEvents] = useState(() => sortAcademicEvents(initial.academicEvents ?? []))
+  const recurringCommitments = useMemo(
+    () => withAcademicCalendar(withCourseTitles(savedCommitments, courses), academicEvents),
+    [savedCommitments, courses, academicEvents]
+  )
   const [externalEvents, setExternalEvents] = useState(initial.externalEvents ?? [])
 
   // Awaits a server action; runs onOk with the saved record (and confirms with
@@ -243,6 +265,7 @@ export function AppStoreProvider({
     events,
     studySessions,
     externalEvents,
+    academicEvents,
     timeZone,
     calendarItems,
     scheduleBetween: (from, to) => scheduleBetween(calendarItems, recurringCommitments, from, to),
@@ -300,6 +323,44 @@ export function AppStoreProvider({
       )
       return ok
     },
+    // ---- Academic calendar
+    addAcademicEvent: async (input) => {
+      const result = await call(createAcademicEventAction({ ...input, id: crypto.randomUUID() }))
+      if (result.ok) {
+        setAcademicEvents((prev) => sortAcademicEvents([...prev, result.data]))
+        showSuccess("Added to your academic calendar.")
+      }
+      return result
+    },
+    updateAcademicEvent: async (id, input) => {
+      const result = await call(updateAcademicEventAction(id, input))
+      if (result.ok) {
+        setAcademicEvents((prev) => sortAcademicEvents(replaceById(prev, result.data)))
+        showSuccess("Academic calendar updated.")
+      }
+      return result
+    },
+    deleteAcademicEvent: (id) => {
+      const before = academicEvents.find((event) => event.id === id)
+      if (!before) return
+      setAcademicEvents((prev) => withoutId(prev, id))
+      save(
+        deleteAcademicEventAction(id),
+        () => {},
+        () => setAcademicEvents((prev) => sortAcademicEvents([...prev, before])),
+        "Removed from your academic calendar."
+      )
+    },
+
+    replaceAcademicCalendar: async (events) => {
+      const result = await call(confirmAcademicCalendarAction(events))
+      if (result.ok) {
+        setAcademicEvents(sortAcademicEvents(result.data))
+        showSuccess("Academic calendar saved. Your classes follow it now.")
+      }
+      return result
+    },
+
     bulkUpdateCourses: async (ids, change) => {
       const count = `${ids.length} ${ids.length === 1 ? "course" : "courses"}`
       const selected = new Set(ids)

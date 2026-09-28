@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
-// The School field: type a few letters ("q") and matching schools appear (names
-// starting with them first; the list is on the server). Pick one, or keep what you
-// typed ("Use …"). An accessible combobox: arrow keys move, Enter picks, Escape closes.
+// The School field (required): type a few letters ("q") and matching schools appear
+// (names starting with them first; the list is on the server). Pick one, or keep what
+// you typed ("Use …"). An accessible combobox: arrow keys move, Enter picks, Escape
+// closes. Under it, the school's website: it comes with a school from the list, and
+// is asked for otherwise (Student OS finds the academic calendar there).
 
 export type SchoolValue = { schoolName: string; schoolDomain: string | null }
 type Suggestion = { name: string; domain: string | null; country: string }
@@ -29,6 +31,8 @@ export function SchoolField({ value, onChange }: { value: SchoolValue; onChange:
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [active, setActive] = useState(-1)
+  // Typing the website (a school not in the list, or "Change").
+  const [editingSite, setEditingSite] = useState(!value.schoolDomain)
   const latest = useRef(0)
   const text = value.schoolName
 
@@ -57,15 +61,14 @@ export function SchoolField({ value, onChange }: { value: SchoolValue; onChange:
   const choose = (option: (typeof options)[number]) => {
     if (option.kind === "school") onChange({ schoolName: option.school.name, schoolDomain: option.school.domain })
     else onChange({ schoolName: typed, schoolDomain: null })
+    setEditingSite(option.kind === "typed" || !option.school.domain)
     setOpen(false)
     setActive(-1)
   }
 
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={inputId}>
-        School<span className="font-normal text-muted-foreground">(optional)</span>
-      </Label>
+      <Label htmlFor={inputId}>School</Label>
       <div className="relative">
         <Input
           id={inputId}
@@ -80,6 +83,7 @@ export function SchoolField({ value, onChange }: { value: SchoolValue; onChange:
           onChange={(e) => {
             // Typed text is a school of its own until one is picked from the list.
             onChange({ schoolName: e.target.value, schoolDomain: null })
+            setEditingSite(true)
             setOpen(true)
             if (!e.target.value.trim()) setSuggestions([])
           }}
@@ -140,6 +144,32 @@ export function SchoolField({ value, onChange }: { value: SchoolValue; onChange:
           </ul>
         )}
       </div>
+      {typed &&
+        (editingSite || !value.schoolDomain ? (
+          <div className="mt-2 grid gap-1.5">
+            <Label htmlFor={`${id}-site`}>School website</Label>
+            <Input
+              id={`${id}-site`}
+              inputMode="url"
+              autoComplete="off"
+              placeholder="e.g. qu.edu"
+              value={value.schoolDomain ?? ""}
+              onChange={(e) => onChange({ schoolName: value.schoolName, schoolDomain: e.target.value || null })}
+            />
+            <p className="text-xs text-muted-foreground">Student OS finds your school&apos;s academic calendar there.</p>
+          </div>
+        ) : (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            Website: {value.schoolDomain}
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center rounded-md px-1.5 font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              onClick={() => setEditingSite(true)}
+            >
+              Change
+            </button>
+          </p>
+        ))}
     </div>
   )
 }

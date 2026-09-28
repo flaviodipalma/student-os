@@ -12,7 +12,8 @@ vi.mock("@/app/actions/auth", () => ({
   logOutAction: vi.fn(),
 }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
-vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({ student: { firstName: "Alex", lastName: "Kim" } }) }))
+vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({
+    academicEvents: [], student: { firstName: "Alex", lastName: "Kim" } }) }))
 
 const { SocialButtons } = await import("@/components/auth/social-buttons")
 const { AccountCard } = await import("./account-card")

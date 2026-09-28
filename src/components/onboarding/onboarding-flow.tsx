@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { BookOpenIcon, CheckIcon, CircleAlertIcon, FileUpIcon, GraduationCapIcon } from "lucide-react"
+import { BookOpenIcon, CheckIcon, CircleAlertIcon, FileUpIcon, GraduationCapIcon, Loader2Icon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
 import { ClassTimesSteps } from "@/components/courses/class-times"
+import { AcademicCalendarReview, readCalendar } from "@/components/settings/academic-calendar-finder"
 import { CourseFormDialog } from "@/components/courses/course-form-dialog"
 import { CommitmentsEditor, type EditableCommitment } from "@/components/preferences/commitments-editor"
 import { ProfileFields } from "@/components/preferences/profile-fields"
@@ -16,7 +17,15 @@ import { OnboardingIntro } from "./onboarding-intro"
 import { useAppStore } from "@/lib/app-store"
 import { useAskedCourseIds } from "@/lib/class-times-asked"
 import { DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
-import { lmsProviderNames, type Course, type LmsProviderId, type ProfileInput, type RecurringCommitment, type StudentPreferences } from "@/lib/types"
+import {
+  lmsProviderNames,
+  type Course,
+  type LmsProviderId,
+  type ProfileInput,
+  type ReadCalendarResponse,
+  type RecurringCommitment,
+  type StudentPreferences,
+} from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 
@@ -25,8 +34,10 @@ import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 // 1-3 are saved together when leaving step 3 (so they survive a reload). Step 4
 // brings in courses: connect Canvas or Blackboard through the browser extension
 // (get it, then a short tutorial that waits for the first sync), or, skipping
-// that, a syllabus or courses added by hand. Then each new course's class times,
-// one course at a time (skippable, with a warning). Reaching the Dashboard marks
+// that, a syllabus or courses added by hand. Then the school's academic calendar
+// (looked for on its website from the moment steps 1-3 are saved, to be checked and
+// saved), and each new course's class times, one course at a time (skippable, with a
+// warning). Reaching the Dashboard marks
 // onboarding complete. Uses the same fields, validation and server actions as the
 // Settings page.
 
@@ -46,6 +57,7 @@ type CourseView =
   | { kind: "extension"; provider: LmsProviderId }
   | { kind: "tutorial"; provider: LmsProviderId }
   | { kind: "manual" }
+  | { kind: "academicCalendar"; courses: Course[] }
   | { kind: "classTimes"; courses: Course[] }
 
 // Courses still without class times that the student wasn't asked about yet.
@@ -60,6 +72,12 @@ function courseHeading(view: CourseView): { title: string; description: string }
   }
   if (view.kind === "tutorial") {
     return { title: `Sync your ${lmsProviderNames[view.provider]} courses`, description: "Three quick steps. This page continues on its own." }
+  }
+  if (view.kind === "academicCalendar") {
+    return {
+      title: "Your academic calendar",
+      description: "Your school's semesters, breaks and exams. Your classes will skip the days without classes.",
+    }
   }
   if (view.kind === "classTimes") {
     return { title: "Add your class times", description: "When each class meets, so it's on your calendar and the Planner keeps it free." }
@@ -89,6 +107,10 @@ export function OnboardingFlow() {
   const [courseDialogOpen, setCourseDialogOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const asked = useAskedCourseIds()
+  // The academic calendar, looked for on the school's website in the background.
+  // result null = still looking.
+  const [calendar, setCalendar] = useState<{ domain: string; result: ReadCalendarResponse | null } | null>(null)
+  const [calendarDone, setCalendarDone] = useState(false)
 
   const go = (to: number) => {
     setError(null)
@@ -129,7 +151,18 @@ export function OnboardingFlow() {
     setBusy(false)
     if (!result.ok) return setError(result.error)
     setCommitments(result.data.recurringCommitments.filter((commitment) => !commitment.courseId)) // now with their saved ids
+    lookForCalendar(result.data.student.schoolDomain)
     go(3)
+  }
+
+  // Starts looking for the school's academic calendar (once per school; not when the
+  // student already has one). The answer waits until the courses step is done.
+  function lookForCalendar(domain: string | null) {
+    if (!domain || store.academicEvents.length > 0 || calendar?.domain === domain) return
+    setCalendar({ domain, result: null })
+    void readCalendar({ mode: "school" }, store.today).then((result) =>
+      setCalendar((current) => (current?.domain === domain ? { domain, result } : current))
+    )
   }
 
   const finish = useCallback(async () => {
@@ -161,14 +194,30 @@ export function OnboardingFlow() {
     },
     [store.recurringCommitments, asked, finish]
   )
-  // The first sync is in: a moment to see "Your courses are in!", then their class times.
+  // After the courses step, whichever way it went: the academic calendar (if it was
+  // found, or is still being looked for), then class times, then the Dashboard.
+  const found = calendar?.result?.ok && calendar.result.proposal.status === "found"
+  const wrapUp = (courses: Course[]) => {
+    if (!calendarDone && calendar && (calendar.result === null || found)) {
+      setError(null)
+      setCourseView({ kind: "academicCalendar", courses })
+      window.scrollTo({ top: 0 })
+      return
+    }
+    askClassTimesOrFinish(courses)
+  }
+  // The latest wrapUp, for the delayed call below.
+  const wrapUpRef = useRef(wrapUp)
+  useEffect(() => {
+    wrapUpRef.current = wrapUp
+  })
+  // The first sync is in: a moment to see "Your courses are in!", then the calendar and class times.
   const onSynced = useCallback(() => {
     setTimeout(async () => {
       const courses = await store.reloadCourses()
-      if (courses) askClassTimesOrFinish(courses)
-      else void finish()
+      wrapUpRef.current(courses ?? [])
     }, 1500)
-  }, [store, askClassTimesOrFinish, finish])
+  }, [store])
 
   const current = step === 3 ? courseHeading(courseView) : steps[step]
 
@@ -231,11 +280,21 @@ export function OnboardingFlow() {
                 showCourses({ kind: "manual" })
                 setCourseDialogOpen(true)
               }}
-              onSkip={() => void finish()}
+              onSkip={() => wrapUp(store.courses)}
             />
           )}
           {step === 3 && courseView.kind === "extension" && <GetExtension provider={courseView.provider} onInstalled={onInstalled} />}
           {step === 3 && courseView.kind === "tutorial" && <SyncTutorial provider={courseView.provider} onSynced={onSynced} />}
+          {step === 3 && courseView.kind === "academicCalendar" && (
+            <CalendarStep
+              domain={calendar?.domain ?? ""}
+              result={calendar?.result ?? null}
+              onDone={() => {
+                setCalendarDone(true)
+                askClassTimesOrFinish(courseView.courses)
+              }}
+            />
+          )}
           {step === 3 && courseView.kind === "classTimes" && (
             <ClassTimesSteps courses={courseView.courses} onDone={() => void finish()} />
           )}
@@ -264,7 +323,7 @@ export function OnboardingFlow() {
           </p>
         )}
 
-        {!importing && courseView.kind !== "classTimes" && (
+        {!importing && courseView.kind !== "classTimes" && courseView.kind !== "academicCalendar" && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
             {/* No "Back" on the first step (there's nothing to go back to). */}
             {step > 0 ? (
@@ -298,12 +357,12 @@ export function OnboardingFlow() {
                 </Button>
               )}
               {step === 3 && (courseView.kind === "extension" || courseView.kind === "tutorial") && (
-                <Button variant="ghost" onClick={() => void finish()} disabled={busy}>
+                <Button variant="ghost" onClick={() => wrapUp(store.courses)} disabled={busy}>
                   I&apos;ll do this later
                 </Button>
               )}
               {step === 3 && courseView.kind === "manual" && (
-                <Button onClick={() => askClassTimesOrFinish(store.courses)} disabled={busy}>
+                <Button onClick={() => wrapUp(store.courses)} disabled={busy}>
                   {busy ? "Finishing…" : store.courses.length === 0 ? "Skip and finish" : "Finish setup"}
                 </Button>
               )}
@@ -400,6 +459,48 @@ function OptionCard({
       <p className="mt-1 flex-1 text-sm text-muted-foreground">{description}</p>
       <Button variant="outline" className="mt-4 w-fit" onClick={onClick}>
         {action}
+      </Button>
+    </div>
+  )
+}
+
+// The academic calendar during setup: still looking (with a way to skip), found (check
+// and save it), or not found (it can be added later in Settings).
+function CalendarStep({ domain, result, onDone }: { domain: string; result: ReadCalendarResponse | null; onDone: () => void }) {
+  if (result === null) {
+    return (
+      <div className="grid gap-4">
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
+          Looking for your academic calendar on {domain}… This can take up to a minute.
+        </p>
+        <Button variant="ghost" className="w-fit" onClick={onDone}>
+          Skip for now
+        </Button>
+      </div>
+    )
+  }
+  if (result.ok && result.proposal.status === "found") {
+    return (
+      <AcademicCalendarReview
+        events={result.proposal.events}
+        sources={result.proposal.sources}
+        from={`on ${domain}`}
+        cancelLabel="Skip for now"
+        onDone={onDone}
+      />
+    )
+  }
+  return (
+    <div className="grid gap-4">
+      <p className="text-sm text-muted-foreground">
+        {result.ok
+          ? `We couldn't find your academic calendar on ${domain}.`
+          : result.message}{" "}
+        You can add it later in Settings, from a link, a PDF or by hand.
+      </p>
+      <Button className="w-fit" onClick={onDone}>
+        Continue
       </Button>
     </div>
   )

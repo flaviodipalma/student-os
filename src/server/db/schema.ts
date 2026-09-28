@@ -46,6 +46,9 @@ export const eventType = pgEnum("event_type", ["class", "sports", "work", "perso
 export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "completed", "skipped"])
 // Learning management systems Student OS can import from (see src/server/integrations/lms).
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
+// What a day on the school's academic calendar is (see src/lib/academic-calendar.ts).
+export const academicEventKind = pgEnum("academic_event_kind", ["term", "no_classes", "exams", "deadline", "other"])
+export const schoolCalendarStatus = pgEnum("school_calendar_status", ["found", "not_found"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
 // Where an external calendar event comes from: a personal calendar (Google, Outlook). "canvas"
 // and "blackboard" are from the removed LMS calendar-feed links (hidden since migration 0017).
@@ -175,6 +178,48 @@ export const studentPreferences = pgTable(
 // Something the student does every week at the same time. Stored once as a rule;
 // the Planner, Calendar and Dashboard work out the individual occurrences when
 // needed (src/lib/recurring.ts), so no per-week rows are ever stored.
+// The student's academic calendar: semesters, breaks and holidays (no classes), the
+// exam period, deadlines. Dates are inclusive. Class times don't meet on no-class
+// and exam days.
+export const academicEvents = pgTable(
+  "academic_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    kind: academicEventKind("kind").notNull(),
+    title: text("title").notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    // The semester it belongs to, e.g. "Fall 2026".
+    term: text("term"),
+    ...timestamps,
+  },
+  (t) => [
+    index("academic_events_user_id_idx").on(t.userId),
+    check("academic_events_dates", sql`${t.endDate} >= ${t.startDate} and ${t.endDate} - ${t.startDate} <= 400`),
+    check("academic_events_title_length", sql`char_length(btrim(${t.title})) between 1 and 150`),
+    check("academic_events_term_length", sql`char_length(${t.term}) between 1 and 60`),
+  ]
+).enableRLS()
+
+// Academic calendars read from schools' websites, shared by every student of that
+// school (public information: no student data). Each student still confirms their
+// own copy (academic_events). A school not found is remembered too, so it isn't
+// searched again right away (and the misses can be reviewed).
+export const schoolCalendars = pgTable(
+  "school_calendars",
+  {
+    domain: text("domain").primaryKey(),
+    status: schoolCalendarStatus("status").notNull(),
+    events: jsonb("events").$type<{ kind: string; title: string; startDate: string; endDate: string; term?: string }[]>().notNull().default([]),
+    sources: text("sources").array().notNull().default([]),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("school_calendars_domain_format", sql`${t.domain} ~ '^[a-z0-9.-]+\\.[a-z]{2,}$'`)]
+).enableRLS()
+
 export const recurringCommitments = pgTable(
   "recurring_commitments",
   {

@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
   lmsSyncStatusAction: vi.fn(),
   reloadCourses: vi.fn(),
   setClassTimes: vi.fn(),
+  replaceAcademicCalendar: vi.fn(),
+  readCalendar: vi.fn(),
 }))
+// The academic calendar lookup (POST /api/academic-calendar/read).
+vi.stubGlobal("fetch", (url: string, init: RequestInit) => mocks.readCalendar(url, init))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }))
 vi.mock("@/app/actions/integrations", () => ({ lmsSyncStatusAction: mocks.lmsSyncStatusAction }))
 vi.mock("@/components/syllabus/syllabus-importer", () => ({
@@ -27,10 +31,12 @@ vi.mock("@/components/courses/course-form-dialog", () => ({
 }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
+    academicEvents: [],
     today: "2026-09-25",
     reloadCourses: mocks.reloadCourses,
     setClassTimes: mocks.setClassTimes,
-    student: { firstName: "Alex", lastName: "", schoolName: "", schoolDomain: null },
+    replaceAcademicCalendar: mocks.replaceAcademicCalendar,
+    student: { firstName: "Alex", lastName: "", schoolName: "Quinnipiac University", schoolDomain: "qu.edu" },
     preferences: DEFAULT_STUDENT_PREFERENCES,
     recurringCommitments: [],
     courses: [],
@@ -52,7 +58,13 @@ const { OnboardingFlow } = await import("./onboarding-flow")
 
 beforeEach(() => {
   for (const mock of Object.values(mocks)) mock.mockReset()
-  mocks.saveOnboarding.mockResolvedValue({ ok: true, data: { recurringCommitments: [] } })
+  mocks.saveOnboarding.mockResolvedValue({
+    ok: true,
+    data: { student: { firstName: "Alex", lastName: "", schoolName: "Quinnipiac University", schoolDomain: "qu.edu" }, recurringCommitments: [] },
+  })
+  // By default the calendar isn't found (setup goes on as before).
+  mocks.readCalendar.mockResolvedValue({ json: async () => ({ ok: true, proposal: { status: "not_found" } }) })
+  mocks.replaceAcademicCalendar.mockResolvedValue({ ok: true, data: [] })
   mocks.completeOnboarding.mockResolvedValue({ ok: true, data: null })
   mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: null, courses: 0 } })
   mocks.reloadCourses.mockResolvedValue([])
@@ -99,6 +111,25 @@ describe("the intro", () => {
     render(<OnboardingFlow />)
     await user.keyboard("{Enter}")
     expect(await screen.findByRole("heading", { name: "Welcome, Alex!" })).toBeTruthy()
+  })
+})
+
+describe("step 1: the school is required", () => {
+  it("without a school (or its website) setup doesn't continue, and says why", async () => {
+    const user = userEvent.setup()
+    render(<OnboardingFlow />)
+    await user.click(screen.getByText("Welcome to Student OS!"))
+    const school = await screen.findByRole("combobox", { name: "School" })
+    await user.clear(school)
+    await user.click(screen.getByRole("button", { name: "Continue" }))
+    expect(screen.getByRole("alert").textContent).toMatch(/Pick your school/)
+    // A school that isn't in the list needs its website.
+    await user.type(school, "My Community College")
+    await user.click(screen.getByRole("button", { name: "Continue" }))
+    expect(screen.getByRole("alert").textContent).toMatch(/Add your school's website/)
+    await user.type(screen.getByLabelText("School website"), "https://www.mycc.edu/about")
+    await user.click(screen.getByRole("button", { name: "Continue" }))
+    expect(await screen.findByRole("heading", { name: "Study preferences" })).toBeTruthy()
   })
 })
 
@@ -295,5 +326,70 @@ describe("class times, one course at a time", () => {
     expect(mocks.setClassTimes).not.toHaveBeenCalled()
     // Answered: the Dashboard notice won't ask about them again.
     expect(JSON.parse(localStorage.getItem("student-os:class-times-asked") ?? "[]")).toEqual(["c1", "c2"])
+  })
+})
+
+describe("the academic calendar during setup", () => {
+  const FALL = { kind: "term", title: "Fall 2026", startDate: "2026-08-24", endDate: "2026-12-18", term: "Fall 2026" }
+  const LABOR = { kind: "no_classes", title: "Labor Day", startDate: "2026-09-07", endDate: "2026-09-07", term: "Fall 2026" }
+  const found = { json: async () => ({ ok: true, proposal: { status: "found", events: [FALL, LABOR], sources: ["https://www.qu.edu/academic-calendar/"] } }) }
+
+  it("looked for as soon as steps 1-3 are saved; checked and saved before class times", async () => {
+    mocks.readCalendar.mockResolvedValue(found)
+    mocks.reloadCourses.mockResolvedValue(COURSES)
+    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 2 } })
+    const user = userEvent.setup()
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    // Asked right after step 3, in the background.
+    expect(mocks.readCalendar).toHaveBeenCalledOnce()
+    const form = mocks.readCalendar.mock.calls[0][1].body as FormData
+    expect([mocks.readCalendar.mock.calls[0][0], form.get("mode")]).toEqual(["/api/academic-calendar/read", "school"])
+
+    await user.click(screen.getByRole("button", { name: "Connect Canvas" }))
+    expect(await screen.findByRole("heading", { name: "Your academic calendar" }, { timeout: 5000 })).toBeTruthy()
+    expect(screen.getByRole("region", { name: "Review the calendar" }).textContent).toMatch(/Found on qu\.edu/)
+    await user.click(screen.getByRole("button", { name: "Remove Labor Day" }))
+    await user.click(screen.getByRole("button", { name: "Save this calendar" }))
+    expect(mocks.replaceAcademicCalendar).toHaveBeenCalledWith([FALL])
+    // Then the class times.
+    expect(await screen.findByRole("heading", { name: "Add your class times" })).toBeTruthy()
+  })
+
+  it("still looking when the courses are done: says so, and can be skipped", async () => {
+    mocks.readCalendar.mockReturnValue(new Promise(() => {}))
+    const user = userEvent.setup()
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    await user.click(await screen.findByRole("button", { name: "Skip for now" }))
+    expect(await screen.findByText(/Looking for your academic calendar on qu\.edu/)).toBeTruthy()
+    await user.click(screen.getByRole("button", { name: "Skip for now" }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"))
+    expect(mocks.replaceAcademicCalendar).not.toHaveBeenCalled()
+  })
+
+  it("'Skip for now' on the review: nothing saved, setup finishes", async () => {
+    mocks.readCalendar.mockResolvedValue(found)
+    const user = userEvent.setup()
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    await user.click(await screen.findByRole("button", { name: "Skip for now" }))
+    await screen.findByRole("region", { name: "Review the calendar" })
+    await user.click(screen.getByRole("button", { name: "Skip for now" }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"))
+    expect(mocks.replaceAcademicCalendar).not.toHaveBeenCalled()
+  })
+
+  it("not found: no calendar screen at all (it can be added later in Settings)", async () => {
+    const user = userEvent.setup()
+    render(<OnboardingFlow />)
+    await toCourses(user)
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    await user.click(await screen.findByRole("button", { name: "Skip for now" }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"))
+    expect(screen.queryByRole("heading", { name: "Your academic calendar" })).toBeNull()
   })
 })

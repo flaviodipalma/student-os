@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { useAppStore } from "@/lib/app-store"
+import { semesterFor } from "@/lib/academic-calendar"
 import { classTimesOf, likelySemesterEnd, likelySemesterStart } from "@/lib/class-times"
 import { courseColors } from "@/lib/course-colors"
 import type { Course, CourseColor } from "@/lib/types"
@@ -225,12 +226,14 @@ export function BulkCourseBar({ selected, onDeleted }: { selected: Course[]; onD
 }
 
 function DatesForm({ courses, onDone }: { courses: Course[]; onDone: () => void }) {
-  const { today, recurringCommitments, bulkUpdateCourses } = useAppStore()
-  // Start from what the first course already has: its class times, its semester, or a guess.
+  const { today, recurringCommitments, academicEvents, bulkUpdateCourses } = useAppStore()
+  // Start from what the first course already has (its class times), else the
+  // semester on the academic calendar, else its LMS semester, else a guess.
   const first = courses[0]
   const saved = first ? classTimesOf(recurringCommitments, first.id).find((time) => time.startDate && time.endDate) : undefined
-  const [from, setFrom] = useState(saved?.startDate ?? first?.termStart ?? likelySemesterStart(today))
-  const [until, setUntil] = useState(saved?.endDate ?? first?.termEnd ?? likelySemesterEnd(today))
+  const semester = semesterFor(academicEvents, today)
+  const [from, setFrom] = useState(saved?.startDate ?? semester?.startDate ?? first?.termStart ?? likelySemesterStart(today))
+  const [until, setUntil] = useState(saved?.endDate ?? semester?.endDate ?? first?.termEnd ?? likelySemesterEnd(today))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 

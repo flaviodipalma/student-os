@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
 import { ClassTimesNotice } from "@/components/courses/class-times"
+import { AcademicHeadsUp } from "@/components/dashboard/academic-heads-up"
 import { DailyProgress } from "@/components/dashboard/daily-progress"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { GettingStarted } from "@/components/dashboard/getting-started"
@@ -38,6 +39,7 @@ export default async function DashboardPage() {
       <DailyProgress className="md:hidden" />
 
       <NeedsAttention />
+      <AcademicHeadsUp />
 
       {/*
         "What do I need to do today?" first:

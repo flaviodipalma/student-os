@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { checkDraft, ClassTimesFields, draftFrom } from "./class-times"
+import { semesterFor } from "@/lib/academic-calendar"
 import { useAppStore } from "@/lib/app-store"
 import { markCoursesAsked } from "@/lib/class-times-asked"
 import { useCourses } from "@/lib/course-store"
@@ -50,9 +51,9 @@ export function CourseFormDialog({
 
 function CourseForm({ course, onDone }: { course?: Course; onDone: () => void }) {
   const { courses, addCourse, updateCourse } = useCourses()
-  const { today, setClassTimes } = useAppStore()
+  const { today, academicEvents, setClassTimes } = useAppStore()
   const { showError } = useFeedback()
-  const [classTimes, setClassTimesDraft] = useState(() => draftFrom([], today))
+  const [classTimes, setClassTimesDraft] = useState(() => draftFrom([], today, undefined, false, semesterFor(academicEvents, today)))
   const [code, setCode] = useState(course?.code ?? "")
   const [name, setName] = useState(course?.name ?? "")
   const [professor, setProfessor] = useState(course?.professor ?? "")

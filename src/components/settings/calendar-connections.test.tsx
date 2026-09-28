@@ -15,7 +15,8 @@ vi.mock("@/app/actions/calendar-integrations", () => ({
 }))
 vi.mock("@/app/actions/integrations", () => ({}))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
-vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({ replaceExternalEvents: mocks.replaceExternalEvents }) }))
+vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({
+    academicEvents: [], replaceExternalEvents: mocks.replaceExternalEvents }) }))
 
 const { CalendarConnections } = await import("./calendar-connections")
 

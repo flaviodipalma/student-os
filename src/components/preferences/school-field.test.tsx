@@ -101,4 +101,22 @@ describe("School field", () => {
     await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByRole("option", { name: /Quincy University/ })).toBeNull()
   })
+
+  it("a school from the list shows its website (with Change); a school not in the list asks for it", async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.type(screen.getByRole("combobox", { name: "School" }), "quinn")
+    await user.click(await screen.findByRole("option", { name: /Quinnipiac University/ }))
+    expect(screen.getByText(/Website: qu.edu/)).toBeTruthy()
+    expect(screen.queryByLabelText("School website")).toBeNull()
+    await user.click(screen.getByRole("button", { name: "Change" }))
+    expect(screen.getByLabelText("School website")).toHaveProperty("value", "qu.edu")
+
+    mocks.search.mockResolvedValue({ ok: true, data: [] })
+    await user.clear(screen.getByRole("combobox", { name: "School" }))
+    await user.type(screen.getByRole("combobox", { name: "School" }), "My Community College")
+    await user.click(await screen.findByRole("option", { name: /Use .My Community College./ }))
+    await user.type(screen.getByLabelText("School website"), "mycc.edu")
+    expect(saved).toEqual({ schoolName: "My Community College", schoolDomain: "mycc.edu" })
+  })
 })

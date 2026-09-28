@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { Course, RecurringCommitment } from "@/lib/types"
+import type { AcademicEvent, Course, RecurringCommitment } from "@/lib/types"
 
 // Class times on the course page, and the "not on your calendar yet" notice, in a
 // simulated browser. The app store is mocked.
@@ -29,9 +29,10 @@ const LECTURE: RecurringCommitment = {
   endDate: "2026-12-20",
 }
 
-const state = vi.hoisted(() => ({ courses: [] as Course[], commitments: [] as RecurringCommitment[], setClassTimes: vi.fn() }))
+const state = vi.hoisted(() => ({ courses: [] as Course[], commitments: [] as RecurringCommitment[], academicEvents: [] as AcademicEvent[], setClassTimes: vi.fn() }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
+    academicEvents: state.academicEvents,
     today: "2026-09-25",
     courses: state.courses,
     recurringCommitments: state.commitments,
@@ -45,6 +46,7 @@ beforeEach(() => {
   stored.clear()
   state.courses = [DS, CALC]
   state.commitments = []
+  state.academicEvents = []
   state.setClassTimes.mockReset()
   state.setClassTimes.mockResolvedValue({ ok: true, data: [] })
   window.scrollTo = vi.fn()
@@ -96,6 +98,18 @@ describe("class times on the course page", () => {
     await user.click(screen.getByRole("button", { name: "Save class times" }))
     expect(screen.getByRole("alert").textContent).toMatch(/End time must be after the start time/)
     expect(state.setClassTimes).not.toHaveBeenCalled()
+  })
+})
+
+describe("dates from the academic calendar", () => {
+  it("the semester on the academic calendar sets the first and last day of classes", async () => {
+    state.academicEvents = [{ id: "t1", kind: "term", title: "Fall 2026", startDate: "2026-08-24", endDate: "2026-12-18" }]
+    const user = userEvent.setup()
+    render(<ClassTimesCard course={DS} />)
+    await user.click(screen.getByRole("button", { name: "Add class times" }))
+    expect(await screen.findByText("From your academic calendar.")).toBeTruthy()
+    expect(screen.getByLabelText("First day of classes")).toHaveProperty("value", "2026-08-24")
+    expect(screen.getByLabelText("Last day of classes")).toHaveProperty("value", "2026-12-18")
   })
 })
 

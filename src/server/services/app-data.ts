@@ -1,6 +1,7 @@
 import "server-only"
 
 import type {
+  AcademicEvent,
   AppNotification,
   CalendarEvent,
   Course,
@@ -14,6 +15,7 @@ import type {
   Task,
 } from "@/lib/types"
 import type { Database } from "../db/types"
+import { listAcademicEvents } from "./academic-calendar"
 import { listCourses } from "./courses"
 import { listEvents } from "./events"
 import { listExternalEvents } from "./external-events"
@@ -39,6 +41,8 @@ export type AppData = {
   notificationPreferences: NotificationPreferences
   // Adaptive planning on/off, and since when history counts.
   learning: LearningSettings
+  // The school's semesters, breaks, exams and deadlines, as the student confirmed them.
+  academicEvents: AcademicEvent[]
 }
 
 // Everything the app shows for one user, loaded once per page load. The
@@ -56,6 +60,7 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     notifications,
     notificationPreferences,
     learning,
+    academicEvents,
   ] = await Promise.all([
     getProfile(db, userId),
     listCourses(db, userId),
@@ -68,6 +73,7 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     listNotifications(db, userId),
     getNotificationPreferences(db, userId),
     getLearningSettings(db, userId),
+    listAcademicEvents(db, userId),
   ])
   return {
     student,
@@ -81,5 +87,6 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     notifications,
     notificationPreferences,
     learning,
+    academicEvents,
   }
 }

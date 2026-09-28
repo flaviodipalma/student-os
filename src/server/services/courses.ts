@@ -18,7 +18,12 @@ import { hasChanges } from "./util"
 export type CourseFields = { code: string; name: string; professor: string; description: string }
 
 export async function listCourses(db: Database, userId: string): Promise<Course[]> {
-  const rows = await db.select().from(courses).where(eq(courses.userId, userId)).orderBy(asc(courses.createdAt))
+  // Oldest first; courses added together (one import) by code, so the order never shuffles.
+  const rows = await db
+    .select()
+    .from(courses)
+    .where(eq(courses.userId, userId))
+    .orderBy(asc(courses.createdAt), asc(courses.courseCode))
   return rows.map(toCourse)
 }
 

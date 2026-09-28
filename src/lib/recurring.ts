@@ -9,10 +9,13 @@ import type { CalendarEvent, RecurringCommitment } from "@/lib/types"
 
 export const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
 
-// Does the commitment happen on this date? Right weekday, and inside its date range.
+// Does the commitment happen on this date? Right weekday, inside its date range, and
+// (a class) not a day without classes.
 export function occursOn(commitment: RecurringCommitment, date: string): boolean {
   if (commitment.startDate && date < commitment.startDate) return false
   if (commitment.endDate && date > commitment.endDate) return false
+  // No class on breaks, holidays and during exams (class times only).
+  if (commitment.skipDates?.includes(date)) return false
   return commitment.daysOfWeek.includes(fromDateKey(date).getDay())
 }
 

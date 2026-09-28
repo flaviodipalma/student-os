@@ -1,6 +1,7 @@
 import "server-only"
 
 import { z } from "zod"
+import { academicKindLabel, semesterFor } from "@/lib/academic-calendar"
 import { toMinutes } from "@/lib/events"
 import { addDays } from "@/lib/format"
 import { completedMinutesFor, isMissed, reasonsOf, whatNow, type NextStudy, type StudySession } from "@/lib/planner"
@@ -403,6 +404,35 @@ export const getStudentPreferences = defineTool({
   },
 })
 
+export const getAcademicCalendar = defineTool({
+  name: "getAcademicCalendar",
+  description:
+    "The school's academic calendar as the student confirmed it: the current semester (first and last day), and between two dates (default: today to 6 months from now) the days without classes (breaks, holidays), the final exam period, academic deadlines (add/drop, withdraw) and other dates. Class times already skip days without classes. Use for \"when is spring break\", \"when do finals start\", \"last day to withdraw\", \"is there class on Monday\".",
+  input: z.object({ from: dateInput.optional(), to: dateInput.optional() }),
+  run(ctx, { from = ctx.today, to = addDays(ctx.today, 183) }) {
+    const events = ctx.data.academicEvents ?? []
+    if (events.length === 0) {
+      return { result: { calendar: "none", note: "No academic calendar yet. The student can add it in Settings > Academic calendar (found on their school's website, from a link or PDF, or by hand)." } }
+    }
+    const semester = semesterFor(events, ctx.today)
+    const view = (event: (typeof events)[number]) => ({
+      kind: academicKindLabel[event.kind],
+      title: untrusted(event.title),
+      semester: event.term ? untrusted(event.term, 60) : null,
+      first: relativeDay(ctx, event.startDate),
+      last: event.endDate === event.startDate ? null : relativeDay(ctx, event.endDate),
+    })
+    return {
+      result: {
+        currentSemester: semester ? { name: untrusted(semester.title, 60), first: relativeDay(ctx, semester.startDate), last: relativeDay(ctx, semester.endDate) } : null,
+        from: relativeDay(ctx, from),
+        to: relativeDay(ctx, to),
+        dates: events.filter((event) => event.endDate >= from && event.startDate <= to).map(view),
+      },
+    }
+  },
+})
+
 export const getWorkloadSummary = defineTool({
   name: "getWorkloadSummary",
   description:
@@ -572,6 +602,7 @@ export const readTools = [
   getAvailableTime,
   getStudySessions,
   getStudentPreferences,
+  getAcademicCalendar,
   getNotifications,
   getLearnedPatterns,
 ]

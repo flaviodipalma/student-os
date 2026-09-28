@@ -130,21 +130,37 @@ export function firstIssue(error: z.ZodError): string {
 
 // ---- Profile, preferences and weekly commitments (onboarding and Settings)
 
-export const profileSchema = z.object({
-  firstName: z.string().trim().min(1, "Add your first name.").max(80, "That name is too long."),
-  lastName: z.string().trim().max(80, "That name is too long.").default(""),
-  schoolName: z.string().trim().max(200, "That school name is too long.").default(""),
-  schoolDomain: z
-    .string()
+// A school's website as typed -> its domain: "https://www.qu.edu/admissions" -> "qu.edu".
+export function schoolWebsiteToDomain(text: string): string {
+  return text
     .trim()
     .toLowerCase()
-    .max(253)
-    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "That school's web address isn't valid.")
-    .nullable()
-    .default(null),
-})
-  // A domain only belongs with a school name.
-  .transform((profile) => (profile.schoolName ? profile : { ...profile, schoolDomain: null }))
+    .replace(/^[a-z]+:\/\//, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/^www\./, "")
+}
+
+// The school is required: Student OS finds its academic calendar on the school's
+// website (the domain comes with a school picked from the list; otherwise the
+// student types it).
+export const profileSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "Add your first name.").max(80, "That name is too long."),
+    lastName: z.string().trim().max(80, "That name is too long.").default(""),
+    schoolName: z.string().trim().min(1, "Pick your school.").max(200, "That school name is too long."),
+    schoolDomain: z
+      .string()
+      .transform(schoolWebsiteToDomain)
+      .pipe(z.string().max(253).regex(/^([a-z0-9.-]+\.[a-z]{2,})?$/, "That doesn't look like a website. Try something like qu.edu."))
+      .transform((domain) => domain || null)
+      .nullable()
+      .default(null),
+  })
+  .refine((profile) => profile.schoolDomain, {
+    message: "Add your school's website (for example qu.edu), so Student OS can find its academic calendar.",
+    path: ["schoolDomain"],
+  })
 
 export const notificationPreferencesSchema = z.object({
   enabled: z.boolean(),
@@ -241,3 +257,27 @@ export const classTimesSchema = z.array(classTimeSchema).max(10, "A course can h
 export const commitmentInputSchema = commitmentFields
   .refine(endAfterStart, endAfterStartIssue)
   .refine(datesInOrder, datesInOrderIssue)
+
+// ---- Academic calendar
+
+const DAY_MS = 86_400_000
+export const academicEventSchema = z
+  .object({
+    kind: z.enum(["term", "no_classes", "exams", "deadline", "other"], { error: "Pick what kind of date this is." }),
+    title: z.string().trim().min(1, "Give it a name, e.g. Thanksgiving break.").max(150, "Keep the name under 150 characters."),
+    startDate: dateKey,
+    endDate: dateKey,
+    term: z
+      .string()
+      .trim()
+      .max(60, "Keep the semester name under 60 characters.")
+      .transform((term) => term || undefined)
+      .optional(),
+  })
+  .refine((event) => event.endDate >= event.startDate, { message: "The last day can't be before the first day.", path: ["endDate"] })
+  .refine((event) => (Date.parse(event.endDate) - Date.parse(event.startDate)) / DAY_MS <= 400, {
+    message: "That's more than a year. Check the dates.",
+    path: ["endDate"],
+  })
+export const createAcademicEventSchema = academicEventSchema.and(z.object({ id }))
+export const academicEventsSchema = z.array(academicEventSchema).max(200)

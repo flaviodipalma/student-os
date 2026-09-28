@@ -30,10 +30,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAppStore } from "@/lib/app-store"
 import { markCoursesAsked, useAskedCourseIds } from "@/lib/class-times-asked"
+import { semesterFor } from "@/lib/academic-calendar"
 import { classTimesOf, likelySemesterEnd, likelySemesterStart } from "@/lib/class-times"
 import { formatTime, fromDateKey } from "@/lib/format"
 import { formatDays } from "@/lib/recurring"
-import { lmsProviderNames, type ClassTimeInput, type Course, type RecurringCommitment } from "@/lib/types"
+import { lmsProviderNames, type AcademicEvent, type ClassTimeInput, type Course, type RecurringCommitment } from "@/lib/types"
 import { classTimesSchema, firstIssue } from "@/lib/validation"
 
 // A course's class times: when and where it meets each week (one or more times,
@@ -58,7 +59,7 @@ export type ClassTimeRow = {
 }
 // `from` / `until`: the semester's first and last day (shared by the course's class
 // times). `datesFrom`: where those came from, for the hint under them.
-export type ClassTimesDraft = { rows: ClassTimeRow[]; from: string; until: string; datesFrom: "saved" | "lms" | "guess" }
+export type ClassTimesDraft = { rows: ClassTimeRow[]; from: string; until: string; datesFrom: "saved" | "calendar" | "lms" | "guess" }
 
 let rowCount = 0
 export const newClassTimeRow = (): ClassTimeRow => ({
@@ -70,8 +71,15 @@ export const newClassTimeRow = (): ClassTimeRow => ({
 })
 
 // The course's saved class times as a draft. The dates: the saved ones, else the
-// course's semester from the LMS, else a guess for the current semester.
-export function draftFrom(times: RecurringCommitment[], today: string, course?: Course, blankRow = false): ClassTimesDraft {
+// semester on the academic calendar, else the course's semester from the LMS, else a
+// guess for the current semester.
+export function draftFrom(
+  times: RecurringCommitment[],
+  today: string,
+  course?: Course,
+  blankRow = false,
+  semester?: AcademicEvent
+): ClassTimesDraft {
   const rows = times.map((time) => ({
     key: `class-time-${++rowCount}`,
     daysOfWeek: time.daysOfWeek,
@@ -83,7 +91,9 @@ export function draftFrom(times: RecurringCommitment[], today: string, course?: 
   const lms = course?.termStart && course.termEnd ? { from: course.termStart, until: course.termEnd } : null
   const dates = saved
     ? { from: saved.startDate ?? "", until: saved.endDate ?? "", datesFrom: "saved" as const }
-    : lms
+    : semester
+      ? { from: semester.startDate, until: semester.endDate, datesFrom: "calendar" as const }
+      : lms
       ? { ...lms, datesFrom: "lms" as const }
       : { from: likelySemesterStart(today), until: likelySemesterEnd(today), datesFrom: "guess" as const }
   return { rows: rows.length === 0 && blankRow ? [newClassTimeRow()] : rows, ...dates }
@@ -191,7 +201,9 @@ export function ClassTimesFields({
             </Field>
           </div>
           <p className="text-xs text-muted-foreground">
-            {value.datesFrom === "lms" && course?.source
+            {value.datesFrom === "calendar"
+              ? "From your academic calendar."
+              : value.datesFrom === "lms" && course?.source
               ? `Your semester's dates from ${lmsProviderNames[course.source.provider]}.`
               : value.datesFrom === "guess"
                 ? "Our best guess for this semester. Change them if yours starts or ends on other days."
@@ -289,8 +301,9 @@ export function ClassTimesDialog({
 }
 
 function ClassTimesEditForm({ course, onDone }: { course: Course; onDone: () => void }) {
-  const { today, recurringCommitments, setClassTimes } = useAppStore()
-  const [draft, setDraft] = useState(() => draftFrom(classTimesOf(recurringCommitments, course.id), today, course, true))
+  const { today, recurringCommitments, academicEvents, setClassTimes } = useAppStore()
+  const semester = semesterFor(academicEvents, today)
+  const [draft, setDraft] = useState(() => draftFrom(classTimesOf(recurringCommitments, course.id), today, course, true, semester))
   const [online, setOnline] = useState(course.online ?? false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -338,11 +351,12 @@ function ClassTimesEditForm({ course, onDone }: { course: Course; onDone: () => 
 // Asks for each course's class times in turn: "Save and next", or "Skip" (after a
 // warning that the course won't be on the calendar). `onDone` runs after the last one.
 export function ClassTimesSteps({ courses, onDone }: { courses: Course[]; onDone: () => void }) {
-  const { today, setClassTimes } = useAppStore()
+  const { today, academicEvents, setClassTimes } = useAppStore()
+  const semester = semesterFor(academicEvents, today)
   // The list is fixed when the steps start (saving changes which courses lack times).
   const [queue] = useState(courses)
   const [index, setIndex] = useState(0)
-  const [draft, setDraft] = useState(() => draftFrom([], today, courses[0], true))
+  const [draft, setDraft] = useState(() => draftFrom([], today, courses[0], true, semester))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirmSkip, setConfirmSkip] = useState(false)
@@ -356,7 +370,7 @@ export function ClassTimesSteps({ courses, onDone }: { courses: Course[]; onDone
     setConfirmSkip(false)
     if (last) return onDone()
     setIndex(index + 1)
-    setDraft(draftFrom([], today, queue[index + 1], true))
+    setDraft(draftFrom([], today, queue[index + 1], true, semester))
     window.scrollTo?.({ top: 0 })
   }
 

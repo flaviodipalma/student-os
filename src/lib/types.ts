@@ -258,9 +258,12 @@ export type RecurringCommitment = {
   courseId?: string
   // Where it happens, e.g. a classroom.
   location?: string
+  // Class times only: days without classes (breaks, holidays, the exam period), from
+  // the academic calendar (src/lib/academic-calendar.ts).
+  skipDates?: string[]
 }
 
-export type RecurringCommitmentInput = Omit<RecurringCommitment, "id" | "courseId" | "location">
+export type RecurringCommitmentInput = Omit<RecurringCommitment, "id" | "courseId" | "location" | "skipDates">
 
 // One weekly meeting of a course, e.g. the lecture Mon/Wed/Fri 10:00–10:50 or the lab
 // Tue 14:00–16:50. Stored as a "class" recurring commitment linked to the course.
@@ -322,3 +325,31 @@ export type AppNotification = {
   // A calendar item: "event:<id>", "commitment:<id>" or "external:<id>".
   relatedEventId: string | null
 }
+
+// ---- Academic calendar (src/lib/academic-calendar.ts) ----------------------------------
+
+// term: a semester's classes (first to last day); no_classes: a break or holiday;
+// exams: the final exam period (no regular classes); deadline: e.g. the last day to
+// withdraw; other: anything else worth knowing (orientation, commencement).
+export const academicEventKinds = ["term", "no_classes", "exams", "deadline", "other"] as const
+export type AcademicEventKind = (typeof academicEventKinds)[number]
+
+export type AcademicEvent = {
+  id: string
+  kind: AcademicEventKind
+  title: string
+  // Inclusive; the same day for one-day items.
+  startDate: string
+  endDate: string
+  // The semester it belongs to, e.g. "Fall 2026".
+  term?: string
+}
+
+export type AcademicEventInput = Omit<AcademicEvent, "id">
+
+// A calendar found for the student to review (src/server/academic-calendar), and the
+// answer of POST /api/academic-calendar/read.
+export type CalendarProposal =
+  | { status: "found"; events: AcademicEventInput[]; sources: string[] }
+  | { status: "not_found" }
+export type ReadCalendarResponse = { ok: true; proposal: CalendarProposal } | { ok: false; message: string }

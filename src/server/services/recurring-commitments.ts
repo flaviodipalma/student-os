@@ -1,11 +1,13 @@
 import "server-only"
 
 import { and, asc, eq, isNull } from "drizzle-orm"
+import { withAcademicCalendar } from "@/lib/academic-calendar"
 import { classTitle } from "@/lib/class-times"
 import type { ClassTimeInput, RecurringCommitment, RecurringCommitmentInput } from "@/lib/types"
 import { courses, recurringCommitments } from "../db/schema"
 import type { Database } from "../db/types"
 import { NotFoundError, ValidationError } from "../errors"
+import { listAcademicEvents } from "./academic-calendar"
 import { hasChanges } from "./util"
 
 // Weekly commitments: one row per rule. The weekly occurrences are never stored;
@@ -52,7 +54,8 @@ function toCommitment(row: typeof recurringCommitments.$inferSelect): RecurringC
   }
 }
 
-// Class times are named after their course as it's called now (it may have been renamed).
+// Class times are named after their course as it's called now (it may have been
+// renamed), and skip the days without classes on the academic calendar.
 export async function listRecurringCommitments(db: Database, userId: string): Promise<RecurringCommitment[]> {
   const rows = await db
     .select({ row: recurringCommitments, code: courses.courseCode, name: courses.courseName })
@@ -60,7 +63,10 @@ export async function listRecurringCommitments(db: Database, userId: string): Pr
     .leftJoin(courses, eq(courses.id, recurringCommitments.courseId))
     .where(eq(recurringCommitments.userId, userId))
     .orderBy(asc(recurringCommitments.startTime), asc(recurringCommitments.createdAt))
-  return rows.map(({ row, code, name }) => ({ ...toCommitment(row), ...(code && name ? { title: classTitle(code, name) } : {}) }))
+  const commitments = rows.map(({ row, code, name }) => ({ ...toCommitment(row), ...(code && name ? { title: classTitle(code, name) } : {}) }))
+  return commitments.some((commitment) => commitment.courseId)
+    ? withAcademicCalendar(commitments, await listAcademicEvents(db, userId))
+    : commitments
 }
 
 export async function createRecurringCommitment(

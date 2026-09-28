@@ -12,6 +12,7 @@ const section = getNavItem("/settings")
 // and connected services have their own page (/integrations).
 const sections = [
   { id: "profile", label: "Profile" },
+  { id: "academic-calendar", label: "Academic calendar" },
   { id: "study-preferences", label: "Study preferences" },
   { id: "recurring-commitments", label: "Recurring commitments" },
   { id: "notifications", label: "Notifications" },

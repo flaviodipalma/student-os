@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, EyeOffIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { academicItemsOn } from "@/lib/academic-calendar"
 import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
 import { useMediaQuery } from "@/lib/use-media-query"
@@ -43,7 +44,7 @@ function rangeTitle(view: View, days: string[]): string {
 // event reminder) open that day and, for a Canvas/Blackboard event, its details.
 export function CalendarView({ initialDate, initialExternalId }: { initialDate?: string; initialExternalId?: string } = {}) {
   const { scheduleBetween } = useEvents()
-  const { externalEvents } = useAppStore()
+  const { externalEvents, academicEvents } = useAppStore()
   const now = useNow()
   const today = toDateKey(now)
   // Phones start on the Day view (a week doesn't fit); the student's own choice wins.
@@ -230,6 +231,7 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
         }
         onSelectSlot={openNew}
         onSelectEvent={openEdit}
+        allDay={academicEvents.length > 0 ? (date) => academicItemsOn(academicEvents, date) : undefined}
       />
 
       <EventFormDialog

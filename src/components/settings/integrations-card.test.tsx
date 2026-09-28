@@ -11,7 +11,8 @@ import type { LmsIntegrationStatus } from "@/server/integrations/lms/connections
 const mocks = vi.hoisted(() => ({ disconnectLmsAction: vi.fn(), refresh: vi.fn() }))
 vi.mock("@/app/actions/integrations", () => ({ disconnectLmsAction: mocks.disconnectLmsAction }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
-vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({}) }))
+vi.mock("@/lib/app-store", () => ({ useAppStore: () => ({
+    academicEvents: [],}) }))
 
 const { IntegrationsCard, formatSyncedAgo } = await import("./integrations-card")
 

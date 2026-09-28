@@ -21,6 +21,7 @@ const ART: Course = { id: "c3", code: "ART 101", name: "Art History", professor:
 const state = vi.hoisted(() => ({ courses: [] as Course[], reloadCourses: vi.fn() }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
+    academicEvents: [],
     today: "2026-09-25",
     courses: state.courses,
     recurringCommitments: [],

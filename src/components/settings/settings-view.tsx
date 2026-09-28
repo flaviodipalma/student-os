@@ -13,6 +13,7 @@ import { useNotifications } from "@/lib/notification-store"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { NotificationPreferences, ProfileInput, StudentPreferences } from "@/lib/types"
 import { firstIssue, notificationPreferencesSchema, preferencesSchema, profileSchema } from "@/lib/validation"
+import { AcademicCalendarCard } from "./academic-calendar-card"
 import { NotificationSettingsFields } from "./notification-settings-fields"
 
 // Profile, study preferences and weekly commitments. Same fields, validation and
@@ -36,7 +37,7 @@ export function SettingsView() {
       <Section
         id="profile"
         title="About you"
-        description="Your name is used in greetings. Your school is optional."
+        description="Your name is used in greetings. Student OS finds your school's academic calendar on its website."
         onSave={async () => {
           const parsed = profileSchema.safeParse(profile)
           if (!parsed.success) return firstIssue(parsed.error)
@@ -45,6 +46,8 @@ export function SettingsView() {
       >
         <ProfileFields value={profile} onChange={setProfile} />
       </Section>
+
+      <AcademicCalendarCard />
 
       <Section
         id="study-preferences"

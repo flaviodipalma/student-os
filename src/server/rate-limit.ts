@@ -19,6 +19,8 @@ export const RATE_LIMITS = {
   ],
   syllabus: [{ limit: 10, windowMs: 60 * 60_000 }],
   sync: [{ limit: 20, windowMs: 60 * 60_000 }],
+  // Finding / reading an academic calendar (often an AI request).
+  academicCalendar: [{ limit: 8, windowMs: 60 * 60_000 }],
 } satisfies Record<string, RateLimit[]>
 
 const hits = new Map<string, number[]>()

@@ -17,6 +17,7 @@ vi.mock("@/app/actions/assistant", () => ({ askAssistantAction: mocks.ask, confi
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => ({
+    academicEvents: [],
     today: "2026-09-22",
     tasks: [{ id: "11111111-1111-4111-8111-111111111111", title: "Database Project" }],
     applySaved: mocks.applySaved,

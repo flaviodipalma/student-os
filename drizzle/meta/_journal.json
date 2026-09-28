@@ -155,6 +155,20 @@
       "when": 1790384454763,
       "tag": "0021_course_term_online",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790619529342,
+      "tag": "0022_academic_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790621052611,
+      "tag": "0023_school_calendars",
+      "breakpoints": true
     }
   ]
 }
