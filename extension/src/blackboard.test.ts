@@ -64,8 +64,8 @@ describe("readBlackboard: courses", () => {
     // Grouped by semester, current first (the same list as Canvas).
     const groups = groupByTerm(courseOptions(read.choices), NOW)
     expect(groups.map((g) => [g.name, g.current, g.courses.map((c) => c.label)])).toEqual([
-      ["Fall 2026", true, ["DAT-101 · Data Structures"]],
-      ["Spring 2026", false, ["INT-101 · Intro to Psychology"]],
+      ["Fall 2026", true, ["DAT101 · Data Structures"]],
+      ["Spring 2026", false, ["INT101 · Intro to Psychology"]],
     ])
   })
 

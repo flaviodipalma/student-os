@@ -74,7 +74,7 @@ describe("POST /api/extension/blackboard/import", () => {
     const response = await send(payload(), alex)
     expect(response).toMatchObject({ status: 200, body: { result: { provider: "blackboard", coursesCreated: 1, assignmentsCreated: 3, assignmentsCompleted: 1 } } })
 
-    expect(await listCourses(t.db, alex)).toEqual([expect.objectContaining({ name: "Data Structures", code: "DAT-101-F26" })])
+    expect(await listCourses(t.db, alex)).toEqual([expect.objectContaining({ name: "Data Structures", code: "DAT101" })])
     const tasks = await listTasks(t.db, alex)
     // The total column is skipped. Due dates in the browser's time zone.
     expect(tasks.map((task) => task.title).sort()).toEqual(["Participation", "Project 1", "Quiz 1"])

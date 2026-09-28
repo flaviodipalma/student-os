@@ -1,3 +1,4 @@
+import { courseNameWithoutCode, shortCourseCode } from "@/lib/course-code"
 import { findDuplicateTask, normalizeCourseCode } from "@/lib/syllabus/duplicates"
 import type { Course, LmsProviderId, Task, TaskInput } from "@/lib/types"
 import type { LmsAssignment, LmsCourse, LmsSubmissionStatus, LmsSyncConflict } from "./types"
@@ -61,11 +62,15 @@ export type ExistingTask = Task & { synced: Partial<TaskSnapshot> | null }
 
 const turnedIn = (status: LmsSubmissionStatus | undefined) => status === "submitted" || status === "graded"
 
-export function courseFieldsFrom(lms: LmsCourse): SyncedCourseFields {
-  const name = lms.courseName.trim().slice(0, 150) || "Untitled course"
+// `fullCode`: keep the LMS's code as it is (see planCourses).
+export function courseFieldsFrom(lms: LmsCourse, options: { fullCode?: boolean } = {}): SyncedCourseFields {
+  // "Intro to Forensic Psyc (PS28301_26/FA)" -> "Intro to Forensic Psyc": the code shows on its own.
+  const name = courseNameWithoutCode(lms.courseName).slice(0, 150) || "Untitled course"
+  const code = lms.courseCode?.trim()
   return {
-    // Every Student OS course has a code; without one, the name stands in.
-    code: (lms.courseCode?.trim() || name).slice(0, 30),
+    // Every Student OS course has a code; without one, the name stands in. "PS28301_26/FA"
+    // becomes "PS283" (src/lib/course-code.ts).
+    code: (code ? (options.fullCode ? code : shortCourseCode(code)) : name).slice(0, 30),
     name,
     professor: lms.instructor?.trim().slice(0, 120) ?? "",
     description: lms.description?.trim().slice(0, 600) ?? "",
@@ -117,8 +122,18 @@ const isFrom = (source: Course["source"], provider: LmsProviderId, externalId: s
 
 export function planCourses(existing: ExistingCourse[], lmsCourses: LmsCourse[]): CourseAction[] {
   const claimed = new Set<string>()
+  // Short codes shared by two courses in this sync (e.g. a lecture and its lab section).
+  const shortCodes = lmsCourses.map((lms) => normalizeCourseCode(courseFieldsFrom(lms).code))
+  const shared = new Set(shortCodes.filter((code, index) => shortCodes.indexOf(code) !== index))
   return lmsCourses.map((lms): CourseAction => {
-    const remote = courseFieldsFrom(lms)
+    let remote = courseFieldsFrom(lms)
+    // Two courses can't have the same code: when the short one is taken (by another
+    // course in this sync, or another imported course), the full code is kept.
+    const short = normalizeCourseCode(remote.code)
+    const taken = existing.some(
+      (course) => course.source && !isFrom(course.source, lms.provider, lms.externalId) && normalizeCourseCode(course.code) === short
+    )
+    if (shared.has(short) || taken) remote = courseFieldsFrom(lms, { fullCode: true })
     const imported = existing.find((course) => isFrom(course.source, lms.provider, lms.externalId))
     if (imported) {
       claimed.add(imported.id)

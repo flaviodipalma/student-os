@@ -9,9 +9,9 @@ const spring = { id: 10, name: "Spring 2026", start_at: "2026-01-15T05:00:00Z", 
 const defaultTerm = { id: 1, name: "Default Term", start_at: null, end_at: null }
 
 const canvasCourses = [
-  { id: 215, name: "Data Structures", course_code: "CSC 215", term: fall },
-  { id: 141, name: "Calculus I", course_code: "MAT 141", term: fall },
-  { id: 101, name: "Intro to Psychology", course_code: "PSY 101", term: spring },
+  { id: 215, name: "Data Structures", course_code: "CSC215", term: fall },
+  { id: 141, name: "Calculus I", course_code: "MAT141", term: fall },
+  { id: 101, name: "Intro to Psychology", course_code: "PSY101", term: spring },
   { id: 5, name: "Quinnipiac Orientation", course_code: "Quinnipiac Orientation", term: defaultTerm },
   { id: 6, name: "Hidden", term: fall, access_restricted_by_date: true },
   { id: 7, name: "", course_code: "" },
@@ -21,12 +21,17 @@ describe("courseOptions", () => {
   it("labels courses by code and name, and leaves out ones Student OS wouldn't import", () => {
     const options = courseOptions(canvasCourses)
     expect(options.map((o) => o.label)).toEqual([
-      "CSC 215 · Data Structures",
-      "MAT 141 · Calculus I",
-      "PSY 101 · Intro to Psychology",
+      "CSC215 · Data Structures",
+      "MAT141 · Calculus I",
+      "PSY101 · Intro to Psychology",
       "Quinnipiac Orientation",
     ])
     expect(options[0]).toMatchObject({ id: "215", term: { key: "11", name: "Fall 2026" } })
+  })
+
+  it("shows short course codes, as Student OS does", () => {
+    const [option] = courseOptions([{ id: 283, name: "Intro to Forensic Psych (PS28301_26/FA)", course_code: "PS28301_26/FA", term: fall }])
+    expect(option.label).toBe("PS283 · Intro to Forensic Psych")
   })
 })
 

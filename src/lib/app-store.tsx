@@ -3,6 +3,7 @@
 import { createContext, use, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
+  bulkUpdateCoursesAction,
   createCourseAction,
   createEventAction,
   createStudySessionAction,
@@ -59,6 +60,7 @@ import {
   type TaskInput,
   type TaskStatus,
 } from "@/lib/types"
+import type { BulkCourseChange } from "@/lib/validation"
 import type { AppData } from "@/server/services/app-data"
 import type { OnboardingDetails, OnboardingSaved } from "@/server/services/onboarding"
 import type { SyllabusImportRequest, SyllabusImportSaved } from "@/server/services/syllabus"
@@ -99,6 +101,8 @@ type AppStore = {
   addCourse: (input: CourseInput) => Promise<Course | null>
   updateCourse: (id: string, changes: Partial<CourseInput>) => void
   deleteCourse: (id: string) => Promise<boolean>
+  // Several courses at once (select mode on the Courses page). True when saved.
+  bulkUpdateCourses: (ids: string[], change: BulkCourseChange) => Promise<boolean>
   // Replaces a course's class times (none = the course isn't on the calendar).
   // `quiet`: no confirmation message (the one-course-at-a-time screens show their own progress).
   // `online`: the course has no class meetings (times must be empty).
@@ -295,6 +299,38 @@ export function AppStoreProvider({
         "Course deleted."
       )
       return ok
+    },
+    bulkUpdateCourses: async (ids, change) => {
+      const count = `${ids.length} ${ids.length === 1 ? "course" : "courses"}`
+      const selected = new Set(ids)
+      const snapshot = { tasks, studySessions, events }
+      if (change.kind === "delete") {
+        // Their tasks and study sessions go too (the server deletes them with the courses).
+        const taskIds = new Set(tasks.filter((task) => selected.has(task.courseId)).map((task) => task.id))
+        setTasks((prev) => prev.filter((task) => !selected.has(task.courseId)))
+        setStudySessions((prev) => prev.filter((session) => !taskIds.has(session.taskId)))
+        setEvents((prev) => prev.map((event) => (event.courseId && selected.has(event.courseId) ? { ...event, courseId: undefined } : event)))
+      }
+      const result = await call(bulkUpdateCoursesAction(ids, change))
+      if (!result.ok) {
+        setTasks(snapshot.tasks)
+        setStudySessions(snapshot.studySessions)
+        setEvents(snapshot.events)
+        showError(result.error)
+        return false
+      }
+      setCourses(result.data.courses)
+      setRecurringCommitments(result.data.commitments)
+      showSuccess(
+        change.kind === "delete"
+          ? `${count} deleted.`
+          : change.kind === "dates"
+            ? `Semester dates set for ${count}.`
+            : change.kind === "online"
+              ? `${count} marked ${change.online ? "online" : "in person"}.`
+              : `Color changed for ${count}.`
+      )
+      return true
     },
     setClassTimes: async (courseId, times, options) => {
       const online = options?.online ?? false

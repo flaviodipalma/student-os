@@ -157,7 +157,7 @@ describe("syncing Blackboard into Student OS", () => {
     const user = await connected("Alex")
     const bb = fakeBlackboard({
       memberships: [
-        bbMembership("_215_1", {}, { courseId: "BIO-215", name: "Biology" }),
+        bbMembership("_215_1", {}, { courseId: "BIO215", name: "Biology" }),
         bbMembership("_300_1", {}, { organization: true, name: "Chess Club" }),
       ],
       columns: {
@@ -177,7 +177,7 @@ describe("syncing Blackboard into Student OS", () => {
     const data = await loadAppData(t.db, user)
     expect(data.courses).toEqual([
       expect.objectContaining({
-        code: "BIO-215",
+        code: "BIO215",
         name: "Biology",
         professor: "Jane Smith",
         source: { provider: "blackboard", externalId: "_215_1", url: `${BASE}/ultra/courses/_215_1/outline` },
@@ -317,7 +317,7 @@ describe("syncing Blackboard into Student OS", () => {
 describe("Canvas and Blackboard connected together", () => {
   const CANVAS = "https://school.instructure.com"
   // Canvas data that deliberately uses the SAME ids as the Blackboard data below.
-  const syncCanvas = (user: string, course = { id: "215", name: "Canvas Biology", course_code: "BIO 215" }) =>
+  const syncCanvas = (user: string, course = { id: "215", name: "Canvas Biology", course_code: "BIO215" }) =>
     importCanvasFromExtension(
       t.db,
       user,
@@ -359,9 +359,9 @@ describe("Canvas and Blackboard connected together", () => {
   it("the same course code in both LMSs is reported, never merged into the other LMS's course", async () => {
     const user = await connected("Alex")
     await syncCanvas(user)
-    const result = await sync(user, fakeBlackboard({ memberships: [bbMembership("_215_1", {}, { name: "Blackboard Biology", courseId: "BIO-215" })], columns: { "_215_1": [bbColumn("_1_1")] } }))
+    const result = await sync(user, fakeBlackboard({ memberships: [bbMembership("_215_1", {}, { name: "Blackboard Biology", courseId: "BIO215" })], columns: { "_215_1": [bbColumn("_1_1")] } }))
     expect(result).toMatchObject({ coursesCreated: 0, coursesLinked: 0, coursesSkipped: 1 })
-    expect(result.errors).toEqual(["Blackboard Biology: You already have a course with the code BIO 215."])
+    expect(result.errors).toEqual(["Blackboard Biology: You already have a course with the code BIO215."])
     expect((await loadAppData(t.db, user)).courses.map((c) => c.source?.provider)).toEqual(["canvas"])
   })
 

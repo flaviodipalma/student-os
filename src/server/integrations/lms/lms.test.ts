@@ -47,7 +47,7 @@ class FixtureReader implements LmsReader {
 const fixtureCourse = (overrides: Partial<LmsCourse> = {}): LmsCourse => ({
   provider: "canvas",
   externalId: "fixture-course-1",
-  courseCode: "CSC 215",
+  courseCode: "CSC215",
   courseName: "Data Structures",
   description: null,
   instructor: "Prof. Smith",
@@ -171,7 +171,7 @@ describe("syncing (with a test fixture reader)", () => {
     })
     const data = await loadAppData(t.db, user)
     expect(data.courses[0]).toMatchObject({
-      code: "CSC 215",
+      code: "CSC215",
       name: "Data Structures",
       professor: "Prof. Smith",
       source: { provider: "canvas", externalId: "fixture-course-1", url: "https://lms.test.invalid/courses/1" },

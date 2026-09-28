@@ -1,3 +1,5 @@
+import { courseNameWithoutCode, shortCourseCode } from "../../src/lib/course-code"
+
 // Choosing which Canvas courses to import. Canvas's "active" courses often include
 // old semesters (many schools never close them), so the student picks; courses in
 // the current semester start checked. No Chrome APIs here (tested in Node).
@@ -28,9 +30,12 @@ const text = (value: unknown) => (typeof value === "string" && value.trim() ? va
 export function courseOptions(courses: Record<string, unknown>[]): CourseOption[] {
   return courses.flatMap((course) => {
     const id = typeof course.id === "number" || typeof course.id === "string" ? String(course.id) : null
-    const name = text(course.name) ?? text(course.course_code)
+    const fullName = text(course.name)
+    const name = (fullName && courseNameWithoutCode(fullName)) ?? text(course.course_code)
     if (!id || !name || course.access_restricted_by_date === true || course.workflow_state === "deleted") return []
-    const code = text(course.course_code)
+    // "PS28301_26/FA" -> "PS283", as Student OS shows it.
+    const rawCode = text(course.course_code)
+    const code = rawCode ? shortCourseCode(rawCode) : null
     const term = typeof course.term === "object" && course.term !== null ? (course.term as Record<string, unknown>) : null
     const termName = text(term?.name)
     return [

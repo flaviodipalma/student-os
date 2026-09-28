@@ -16,7 +16,7 @@ import type { LmsAssignment, LmsCourse } from "./types"
 const lmsCourse = (overrides: Partial<LmsCourse> = {}): LmsCourse => ({
   provider: "canvas",
   externalId: "course-1",
-  courseCode: "CSC 215",
+  courseCode: "CSC215",
   courseName: "Data Structures",
   description: null,
   instructor: "Prof. Smith",
@@ -72,7 +72,7 @@ const inCourse1 = (id: string) => (id === "course-1" ? "c1" : undefined)
 describe("normalized course mapping", () => {
   it("fills Student OS course fields from an LMS course", () => {
     expect(courseFieldsFrom(lmsCourse())).toEqual({
-      code: "CSC 215",
+      code: "CSC215",
       name: "Data Structures",
       professor: "Prof. Smith",
       description: "",
@@ -129,6 +129,47 @@ describe("course matching", () => {
   it("doesn't link another provider's or another LMS course's record by code", () => {
     const other = course({ source: { provider: "blackboard", externalId: "x" } })
     expect(planCourses([other], [lmsCourse()])).toEqual([expect.objectContaining({ kind: "create" })])
+  })
+})
+
+describe("short course codes", () => {
+  const forensic = lmsCourse({ externalId: "283", courseCode: "PS28301_26/FA", courseName: "Intro to Forensic Psych" })
+
+  it("a new course gets the short code (subject + number)", () => {
+    expect(planCourses([], [forensic])).toEqual([expect.objectContaining({ kind: "create", fields: expect.objectContaining({ code: "PS283" }) })])
+  })
+
+  it("a course imported before with the long code switches to the short one", () => {
+    const before = courseFieldsFrom(forensic, { fullCode: true })
+    const [action] = planCourses([course({ code: "PS28301_26/FA", name: forensic.courseName, ...imported("283"), synced: before })], [forensic])
+    expect(action).toMatchObject({ kind: "update", changes: { code: "PS283" } })
+  })
+
+  it("...but a code the student changed stays theirs", () => {
+    const before = courseFieldsFrom(forensic, { fullCode: true })
+    const [action] = planCourses([course({ code: "Forensics", name: forensic.courseName, ...imported("283"), synced: before })], [forensic])
+    expect(action).toMatchObject({ kind: "unchanged" })
+  })
+
+  it("two courses that would share a short code (lecture + lab section) keep their full codes", () => {
+    const lab = lmsCourse({ externalId: "284", courseCode: "PS28302_26/FA", courseName: "Forensic Psych Lab" })
+    expect(planCourses([], [forensic, lab]).map((action) => action.kind === "create" && action.fields.code)).toEqual(["PS28301_26/FA", "PS28302_26/FA"])
+    // Also when the other one was imported earlier.
+    const earlier = course({ id: "c9", code: "PS283", ...imported("283") })
+    expect(planCourses([earlier], [lab])).toEqual([expect.objectContaining({ kind: "create", fields: expect.objectContaining({ code: "PS28302_26/FA" }) })])
+  })
+
+  it("the name drops the code Canvas adds in brackets; a course imported with it gets the clean name", () => {
+    const named = lmsCourse({ externalId: "283", courseCode: "PS28301_26/FA", courseName: "Intro to Forensic Psyc (PS28301_26/FA)" })
+    expect(courseFieldsFrom(named)).toMatchObject({ code: "PS283", name: "Intro to Forensic Psyc" })
+    const before = { ...courseFieldsFrom(named), name: "Intro to Forensic Psyc (PS28301_26/FA)" }
+    const [action] = planCourses([course({ code: "PS283", name: before.name, ...imported("283"), synced: before })], [named])
+    expect(action).toMatchObject({ kind: "update", changes: { name: "Intro to Forensic Psyc" } })
+  })
+
+  it("links a course added by hand with the short code", () => {
+    const [action] = planCourses([course({ code: "PS 283" })], [forensic])
+    expect(action).toMatchObject({ kind: "link", courseId: "c1" })
   })
 })
 

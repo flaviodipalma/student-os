@@ -41,6 +41,18 @@ export const courseFields = z.object({
 export const createCourseSchema = courseFields.extend({ id })
 export const updateCourseSchema = courseFields.partial()
 
+// Several courses changed at once (Courses page, select mode).
+export const courseIdsSchema = z.array(id).min(1, "Select at least one course.").max(100)
+export const bulkCourseChangeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("delete") }),
+  z
+    .object({ kind: z.literal("dates"), from: dateKey, until: dateKey })
+    .refine((value) => value.until >= value.from, { message: "The last day can't be before the first day.", path: ["until"] }),
+  z.object({ kind: z.literal("online"), online: z.boolean() }),
+  z.object({ kind: z.literal("color"), color: z.enum(["sky", "emerald", "violet", "orange", "rose"]) }),
+])
+export type BulkCourseChange = z.infer<typeof bulkCourseChangeSchema>
+
 // ---- Tasks
 
 export const taskFields = z.object({

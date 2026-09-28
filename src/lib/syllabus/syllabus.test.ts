@@ -26,7 +26,7 @@ const TODAY = "2026-09-22"
 function aiOutput(overrides: Partial<SyllabusExtraction> = {}): SyllabusExtraction {
   return {
     course: {
-      courseCode: "CSC 215",
+      courseCode: "CSC215",
       courseName: "Data Structures",
       professor: "John Smith",
       description: "Lists, trees and graphs.",
@@ -96,7 +96,7 @@ function expectImportError(fn: () => unknown, code: SyllabusImportError["code"])
 describe("validateExtraction", () => {
   it("accepts well-formed AI output", () => {
     const result = validateExtraction(aiOutput(), TODAY)
-    expect(result.course.courseCode).toBe("CSC 215")
+    expect(result.course.courseCode).toBe("CSC215")
     expect(result.items.map((i) => i.title)).toEqual(["Assignment 1", "Assignment 2", "Midterm Exam"])
     expect(result.items[2]).toMatchObject({ estimatedMinutes: 75, priority: "high", needsReview: false })
   })
@@ -175,7 +175,7 @@ describe("duplicate detection", () => {
   it("matches the course by code and leaves likely duplicates unselected", () => {
     const draft = buildReviewDraft(validateExtraction(aiOutput(), TODAY), [csc215], [existingTask()])
 
-    expect(draft.target).toEqual({ kind: "existing", courseId: "csc215" }) // "CSC 215" = "CSC215"
+    expect(draft.target).toEqual({ kind: "existing", courseId: "csc215" }) // "CSC215" = "CSC215"
     const duplicates = findDraftDuplicates(draft, [existingTask()])
     const a2 = draft.items.find((i) => i.title === "Assignment 2")!
     expect(duplicates.get(a2.key)?.id).toBe("t-a2")
@@ -201,7 +201,7 @@ describe("importing a reviewed syllabus (saved to the database)", () => {
     expect(saved.createdCourse).toBe(true)
     const data = await loadAppData(t.db, user)
     expect(data.courses).toEqual([
-      expect.objectContaining({ code: "CSC 215", name: "Data Structures", professor: "John Smith" }),
+      expect.objectContaining({ code: "CSC215", name: "Data Structures", professor: "John Smith" }),
     ])
     expect(data.tasks.map((task) => [task.title, task.courseId, task.dueDate, task.type])).toEqual([
       ["Assignment 1", saved.course.id, "2026-09-25", "assignment"],
@@ -338,7 +338,7 @@ describe("imported tasks and the Planner", () => {
 
 describe("PDF text extraction", () => {
   it("reads the text layer of a PDF", async () => {
-    const pdf = makeTextPdf(["CSC 215 — Data Structures", "Assignment 1 — September 25", "Midterm Exam — October 14"])
+    const pdf = makeTextPdf(["CSC215 — Data Structures", "Assignment 1 — September 25", "Midterm Exam — October 14"])
     const { text, pageCount } = await extractPdfText(pdf)
     expect(pageCount).toBe(1)
     expect(text).toContain("Assignment 1 — September 25")
@@ -357,7 +357,7 @@ describe("PDF text extraction", () => {
 
 describe("processSyllabus (with a mocked AI service)", () => {
   const syllabusPdf = makeTextPdf([
-    "CSC 215 — Data Structures, Fall 2026",
+    "CSC215 — Data Structures, Fall 2026",
     "Instructor: John Smith",
     "Assignment 1 — September 25",
     "Midterm Exam — October 14",

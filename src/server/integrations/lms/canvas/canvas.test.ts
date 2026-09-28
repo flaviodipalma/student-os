@@ -35,10 +35,10 @@ const assignment = (id: number, courseId: number, overrides: Record<string, unkn
 })
 describe("mapping Canvas data", () => {
   it("maps a course; skips deleted, date-restricted and nameless ones", () => {
-    expect(canvasCourseToLms(course(215, { name: "Data Structures", course_code: "CSC 215" }))).toEqual({
+    expect(canvasCourseToLms(course(215, { name: "Data Structures", course_code: "CSC215" }))).toEqual({
       provider: "canvas",
       externalId: "215",
-      courseCode: "CSC 215",
+      courseCode: "CSC215",
       courseName: "Data Structures",
       description: null,
       instructor: "Prof. Smith",
@@ -147,7 +147,7 @@ describe("syncing Canvas into Student OS", () => {
   it("imports courses and assignments as normal courses and tasks", async () => {
     const user = await connected("Alex")
     const canvas = fakeCanvas({
-      courses: [course(215, { name: "Data Structures", course_code: "CSC 215" }), course(9, { access_restricted_by_date: true })],
+      courses: [course(215, { name: "Data Structures", course_code: "CSC215" }), course(9, { access_restricted_by_date: true })],
       assignments: { "215": [assignment(1, 215), assignment(2, 215, { due_at: null })] },
     })
     const result = await sync(user, canvas)
@@ -156,7 +156,7 @@ describe("syncing Canvas into Student OS", () => {
     const data = await loadAppData(t.db, user)
     expect(data.courses).toEqual([
       expect.objectContaining({
-        code: "CSC 215",
+        code: "CSC215",
         name: "Data Structures",
         source: { provider: "canvas", externalId: "215", url: `${BASE}/courses/215` },
       }),
@@ -328,16 +328,16 @@ describe("syncing over time", () => {
 
   it("one item that can't be saved doesn't stop the rest (partial failure)", async () => {
     const user = await connected("Alex")
-    // Two Canvas courses whose codes are the same to Student OS ("CSC 215" and "CSC215"):
+    // Two Canvas courses whose codes are the same to Student OS ("CSC215" and "CSC215"):
     // the second can't be created, but everything else still syncs.
     const canvas = fakeCanvas({
-      courses: [course(1, { course_code: "CSC 215", name: "Data Structures" }), course(2, { course_code: "CSC215", name: "Data Structures (lab)" }), course(3)],
+      courses: [course(1, { course_code: "CSC215", name: "Data Structures" }), course(2, { course_code: "CSC215", name: "Data Structures (lab)" }), course(3)],
       assignments: { "1": [assignment(10, 1)], "2": [assignment(20, 2)], "3": [assignment(30, 3)] },
     })
     const result = await sync(user, canvas)
     expect(result.coursesCreated).toBe(2)
     expect(result.coursesSkipped).toBe(1)
-    expect(result.errors).toEqual(["Data Structures (lab): You already have a course with the code CSC 215."])
+    expect(result.errors).toEqual(["Data Structures (lab): You already have a course with the code CSC215."])
     expect(result.assignmentsCreated).toBe(2) // the lab's assignment has no course to go in
     expect((await loadAppData(t.db, user)).tasks.map((task) => task.title).sort()).toEqual(["Assignment 10", "Assignment 30"])
   })

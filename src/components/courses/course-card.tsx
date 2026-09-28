@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { CalendarClockIcon, ChevronRightIcon, CircleAlertIcon } from "lucide-react"
+import { CalendarClockIcon, CheckIcon, ChevronRightIcon, CircleAlertIcon } from "lucide-react"
 import { describeClassTime } from "./class-times"
 import { courseColorClass } from "@/components/course-tag"
 import { useAppStore } from "@/lib/app-store"
@@ -13,7 +13,18 @@ import { courseWorkload, formatDue, isDone, tasksForCourse, upcomingDeadlines } 
 import type { Course } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-export function CourseCard({ course }: { course: Course }) {
+// A link to the course; in select mode (Courses page) a checkbox-like button instead.
+export function CourseCard({
+  course,
+  selecting = false,
+  selected = false,
+  onToggle,
+}: {
+  course: Course
+  selecting?: boolean
+  selected?: boolean
+  onToggle?: () => void
+}) {
   const { tasks, today } = useTasks()
   const courseTasks = tasksForCourse(tasks, course.id)
   const open = courseTasks.filter((task) => !isDone(task)).length
@@ -22,11 +33,12 @@ export function CourseCard({ course }: { course: Course }) {
   const classTimes = classTimesOf(recurringCommitments, course.id)
   const workload = courseWorkload(courseTasks, today, (taskId) => completedMinutesFor(taskId, calendarItems))
 
-  return (
-    <Link
-      href={`/courses/${course.id}`}
-      className="group flex overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-md hover:ring-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
+  const frame = cn(
+    "group flex w-full overflow-hidden rounded-xl bg-card text-left ring-1 ring-border transition-shadow outline-none hover:shadow-md hover:ring-foreground/15 focus-visible:ring-3 focus-visible:ring-ring/50",
+    selected && "ring-2 ring-primary hover:ring-primary"
+  )
+  const body = (
+    <>
       <span aria-hidden className={cn("w-1.5 shrink-0", courseColorClass[course.color])} />
       <div className="flex min-w-0 flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
@@ -48,10 +60,22 @@ export function CourseCard({ course }: { course: Course }) {
               {course.online ? "Online" : classTimes.length > 0 ? classTimes.map(describeClassTime).join("; ") : "No class times"}
             </p>
           </div>
-          <ChevronRightIcon
-            aria-hidden
-            className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-          />
+          {selecting ? (
+            <span
+              aria-hidden
+              className={cn(
+                "mt-1 flex size-5 shrink-0 items-center justify-center rounded-md border",
+                selected ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background"
+              )}
+            >
+              {selected && <CheckIcon className="size-3.5" />}
+            </span>
+          ) : (
+            <ChevronRightIcon
+              aria-hidden
+              className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+            />
+          )}
         </div>
         <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{course.description}</p>
         <dl className="mt-4 flex gap-6 border-t pt-4 text-sm">
@@ -80,6 +104,15 @@ export function CourseCard({ course }: { course: Course }) {
           </div>
         </dl>
       </div>
+    </>
+  )
+  return selecting ? (
+    <button type="button" role="checkbox" aria-checked={selected} aria-label={`${course.code} ${course.name}`} onClick={onToggle} className={frame}>
+      {body}
+    </button>
+  ) : (
+    <Link href={`/courses/${course.id}`} className={frame}>
+      {body}
     </Link>
   )
 }

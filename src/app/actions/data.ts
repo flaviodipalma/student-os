@@ -4,7 +4,9 @@ import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import type { CalendarEvent, Course, RecurringCommitment, StudySessionRecord, Task } from "@/lib/types"
 import {
+  bulkCourseChangeSchema,
   classTimesSchema,
+  courseIdsSchema,
   createCourseSchema,
   createEventSchema,
   createSessionSchema,
@@ -16,7 +18,7 @@ import {
   updateTaskSchema,
 } from "@/lib/validation"
 import { parse, runAction } from "@/server/actions"
-import { createCourse, deleteCourse, listCourses, updateCourse } from "@/server/services/courses"
+import { bulkUpdateCourses, createCourse, deleteCourse, listCourses, updateCourse } from "@/server/services/courses"
 import { createEvent, deleteEvent, updateEvent } from "@/server/services/events"
 import { setClassTimes } from "@/server/services/recurring-commitments"
 import { createStudySession, deleteStudySession, updateStudySession } from "@/server/services/study-sessions"
@@ -42,6 +44,16 @@ export async function deleteCourseAction(id: unknown): Promise<ActionResult<null
     await deleteCourse(db, userId, parse(idSchema, id))
     return null
   })
+}
+
+// Several courses at once: delete, semester dates, online / in person, or color.
+export async function bulkUpdateCoursesAction(
+  courseIds: unknown,
+  change: unknown
+): Promise<ActionResult<{ courses: Course[]; commitments: RecurringCommitment[] }>> {
+  return runAction(({ db, userId }) =>
+    bulkUpdateCourses(db, userId, parse(courseIdsSchema, courseIds), parse(bulkCourseChangeSchema, change))
+  )
 }
 
 // The student's courses and tasks as saved now (e.g. after the extension imported some).

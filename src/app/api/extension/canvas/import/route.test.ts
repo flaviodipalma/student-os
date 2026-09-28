@@ -19,7 +19,7 @@ vi.mock("@/server/auth", () => ({ getCurrentUser: async () => (state.userId ? { 
 const { POST } = await import("./route")
 
 const BASE = "https://school.instructure.com"
-const course = { id: 215, name: "Data Structures", course_code: "CSC 215", workflow_state: "available", teachers: [{ display_name: "Prof. Smith" }] }
+const course = { id: 215, name: "Data Structures", course_code: "CSC215", workflow_state: "available", teachers: [{ display_name: "Prof. Smith" }] }
 const project = {
   id: 1,
   course_id: 215,
@@ -78,7 +78,7 @@ describe("POST /api/extension/canvas/import", () => {
     expect(response).toMatchObject({ status: 200, cache: "no-store" })
     expect(response.body.result).toMatchObject({ provider: "canvas", coursesCreated: 1, assignmentsCreated: 2, assignmentsCompleted: 1 })
 
-    expect(await listCourses(t.db, alex.userId)).toEqual([expect.objectContaining({ code: "CSC 215", name: "Data Structures" })])
+    expect(await listCourses(t.db, alex.userId)).toEqual([expect.objectContaining({ code: "CSC215", name: "Data Structures" })])
     const tasks = await listTasks(t.db, alex.userId)
     // Due in the browser's time zone: 03:59 UTC is 23:59 the day before in New York.
     expect(tasks.find((task) => task.title === "Project 1")).toMatchObject({ dueDate: "2026-09-25", dueTime: "23:59", status: "not_started" })
@@ -199,14 +199,14 @@ describe("POST /api/extension/canvas/import", () => {
 
   it("a course the extension couldn't read is skipped, not reported as gone", async () => {
     const alex = await student("Alex")
-    const math = { id: 300, name: "Calculus", course_code: "MAT 141" }
+    const math = { id: 300, name: "Calculus", course_code: "MAT141" }
     const response = await send(payload({ courses: [course, math], assignments: { "215": [project] } }), alex.userId)
     expect(response.body.result).toMatchObject({ coursesSkipped: 1, assignmentsCreated: 1, assignmentsMissing: 0 })
   })
 
   it("a course the student unchecks isn't reported as gone, and its tasks stay", async () => {
     const alex = await student("Alex")
-    const math = { id: 300, name: "Calculus", course_code: "MAT 141" }
+    const math = { id: 300, name: "Calculus", course_code: "MAT141" }
     const problemSet = { ...project, id: 30, course_id: 300, name: "Problem Set 1" }
     await send(payload({ courses: [course, math], assignments: { "215": [project], "300": [problemSet] } }), alex.userId)
     const next = await send(payload({ courses: [course], assignments: { "215": [project] } }), alex.userId)
