@@ -12,14 +12,20 @@ import {
   type NotificationSync,
 } from "@/server/services/notifications"
 import { saveNotificationPreferences } from "@/server/services/preferences"
+import { pushMessagesFor, pushToStudent } from "@/server/push"
 import { getStudentTimeZone } from "@/server/student-clock"
 
 // Server actions for reminders. The student is always the signed-in user; ids from
 // the browser only ever match that student's own notifications.
 
 // Generates any reminders due now (in the student's time zone) and returns the list.
+// New ones are also pushed to the student's other devices with push on.
 export async function syncNotificationsAction(): Promise<ActionResult<NotificationSync>> {
-  return runAction(async ({ db, userId }) => syncNotifications(db, userId, { timeZone: await getStudentTimeZone() }))
+  return runAction(async ({ db, userId }) => {
+    const sync = await syncNotifications(db, userId, { timeZone: await getStudentTimeZone() })
+    if (sync.created.length > 0) await pushToStudent(db, userId, await pushMessagesFor(db, userId, sync.created))
+    return sync
+  })
 }
 
 export async function markNotificationReadAction(id: unknown): Promise<ActionResult<null>> {

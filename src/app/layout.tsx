@@ -21,6 +21,10 @@ export const metadata: Metadata = {
     default: "Student OS",
   },
   description: "Know what to do today: deadlines, classes and commitments in one plan.",
+  // Installed on a phone's home screen (see app/manifest.ts).
+  applicationName: "Student OS",
+  appleWebApp: { capable: true, title: "Student OS", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

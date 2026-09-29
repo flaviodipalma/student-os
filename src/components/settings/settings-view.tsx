@@ -14,10 +14,16 @@ import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@
 import type { NotificationPreferences, ProfileInput, StudentPreferences } from "@/lib/types"
 import { firstIssue, notificationPreferencesSchema, preferencesSchema, profileSchema } from "@/lib/validation"
 import { NotificationSettingsFields } from "./notification-settings-fields"
+import { PushSettingsCard } from "./push-settings-card"
 
-// Profile, study preferences and weekly commitments. Same fields, validation and
-// server actions as onboarding; this page just saves each section on its own.
-export function SettingsView() {
+// Settings, by tab (src/app/(app)/settings/page.tsx): Profile, Planning and
+// Notifications. Same fields, validation and server actions as onboarding; each
+// section saves on its own.
+
+const toMessage = (result: ActionResult<unknown>) => (result.ok ? null : result.error)
+
+// Profile: name and school (the account card follows on the page).
+export function ProfileSettings() {
   const store = useAppStore()
   const [profile, setProfile] = useState<ProfileInput>({
     firstName: store.student.firstName,
@@ -25,27 +31,28 @@ export function SettingsView() {
     schoolName: store.student.schoolName,
     schoolDomain: store.student.schoolDomain,
   })
+  return (
+    <Section
+      id="profile"
+      title="About you"
+      description="Your name is used in greetings. Student OS finds your school's academic calendar on its website."
+      onSave={async () => {
+        const parsed = profileSchema.safeParse(profile)
+        if (!parsed.success) return firstIssue(parsed.error)
+        return toMessage(await store.updateProfile(parsed.data))
+      }}
+    >
+      <ProfileFields value={profile} onChange={setProfile} />
+    </Section>
+  )
+}
+
+// Planning: study preferences and weekly commitments (personalization follows on the page).
+export function PlanningSettings() {
+  const store = useAppStore()
   const [preferences, setPreferences] = useState<StudentPreferences>(store.preferences)
-  const notificationStore = useNotifications()
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(notificationStore.preferences)
-
-  const toMessage = (result: ActionResult<unknown>) => (result.ok ? null : result.error)
-
   return (
     <div className="space-y-6">
-      <Section
-        id="profile"
-        title="About you"
-        description="Your name is used in greetings. Student OS finds your school's academic calendar on its website."
-        onSave={async () => {
-          const parsed = profileSchema.safeParse(profile)
-          if (!parsed.success) return firstIssue(parsed.error)
-          return toMessage(await store.updateProfile(parsed.data))
-        }}
-      >
-        <ProfileFields value={profile} onChange={setProfile} />
-      </Section>
-
       <Section
         id="study-preferences"
         title="Study preferences"
@@ -83,10 +90,19 @@ export function SettingsView() {
           />
         </CardContent>
       </Card>
+    </div>
+  )
+}
 
+// Notifications: which reminders and how early, then push reminders per device.
+export function NotificationSettings() {
+  const notificationStore = useNotifications()
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(notificationStore.preferences)
+  return (
+    <div className="space-y-6">
       <Section
         id="notifications"
-        title="Notifications"
+        title="Reminders"
         description="Reminders about deadlines, study sessions and events, in the bell and on your Dashboard."
         onSave={async () => {
           const parsed = notificationPreferencesSchema.safeParse(notificationPrefs)
@@ -101,6 +117,8 @@ export function SettingsView() {
       >
         <NotificationSettingsFields value={notificationPrefs} onChange={setNotificationPrefs} />
       </Section>
+
+      <PushSettingsCard />
     </div>
   )
 }

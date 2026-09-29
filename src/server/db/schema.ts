@@ -220,6 +220,35 @@ export const schoolCalendars = pgTable(
   (t) => [check("school_calendars_domain_format", sql`${t.domain} ~ '^[a-z0-9.-]+\\.[a-z]{2,}$'`)]
 ).enableRLS()
 
+// Devices a student turned push reminders on for (Web Push). The endpoint is the
+// browser's push address; p256dh and auth are its public keys (they only let us
+// encrypt messages to it). The device's time zone lets the scheduled job work out
+// "due soon" while the app is closed.
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    timeZone: text("time_zone"),
+    // e.g. "Chrome on Mac", for the student's list of devices.
+    device: text("device").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("push_subscriptions_user_id_idx").on(t.userId),
+    check("push_subscriptions_endpoint_https", sql`${t.endpoint} like 'https://%' and char_length(${t.endpoint}) <= 2048`),
+    check("push_subscriptions_keys_length", sql`char_length(${t.p256dh}) <= 200 and char_length(${t.auth}) <= 100`),
+    check("push_subscriptions_device_length", sql`char_length(${t.device}) <= 80`),
+  ]
+).enableRLS()
+
 export const recurringCommitments = pgTable(
   "recurring_commitments",
   {

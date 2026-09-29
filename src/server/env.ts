@@ -83,6 +83,14 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
     ;(production ? report.errors : report.warnings).push("ANTHROPIC_API_KEY isn't set: syllabus import and the Assistant won't work.")
   }
 
+  // ---- Push reminders (optional): the key pair, and the scheduler's secret
+  const push = group(env, report, "Push reminders", ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"])
+  if (push && !/^(mailto:|https:\/\/)/.test(env.VAPID_SUBJECT ?? "")) report.errors.push("VAPID_SUBJECT must start with mailto: or https://.")
+  if (env.CRON_SECRET && env.CRON_SECRET.length < 32) report.errors.push("CRON_SECRET must be at least 32 characters.")
+  if (push && !env.CRON_SECRET) {
+    ;(production ? report.errors : report.warnings).push("CRON_SECRET isn't set: push reminders only go out while Student OS is open somewhere.")
+  }
+
   // ---- Integrations (each is optional; if configured, fully and safely)
   const redirects: string[] = []
   if (group(env, report, "Google Calendar", ["GOOGLE_CALENDAR_CLIENT_ID", "GOOGLE_CALENDAR_CLIENT_SECRET", "GOOGLE_CALENDAR_REDIRECT_URI"])) redirects.push("GOOGLE_CALENDAR_REDIRECT_URI")

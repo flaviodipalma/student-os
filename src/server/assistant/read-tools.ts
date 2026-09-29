@@ -541,7 +541,7 @@ export const getLearnedPatterns = defineTool({
         result: {
           enabled: false,
           explicit: { planningMode: settings.planningMode, preferredStudyTimes: settings.preferredPeriods },
-          note: "Learning from history is off (Settings > Personalization): the Planner uses the student's own estimates, settings and planning mode only.",
+          note: "Learning from history is off (Settings > Planning > Personalization): the Planner uses the student's own estimates, settings and planning mode only.",
         },
       }
     }

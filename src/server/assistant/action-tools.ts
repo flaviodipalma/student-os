@@ -215,7 +215,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
       if (parts.length === 0) return { ok: false, problem: "That wouldn't change anything." }
       return {
         ok: true,
-        pending: { action, summary: `Personalization: ${parts.join("; ")}.`, note: "You can change this any time in Settings > Personalization.", confirmLabel: "Save" },
+        pending: { action, summary: `Personalization: ${parts.join("; ")}.`, note: "You can change this any time in Settings > Planning > Personalization.", confirmLabel: "Save" },
       }
     }
 

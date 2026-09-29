@@ -156,15 +156,44 @@ To configure on deployment:
   database reports (slow queries, connections).
 - Anthropic usage and spend alerts in the Anthropic console.
 
-## Reminders (no background jobs)
+## Reminders and push notifications
 
-Reminders are created when a student has Student OS open (on load, every minute,
-and right after their data changes) and are shown in the app and, if allowed, as
-desktop notifications from that tab. Nothing runs while no one is using the app:
-a reminder that came due while it was closed appears the next time it opens
-(deduplicated, and stale "coming up" ones are dropped). Email or push reminders
-would need a scheduled job (e.g. a cron hitting a protected endpoint) and are
-not built.
+Reminders are created while a student has Student OS open (on load, every minute,
+and after their data changes) and shown in the app. **Push reminders** also reach
+their phone or computer while Student OS is closed, once they turn them on
+(Settings > Push reminders; on iPhone, after adding Student OS to the home screen).
+
+Setup, per environment:
+
+1. Keys (VAPID): `npx web-push generate-vapid-keys`, then set
+   `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`
+   (`mailto:you@...`). Don't reuse development keys; changing keys later means
+   every student has to turn push on again.
+2. `CRON_SECRET`: 32+ random characters (`openssl rand -hex 32`).
+3. A scheduler that calls the job every 5 minutes:
+   `POST https://<your-domain>/api/cron/reminders` with
+   `Authorization: Bearer <CRON_SECRET>`. It answers with counts
+   (`students`, `created`, `sent`, `removed`, `failed`) and is safe to call as
+   often as wanted (a reminder is pushed once). Options:
+   - **Supabase** (recommended: already used). In the SQL editor, enable the
+     `pg_cron` and `pg_net` extensions (Database > Extensions), then:
+     ```sql
+     select cron.schedule('student-os-reminders', '*/5 * * * *', $$
+       select net.http_post(
+         url := 'https://<your-domain>/api/cron/reminders',
+         headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>')
+       )
+     $$);
+     ```
+     (Store the secret in Supabase Vault instead of the query if you prefer.)
+   - **Vercel Cron** also works (it sends `Authorization: Bearer $CRON_SECRET`
+     on a GET), but the Hobby plan only runs jobs once a day, which is too rare.
+4. Check: Settings > Push reminders > Turn on, then Send a test; and
+   `npm run reminders:run -- https://<your-domain>` with `CRON_SECRET` set.
+
+Without the keys the Push reminders card says it isn't set up; without
+`CRON_SECRET` the job answers 503 and push only happens while the app is open
+somewhere (the environment check reports both).
 
 ## Deploying
 

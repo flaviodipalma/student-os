@@ -1,51 +1,56 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/app-shell/page-header"
+import { PageTabs } from "@/components/app-shell/page-tabs"
 import { AccountCard } from "@/components/settings/account-card"
 import { LearningCard } from "@/components/settings/learning-card"
-import { SettingsView } from "@/components/settings/settings-view"
+import { NotificationSettings, PlanningSettings, ProfileSettings } from "@/components/settings/settings-view"
 import { getNavItem } from "@/lib/navigation"
 import { enabledSocialProviders, getAccountDetails } from "@/server/social-auth"
 
 const section = getNavItem("/settings")
 
-// In the order they appear on the page. The theme lives in the header's theme menu,
-// and connected services have their own page (/integrations).
-const sections = [
-  { id: "profile", label: "Profile" },
-  { id: "study-preferences", label: "Study preferences" },
-  { id: "recurring-commitments", label: "Recurring commitments" },
-  { id: "notifications", label: "Notifications" },
-  { id: "personalization", label: "Personalization" },
-  { id: "account", label: "Account" },
-]
-
 export const metadata: Metadata = { title: section.title }
+
+// Settings in three tabs, each with its own address:
+//   /settings                       Profile: about you, the account and ways to log in
+//   /settings?tab=planning          Planning: study preferences, weekly commitments, personalization
+//   /settings?tab=notifications     Notifications: reminders, push on this and other devices
+// The theme lives in the header's theme menu; connected services have their own page
+// (/integrations); the academic calendar is in Calendar.
+const tabs = [
+  { id: "profile", label: "Profile", href: "/settings" },
+  { id: "planning", label: "Planning", href: "/settings?tab=planning" },
+  { id: "notifications", label: "Notifications", href: "/settings?tab=notifications" },
+]
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const params = await searchParams
+  const tab = params.tab === "planning" || params.tab === "notifications" ? params.tab : "profile"
 
   return (
     <>
       <PageHeader title={section.title} description={section.description} />
-      <nav aria-label="Settings sections" className="-mt-2 mb-6 flex flex-wrap gap-2">
-        {sections.map((item) => (
-          <a
-            key={item.id}
-            href={`#${item.id}`}
-            className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground outline-none hover:bg-muted/70 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {item.label}
-          </a>
-        ))}
-      </nav>
+      <div className="-mt-2 mb-6">
+        <PageTabs label="Settings sections" tabs={tabs} current={tab} />
+      </div>
       <div className="space-y-6">
-        <SettingsView />
-        <LearningCard />
-        <AccountCard
-          account={await getAccountDetails()}
-          available={await enabledSocialProviders()}
-          outcome={typeof params.login === "string" ? { code: params.login, provider: typeof params.provider === "string" ? params.provider : undefined } : undefined}
-        />
+        {tab === "profile" && (
+          <>
+            <ProfileSettings />
+            <AccountCard
+              account={await getAccountDetails()}
+              available={await enabledSocialProviders()}
+              outcome={typeof params.login === "string" ? { code: params.login, provider: typeof params.provider === "string" ? params.provider : undefined } : undefined}
+            />
+          </>
+        )}
+        {tab === "planning" && (
+          <>
+            <PlanningSettings />
+            <LearningCard />
+          </>
+        )}
+        {tab === "notifications" && <NotificationSettings />}
       </div>
     </>
   )

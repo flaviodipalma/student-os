@@ -27,16 +27,14 @@ minute, and ~1.5 s after the student's tasks or study sessions change.
 so a cron job, scheduled worker or serverless scheduled function can call it later
 for every student without changes.
 
-**Limitation (no background execution yet).** Student OS has no background job
-system, and browser code only runs while a Student OS tab is open. So:
-- reminders are created when the student opens the app (or while it's open), not
-  while it's closed; a reminder whose moment passed while the app was closed is
-  only delivered if it's still useful (see the windows below), otherwise skipped;
-- desktop notifications appear only while Student OS is open in a tab (they're
-  useful when that tab is in the background). There's no service worker / Web
-  Push, email or SMS.
-Adding a scheduler later = call `syncNotifications` on a timer; delivery outside
-the app would additionally need push, email or similar.
+**Push (Web Push), and the scheduled job.** New reminders are also pushed to the
+student's devices with push turned on (Settings > Push reminders): by the open
+app's sync, and by a scheduled job (`POST /api/cron/reminders`, every few
+minutes, src/server/push/reminders-job.ts) that runs `syncNotifications` for every
+student with a push device, in that device's time zone. The reminder's id is the
+notification `tag` for both push and the open tab's desktop notification, so the
+same reminder never shows twice on a device (one replaces the other). Devices the push service
+reports gone are removed. Setup: docs/deployment.md.
 
 ## What is generated (src/lib/notifications/generate.ts)
 
@@ -113,6 +111,8 @@ Row Level Security is on with no policies, like every table.
 - `src/server/services/preferences.ts`: notification preferences
 - `src/app/actions/notifications.ts`: server actions (+ tests)
 - `src/lib/notification-store.tsx`: browser delivery (sync timer, desktop notifications)
+- `src/server/push/`: push devices, sending, the scheduled job (+ tests); `public/sw.js`: shows pushes
+- `src/components/settings/push-settings-card.tsx`: Settings > Push reminders
 - `src/components/notifications/notification-center.tsx`: the bell and list
 - `src/components/dashboard/needs-attention.tsx`, `src/components/settings/notification-settings-fields.tsx`
 - `drizzle/0007_notifications.sql`

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 import { SimpleSelect } from "@/components/form-fields"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import type { NotificationPreferences } from "@/lib/types"
 import { reminderMinuteOptions } from "@/lib/types"
+import { canPushHere } from "@/lib/push-client"
 
 // The reminder settings in Settings > Notifications. Desktop notifications ask the
 // browser for permission only when the student turns them on here (never on load),
@@ -61,6 +62,8 @@ function CheckRow({
   )
 }
 
+const noSubscription = () => () => {}
+
 export function NotificationSettingsFields({
   value,
   onChange,
@@ -70,6 +73,8 @@ export function NotificationSettingsFields({
 }) {
   const [permissionNote, setPermissionNote] = useState<string | null>(null)
   const off = !value.enabled
+  // Checked in the browser (on the server: assume push works, so nothing flickers in).
+  const pushWorksHere = useSyncExternalStore(noSubscription, canPushHere, () => true)
 
   // Asks the browser only now, because the student chose to turn desktop notifications on.
   async function toggleDesktop(checked: boolean) {
@@ -119,14 +124,17 @@ export function NotificationSettingsFields({
             options={reminderMinuteOptions.map((minutes) => ({ value: String(minutes), label: timingLabel[minutes] }))}
           />
         </div>
-        <CheckRow
-          id="notifications-desktop"
-          label="Enable desktop notifications"
-          hint="Shows new reminders on your computer while Student OS is open in a browser tab."
-          checked={value.browserNotifications}
-          disabled={off}
-          onChange={toggleDesktop}
-        />
+        {/* Where push reminders work (see Push reminders), they replace this. */}
+        {!pushWorksHere && (
+          <CheckRow
+            id="notifications-desktop"
+            label="Enable desktop notifications"
+            hint="Shows new reminders on your computer while Student OS is open in a browser tab."
+            checked={value.browserNotifications}
+            disabled={off}
+            onChange={toggleDesktop}
+          />
+        )}
         {permissionNote && (
           <p role="status" className="text-xs text-warning">
             {permissionNote}
