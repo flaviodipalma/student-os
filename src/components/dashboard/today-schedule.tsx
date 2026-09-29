@@ -78,7 +78,7 @@ export function TodaySchedule({ className }: { className?: string }) {
                   ? item.event.title
                   : `Study — ${taskTitle.get(item.session.taskId) ?? item.event?.title ?? "task"}`
               const style = item.kind === "event" ? eventStyle[item.event.type].block : eventStyle.study.block
-              // Events say where they're from (Student OS, Canvas, Blackboard); study sessions
+              // Events say where they're from (Quadernio, Canvas, Blackboard); study sessions
               // say whether they're already scheduled or recommended by the Planner.
               const label =
                 item.kind === "event"

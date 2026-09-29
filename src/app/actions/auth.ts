@@ -13,7 +13,7 @@ import { logger } from "@/server/log"
 
 // Sign up, log in and log out with Supabase Auth: email + password, or Google /
 // Microsoft / Apple (OAuth / OpenID Connect, run by Supabase). Every method
-// signs in the same kind of Student OS user; social sign-in never connects a
+// signs in the same kind of Quadernio user; social sign-in never connects a
 // calendar.
 
 export type AuthFormState = { error?: string; notice?: string }
@@ -157,7 +157,7 @@ export async function linkLoginMethodAction(_previous: AuthFormState, formData: 
       options: { redirectTo: await authCallbackUrl(), scopes: socialProviders[provider].scopes, skipBrowserRedirect: true },
     })
     if (error || !data.url) {
-      if (error?.code === "manual_linking_disabled") return { error: "Adding login methods isn't turned on for this Student OS server yet." }
+      if (error?.code === "manual_linking_disabled") return { error: "Adding login methods isn't turned on for this Quadernio server yet." }
       return { error: authErrorMessages[authErrorFromCode(error?.code)] }
     }
     url = data.url

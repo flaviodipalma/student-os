@@ -1,4 +1,4 @@
-// Server logs for Student OS (see docs/security.md, "Logging").
+// Server logs for Quadernio (see docs/security.md, "Logging").
 //
 // One line per event: JSON in production (so the hosting platform / a log
 // service can search and alert on it), readable text in development.

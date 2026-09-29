@@ -62,7 +62,7 @@ function itemView(ctx: ToolContext, item: CalendarEvent) {
     end: timeLabel(item.endTime),
     kind: item.sessionId ? "study session" : item.commitmentId ? "weekly commitment" : item.type,
     source: sourceName(item),
-    // Canvas / Blackboard events are read-only copies: Student OS can't change them.
+    // Canvas / Blackboard events are read-only copies: Quadernio can't change them.
     readOnly: Boolean(item.source && item.source !== "student_os"),
     ...(item.location ? { location: untrusted(item.location, 80) } : {}),
     ...(item.taskId ? { taskId: item.taskId } : {}),
@@ -239,7 +239,7 @@ export const getTaskDetails = defineTool({
   input: z.object({ task: taskRefInput }),
   run(ctx, { task: ref }) {
     const resolved = resolveTask(ctx.data.tasks, ref, { includeCompleted: true })
-    if ("notFound" in resolved) return { result: { status: "not_found", message: "No task matches that in Student OS." } }
+    if ("notFound" in resolved) return { result: { status: "not_found", message: "No task matches that in Quadernio." } }
     if ("ambiguous" in resolved) return { result: { status: "ambiguous", options: resolved.ambiguous.map((t) => taskBrief(ctx, t)) } }
     const task = resolved.found
     const scored = ctx.planner.planFor(ctx.today).ranked.find((s) => s.task.id === task.id)
@@ -531,7 +531,7 @@ function estimateView(ctx: ToolContext, task: Task) {
 export const getLearnedPatterns = defineTool({
   name: "getLearnedPatterns",
   description:
-    "The student's planning profile, as computed by Student OS from their own history, in three separate parts: explicit (what they chose: planning mode, preferred study times), observed (each value with confidence, number of observations, the date of the newest evidence and its source) and inferred (what the Planner does because of it). Also the insights (each with an id for correctPersonalization, whether it affects planning and whether the student turned it off) and learned estimates for open tasks. Use for \"why is this session longer?\", \"when do I study best?\", \"why afternoon sessions?\". Only explain what this returns; never infer other patterns.",
+    "The student's planning profile, as computed by Quadernio from their own history, in three separate parts: explicit (what they chose: planning mode, preferred study times), observed (each value with confidence, number of observations, the date of the newest evidence and its source) and inferred (what the Planner does because of it). Also the insights (each with an id for correctPersonalization, whether it affects planning and whether the student turned it off) and learned estimates for open tasks. Use for \"why is this session longer?\", \"when do I study best?\", \"why afternoon sessions?\". Only explain what this returns; never infer other patterns.",
   input: z.object({}),
   run(ctx) {
     const a = ctx.adaptive

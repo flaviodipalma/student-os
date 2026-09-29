@@ -10,7 +10,7 @@ import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
 import { parseExtensionLmsBaseUrl } from "./base-url"
 
-// A Canvas import sent by the Student OS browser extension. The extension reads
+// A Canvas import sent by the Quadernio browser extension. The extension reads
 // Canvas with the student's own browser session:
 //   GET /api/v1/courses?enrollment_type=student&enrollment_state=active&include[]=teachers&include[]=term
 //   GET /api/v1/courses/:id/assignments?include[]=submission&order_by=due_at

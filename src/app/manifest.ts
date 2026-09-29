@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next"
 
-// Lets students install Student OS on their phone's home screen (or as a desktop
+// Lets students install Quadernio on their phone's home screen (or as a desktop
 // app). On iPhone, installing is what allows push notifications (iOS 16.4+).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Student OS",
-    short_name: "Student OS",
+    name: "Quadernio",
+    short_name: "Quadernio",
     description: "Know what to do today: deadlines, classes and commitments in one plan.",
     start_url: "/dashboard",
     scope: "/",

@@ -1,13 +1,13 @@
 import { autoSyncCourses, shouldAutoSync, siteFor } from "./auto-sync"
 import { courseOptions } from "./courses"
 import { importChosen, LMS, loadAddress, loadAutoSync, loadChoice, setLoggedOut, showBadge, updateSite } from "./lms-sync"
-import { currentAccount, StudentOsError } from "./student-os"
+import { currentAccount, QuadernioError } from "./quadernio"
 
 // The background worker: syncs automatically when the student opens their Canvas or
 // Blackboard (a switch per site in the popup, which also grants access to that
 // site). At most once every half hour per site, only the courses they chose,
 // quietly: a badge on the extension icon only when something needs them (logged out
-// of Student OS, new courses). Anything else (logged out of the LMS, offline) is
+// of Quadernio, new courses). Anything else (logged out of the LMS, offline) is
 // skipped until the next visit.
 
 const running = new Set<string>()
@@ -28,12 +28,12 @@ async function autoSync(tabId: number, url: string | undefined) {
     await updateSite(origin, lms.id, { lastAttemptAt: Date.now() })
     const address = await loadAddress()
 
-    // Logged in to Student OS? (Checked first: it's quick, and nothing is read from the LMS otherwise.)
+    // Logged in to Quadernio? (Checked first: it's quick, and nothing is read from the LMS otherwise.)
     try {
       await currentAccount(address, fetch)
       await setLoggedOut(false)
     } catch (error) {
-      if (error instanceof StudentOsError && error.loggedOut) await setLoggedOut(true)
+      if (error instanceof QuadernioError && error.loggedOut) await setLoggedOut(true)
       return
     }
 
@@ -45,7 +45,7 @@ async function autoSync(tabId: number, url: string | undefined) {
     if (plan.ids.length > 0) await importChosen(tabId, address, lms, list, plan.ids, { automatic: true })
     await updateSite(origin, lms.id, { newCourses: plan.newCourses })
   } catch {
-    // Logged out of the LMS, offline, Student OS unreachable: try again on a later visit.
+    // Logged out of the LMS, offline, Quadernio unreachable: try again on a later visit.
   } finally {
     running.delete(origin)
   }
@@ -62,21 +62,21 @@ chrome.permissions.onRemoved.addListener(async (removed) => {
 // The badge after Chrome restarts (it isn't kept).
 chrome.runtime.onStartup.addListener(async () => {
   await showBadge(await loadAutoSync())
-  await markStudentOs()
+  await markQuadernio()
 })
 
-// ---- Telling Student OS the extension is installed ------------------------------------
+// ---- Telling Quadernio the extension is installed ------------------------------------
 
-// marker.ts runs on the Student OS address the student uses, so its pages (onboarding)
+// marker.ts runs on the Quadernio address the student uses, so its pages (onboarding)
 // know the extension is there. Registered for that address (the extension has access
-// to it), again whenever it changes, and added right away to Student OS tabs already
+// to it), again whenever it changes, and added right away to Quadernio tabs already
 // open (the onboarding page is usually open while the extension is being installed).
-async function markStudentOs() {
+async function markQuadernio() {
   const address = await loadAddress()
   const matches = [`${address}/*`]
   try {
-    await chrome.scripting.unregisterContentScripts({ ids: ["student-os-marker"] }).catch(() => {})
-    await chrome.scripting.registerContentScripts([{ id: "student-os-marker", matches, js: ["marker.js"], runAt: "document_start" }])
+    await chrome.scripting.unregisterContentScripts({ ids: ["quadernio-marker"] }).catch(() => {})
+    await chrome.scripting.registerContentScripts([{ id: "quadernio-marker", matches, js: ["marker.js"], runAt: "document_start" }])
     const tabs = await chrome.tabs.query({ url: matches })
     await Promise.all(
       tabs.map((tab) => (tab.id ? chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["marker.js"] }).catch(() => {}) : null))
@@ -86,7 +86,7 @@ async function markStudentOs() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => void markStudentOs())
+chrome.runtime.onInstalled.addListener(() => void markQuadernio())
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.address) void markStudentOs()
+  if (changes.address) void markQuadernio()
 })

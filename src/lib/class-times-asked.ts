@@ -7,8 +7,8 @@ import { useSyncExternalStore } from "react"
 // asking. Kept in this browser only: it's a convenience; the course page always
 // shows whether a course has class times.
 
-const KEY = "student-os:class-times-asked"
-const EVENT = "student-os:class-times-asked"
+const KEY = "quadernio:class-times-asked"
+const EVENT = "quadernio:class-times-asked"
 
 function read(): string {
   try {

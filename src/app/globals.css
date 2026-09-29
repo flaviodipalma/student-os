@@ -7,7 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Student OS design tokens. Every color in the app comes from here: components use
+  Quadernio design tokens. Every color in the app comes from here: components use
   semantic names (bg-card, text-muted-foreground, text-danger, bg-event-class-bg...),
   never raw palette colors, so Light and Dark are just two sets of values below.
 

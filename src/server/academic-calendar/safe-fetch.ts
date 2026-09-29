@@ -21,7 +21,7 @@ export type FetchedPage = { url: string; contentType: string; body: Buffer }
 
 const TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 4
-const USER_AGENT = "StudentOS-AcademicCalendar/1.0 (finds a school's public academic calendar for its students)"
+const USER_AGENT = "Quadernio-AcademicCalendar/1.0 (finds a school's public academic calendar for its students)"
 
 // ---- Addresses --------------------------------------------------------------------------
 

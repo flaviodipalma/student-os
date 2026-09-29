@@ -20,7 +20,7 @@ import { whatNow } from "./what-now"
 
 // Personalization in the Planner (Prompt 32): pacing, preferred times, "fits the
 // free time now", planning modes; and several simulated weeks of five kinds of
-// student using Student OS every day. Personalization may change soft
+// student using Quadernio every day. Personalization may change soft
 // decisions; hard constraints never move.
 
 const TUE = "2026-09-22"

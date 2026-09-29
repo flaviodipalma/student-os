@@ -30,7 +30,7 @@ export async function readCalendar(fields: Record<string, string | File>, today:
     const response = await fetch("/api/academic-calendar/read", { method: "POST", body: form })
     return (await response.json()) as ReadCalendarResponse
   } catch {
-    return { ok: false, message: "We couldn't reach Student OS. Check your connection and try again." }
+    return { ok: false, message: "We couldn't reach Quadernio. Check your connection and try again." }
   }
 }
 

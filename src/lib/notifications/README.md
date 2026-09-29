@@ -1,8 +1,8 @@
 # Notifications & reminders
 
-Student OS reminds students about their own work: tasks, study sessions, calendar
+Quadernio reminds students about their own work: tasks, study sessions, calendar
 events (their own, weekly commitments, Canvas and Blackboard) and today's plan.
-Everything comes from data Student OS already has; the Planner stays the source
+Everything comes from data Quadernio already has; the Planner stays the source
 of truth for recommended work. No AI.
 
 ## Architecture: generation and delivery are separate

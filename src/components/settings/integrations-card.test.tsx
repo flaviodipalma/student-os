@@ -40,8 +40,8 @@ afterEach(cleanup)
 describe("Canvas and Blackboard: through the browser extension only", () => {
   it("not connected: explains the extension; no forms, links to paste or sign-in buttons", () => {
     render(<IntegrationsCard integrations={lms()} timeZone="UTC" />)
-    expect(screen.getByText(/Connect with the Student OS browser extension/)).toBeTruthy()
-    expect(within(row("Canvas")).getByText(/Not connected · open Canvas, click the Student OS extension/)).toBeTruthy()
+    expect(screen.getByText(/Connect with the Quadernio browser extension/)).toBeTruthy()
+    expect(within(row("Canvas")).getByText(/Not connected · open Canvas, click the Quadernio extension/)).toBeTruthy()
     expect(within(row("Blackboard")).getByText(/Not connected · open Blackboard/)).toBeTruthy()
     expect(screen.queryByRole("textbox")).toBeNull()
     expect(screen.queryByRole("button")).toBeNull()

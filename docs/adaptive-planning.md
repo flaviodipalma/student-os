@@ -3,7 +3,7 @@
 > Extended by long-term personalization (profile, modes, preferred times, pacing,
 > corrections): see docs/personalization.md.
 
-Student OS learns from one student's own history and uses it as **soft**
+Quadernio learns from one student's own history and uses it as **soft**
 input to the deterministic Planner. The Planner stays the authority on what's
 possible.
 
@@ -120,7 +120,7 @@ course names or descriptions. Nothing behavioral is written to logs.
 - Time actually spent is known only when the student logs it (marks sessions
   done, or records progress). Work done off the plan isn't seen.
 - Rescheduling is recorded only from this release on, and only for sessions
-  moved in Student OS.
+  moved in Quadernio.
 - The Planner's own suggestions aren't stored, so ignoring a suggestion without
   pressing Skip isn't a signal.
 - Workload tolerance and preferred times are insights. They don't pull study

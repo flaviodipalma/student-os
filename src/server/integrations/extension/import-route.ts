@@ -10,7 +10,7 @@ import { readLimited } from "../../read-limited"
 import { extensionJson as json, extensionUser } from "./http"
 
 // The browser extension's import endpoints (/api/extension/<lms>/import) share one
-// shape: the Student OS login plus the extension check (http.ts), the student's Sync
+// shape: the Quadernio login plus the extension check (http.ts), the student's Sync
 // now allowance, a size limit, JSON, then the LMS's own import. Answers
 // 200 { result: LmsSyncResult }, or { error } with 400 / 401 (logged out) /
 // 403 (not the extension) / 413 / 429 / 503.
@@ -20,7 +20,7 @@ export const MAX_IMPORT_BYTES = 2 * 1024 * 1024
 type Importer = (db: Database, userId: string, payload: unknown) => Promise<LmsSyncResult>
 
 export function extensionImportRoute(lmsName: string, importer: Importer) {
-  const tooLarge = `That's more ${lmsName} data than Student OS can take at once.`
+  const tooLarge = `That's more ${lmsName} data than Quadernio can take at once.`
   const notData = `That doesn't look like ${lmsName} data. Update the extension and try again.`
 
   return async function POST(request: Request): Promise<Response> {

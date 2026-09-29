@@ -41,7 +41,7 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Student-OS-Extension": "1" }
+const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Quadernio-Extension": "1" }
 const send = async (body: unknown, userId: string | null, headers: Record<string, string> = EXTENSION) => {
   state.userId = userId
   const response = await POST(
@@ -122,10 +122,10 @@ describe("POST /api/extension/blackboard/import", () => {
     expect(await listTasks(t.db, alex)).toHaveLength(3)
   })
 
-  it("needs the Student OS login and the extension, like every extension endpoint", async () => {
+  it("needs the Quadernio login and the extension, like every extension endpoint", async () => {
     const alex = await t.addUser("Alex")
     expect(await send(payload(), null)).toMatchObject({ status: 401, body: { loggedOut: true } })
-    expect(await send(payload(), alex, { Origin: "https://evil.example.com", "X-Student-OS-Extension": "1" })).toMatchObject({ status: 403 })
+    expect(await send(payload(), alex, { Origin: "https://evil.example.com", "X-Quadernio-Extension": "1" })).toMatchObject({ status: 403 })
     expect(await connectionOf(alex)).toBeUndefined()
   })
 

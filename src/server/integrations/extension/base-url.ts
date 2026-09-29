@@ -12,7 +12,7 @@ import { parseLmsBaseUrl } from "../lms/base-url"
 // addresses, ports, credentials or local names.
 export function parseExtensionLmsBaseUrl(input: string, lmsName: string): string {
   return parseLmsBaseUrl(input, "any-https", {
-    invalid: `The extension sent a ${lmsName} address Student OS can't use. Open your school's ${lmsName} (https://…) and try again.`,
+    invalid: `The extension sent a ${lmsName} address Quadernio can't use. Open your school's ${lmsName} (https://…) and try again.`,
     notAllowed: () => "",
   })
 }

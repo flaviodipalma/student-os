@@ -38,7 +38,7 @@ function messageFor(error: unknown): string {
   if (error instanceof FetchRefused) return error.message
   if (error instanceof CalendarReadError) {
     if (error.reason === "not-configured") return "Reading academic calendars isn't set up on this server yet."
-    if (error.reason === "busy") return "Student OS is busy right now. Try again in a minute."
+    if (error.reason === "busy") return "Quadernio is busy right now. Try again in a minute."
     return "We couldn't read that calendar. Try again, or add the dates by hand."
   }
   if (error instanceof SyllabusImportError) {
@@ -52,7 +52,7 @@ function messageFor(error: unknown): string {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser()
-  if (!user) return refuse("Log in to Student OS first.", 401)
+  if (!user) return refuse("Log in to Quadernio first.", 401)
   // Reading a calendar can mean an AI request.
   if (!takeRateLimit(`academic-calendar:${user.id}`, RATE_LIMITS.academicCalendar).ok) {
     return refuse("You've looked for calendars a lot in the last hour. Try again later.", 429)

@@ -12,9 +12,9 @@ import {
   updateSite,
 } from "./lms-sync"
 import { courseOptions, groupByTerm, initialSelection, type CourseOption } from "./courses"
-import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, StudentOsError } from "./student-os"
+import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, QuadernioError } from "./quadernio"
 
-// The popup. It syncs to the Student OS account logged in in this browser (Chrome
+// The popup. It syncs to the Quadernio account logged in in this browser (Chrome
 // sends that login with the extension's requests), so there's nothing to set up:
 // it checks who's logged in, then syncs Canvas or Blackboard from the tab the
 // student is on. Sync reads the course list, lets the student choose (the first
@@ -78,8 +78,8 @@ async function checkLogin() {
     // Logged in again: automatic sync can carry on.
     showAutoSync(await setLoggedOut(false))
   } catch (error) {
-    if (error instanceof StudentOsError && error.loggedOut) show({ kind: "logged-out" })
-    else show({ kind: "error", message: error instanceof StudentOsError ? error.message : "Something went wrong. Please try again." })
+    if (error instanceof QuadernioError && error.loggedOut) show({ kind: "logged-out" })
+    else show({ kind: "error", message: error instanceof QuadernioError ? error.message : "Something went wrong. Please try again." })
   }
 }
 
@@ -134,9 +134,9 @@ async function setAutoSync(origin: string, lms: keyof typeof LMS_NAMES, on: bool
   }
 }
 
-// ---- The Student OS address --------------------------------------------------------
+// ---- The Quadernio address --------------------------------------------------------
 
-// Student OS is reached with a host permission for its address (that's also what lets
+// Quadernio is reached with a host permission for its address (that's also what lets
 // Chrome send the login). This computer is granted in the manifest; any other address
 // is asked for once.
 async function allowAddress(origin: string): Promise<boolean> {
@@ -157,13 +157,13 @@ addressForm.addEventListener("submit", async (event) => {
   event.preventDefault()
   try {
     const next = normalizeAddress(addressInput.value)
-    if (!(await allowAddress(next))) throw new StudentOsError(`The extension needs permission to reach ${next}.`)
+    if (!(await allowAddress(next))) throw new QuadernioError(`The extension needs permission to reach ${next}.`)
     address = next
     await saveAddress(address)
     addressForm.hidden = true
     await checkLogin()
   } catch (error) {
-    show({ kind: "error", message: error instanceof StudentOsError ? error.message : "Something went wrong. Please try again." })
+    show({ kind: "error", message: error instanceof QuadernioError ? error.message : "Something went wrong. Please try again." })
   }
 })
 
@@ -246,12 +246,12 @@ function chooseCourses(options: CourseOption[], selected: Set<string>): Promise<
 
 async function sync(choose: boolean): Promise<{ lines: string[]; name: string } | null> {
   const tab = await canvasTab()
-  if (!tab?.id) throw new StudentOsError(NOT_AN_LMS)
+  if (!tab?.id) throw new QuadernioError(NOT_AN_LMS)
 
   setText(progress, "Reading your courses…")
   const { lms, list } = await readCourses(tab.id, tab.url)
   const options = courseOptions(list.choices)
-  if (options.length === 0) throw new StudentOsError(`${lms.name} doesn't list any active courses for you.`)
+  if (options.length === 0) throw new QuadernioError(`${lms.name} doesn't list any active courses for you.`)
 
   const saved = await loadChoice(list.baseUrl)
   const { selected, needsReview } = initialSelection(options, saved, Date.now())
@@ -290,12 +290,12 @@ async function runSync(choose: boolean) {
     )
     result.hidden = false
   } catch (error) {
-    if (error instanceof StudentOsError && error.loggedOut) {
-      // Logged out of Student OS since the popup opened.
-      show({ kind: "logged-out", message: "You're logged out of Student OS. Log in, then click Sync now again." })
+    if (error instanceof QuadernioError && error.loggedOut) {
+      // Logged out of Quadernio since the popup opened.
+      show({ kind: "logged-out", message: "You're logged out of Quadernio. Log in, then click Sync now again." })
       return
     }
-    setNotice(syncError, error instanceof StudentOsError ? error.message : "Something went wrong. Please try again.")
+    setNotice(syncError, error instanceof QuadernioError ? error.message : "Something went wrong. Please try again.")
   } finally {
     setText(progress, null)
     syncButton.disabled = false
@@ -311,7 +311,7 @@ for (const id of ["choose-courses", "review-courses"]) {
     if (!syncButton.disabled) void runSync(true)
   })
 }
-$("open-student-os").addEventListener("click", (event) => {
+$("open-quadernio").addEventListener("click", (event) => {
   event.preventDefault()
   void chrome.tabs.create({ url: `${address}/tasks` })
 })

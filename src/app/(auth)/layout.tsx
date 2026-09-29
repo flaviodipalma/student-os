@@ -12,10 +12,10 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <GraduationCapIcon className="size-5" />
         </span>
-        <span className="text-lg font-semibold tracking-tight">Student OS</span>
+        <span className="text-lg font-semibold tracking-tight">Quadernio</span>
       </div>
       <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
-        You don&apos;t organize college. Student OS does: it plans your study time around your classes and deadlines.
+        You don&apos;t organize college. Quadernio does: it plans your study time around your classes and deadlines.
       </p>
       <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-8">
         {!supabaseEnv() && (

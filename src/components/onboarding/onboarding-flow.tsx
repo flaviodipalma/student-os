@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils"
 import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 
-// First-time setup. A short intro ("Welcome to Student OS!", "Let's get started"),
+// First-time setup. A short intro ("Welcome to Quadernio!", "Let's get started"),
 // then four steps. Everything entered is kept while moving back and forth. Steps
 // 1-3 are saved together when leaving step 3 (so they survive a reload). Step 4
 // brings in courses: connect Canvas or Blackboard through the browser extension
@@ -42,7 +42,7 @@ import { firstIssue, preferencesSchema, profileSchema } from "@/lib/validation"
 // Settings page.
 
 const steps = [
-  { title: "About you", description: "So Student OS knows what to call you." },
+  { title: "About you", description: "So Quadernio knows what to call you." },
   { title: "Study preferences", description: "When and how you like to study. The defaults work for most students." },
   {
     title: "Recurring commitments",
@@ -68,7 +68,7 @@ function needClassTimes(courses: Course[], commitments: RecurringCommitment[], a
 
 function courseHeading(view: CourseView): { title: string; description: string } {
   if (view.kind === "extension") {
-    return { title: "Get the Student OS extension", description: `To connect ${lmsProviderNames[view.provider]}, add the extension to Chrome.` }
+    return { title: "Get the Quadernio extension", description: `To connect ${lmsProviderNames[view.provider]}, add the extension to Chrome.` }
   }
   if (view.kind === "tutorial") {
     return { title: `Sync your ${lmsProviderNames[view.provider]} courses`, description: "Three quick steps. This page continues on its own." }
@@ -229,7 +229,7 @@ export function OnboardingFlow() {
         <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <GraduationCapIcon className="size-5" />
         </span>
-        <span className="text-lg font-semibold tracking-tight">Student OS</span>
+        <span className="text-lg font-semibold tracking-tight">Quadernio</span>
       </div>
 
       <Progress step={step} />
@@ -244,9 +244,9 @@ export function OnboardingFlow() {
         <p className="mt-1 text-muted-foreground">{current.description}</p>
         {step === 0 && (
           <div className="mt-4 rounded-lg bg-primary/[0.06] px-4 py-3 text-sm">
-            <p className="font-semibold">You don&apos;t organize college. Student OS does.</p>
+            <p className="font-semibold">You don&apos;t organize college. Quadernio does.</p>
             <p className="mt-1 text-muted-foreground">
-              Add your classes and deadlines, and Student OS plans your study time around your schedule, and tells you
+              Add your classes and deadlines, and Quadernio plans your study time around your schedule, and tells you
               what to work on right now. Four quick steps; skip anything you don&apos;t need yet.
             </p>
           </div>

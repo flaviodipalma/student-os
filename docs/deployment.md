@@ -1,4 +1,4 @@
-# Deploying Student OS
+# Deploying Quadernio
 
 The simplest production setup for an early-stage product: one Next.js app, one
 managed Postgres, and hosted providers for everything else. No servers to run,
@@ -9,7 +9,7 @@ Browser ──HTTPS──> Next.js app (e.g. Vercel)  ──> Supabase: Auth + P
                         │                        (pooler connection, RLS on, no policies)
                         ├──> Anthropic (syllabus reader, Assistant)
                         ├──> Google Calendar API / Microsoft Graph (per-student OAuth)
-                        └──< Student OS browser extension (Canvas / Blackboard, read in the student's own browser)
+                        └──< Quadernio browser extension (Canvas / Blackboard, read in the student's own browser)
 Login: Google / Microsoft / Apple through Supabase Auth
 ```
 
@@ -57,7 +57,7 @@ Full list with explanations: `.env.example`. For production:
 | `LMS_TOKEN_ENCRYPTION_KEY` | for Google Calendar / Outlook | `openssl rand -base64 32`; **back it up** (losing it = every student reconnects their calendars) |
 | `GOOGLE_CALENDAR_*`, `OUTLOOK_CALENDAR_*` | optional | Client id, secret, `https://<domain>/api/integrations/<google\|outlook>-calendar/callback` |
 | `NEXT_PUBLIC_EXTENSION_STORE_URL` | recommended | The extension's Chrome Web Store page: onboarding's "Add to Chrome" (public by design) |
-| `STUDENT_OS_EXTENSION_IDS` | recommended | The published Chrome extension's id: only it may use a student's login (`extension/README.md`) |
+| `QUADERNIO_EXTENSION_IDS` | recommended | The published Chrome extension's id: only it may use a student's login (`extension/README.md`) |
 
 Never give a secret a `NEXT_PUBLIC_` name (the startup check refuses it).
 
@@ -126,7 +126,7 @@ entries from production apps.
 - **Google Calendar / Outlook:** `docs/calendar-integrations.md` (Google consent
   screen verification before public launch; Microsoft client secret expiry).
 - **Canvas / Blackboard:** nothing to set up on their side: students connect with the
-  browser extension (`extension/README.md`). Publish it and set `STUDENT_OS_EXTENSION_IDS`.
+  browser extension (`extension/README.md`). Publish it and set `QUADERNIO_EXTENSION_IDS`.
 - **Anthropic:** a production key with a spending limit set in the console.
 
 ## Monitoring
@@ -158,10 +158,10 @@ To configure on deployment:
 
 ## Reminders and push notifications
 
-Reminders are created while a student has Student OS open (on load, every minute,
+Reminders are created while a student has Quadernio open (on load, every minute,
 and after their data changes) and shown in the app. **Push reminders** also reach
-their phone or computer while Student OS is closed, once they turn them on
-(Settings > Push reminders; on iPhone, after adding Student OS to the home screen).
+their phone or computer while Quadernio is closed, once they turn them on
+(Settings > Push reminders; on iPhone, after adding Quadernio to the home screen).
 
 Setup, per environment:
 
@@ -178,7 +178,7 @@ Setup, per environment:
    - **Supabase** (recommended: already used). In the SQL editor, enable the
      `pg_cron` and `pg_net` extensions (Database > Extensions), then:
      ```sql
-     select cron.schedule('student-os-reminders', '*/5 * * * *', $$
+     select cron.schedule('quadernio-reminders', '*/5 * * * *', $$
        select net.http_post(
          url := 'https://<your-domain>/api/cron/reminders',
          headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>')
@@ -236,7 +236,7 @@ on the deployment / provider side.
 | Health checks (`/api/health`, `/api/health/ready`) | code | done |
 | Uptime monitor on readiness | infra | to do |
 | Rate limiting (per instance) | code | done |
-| Browser extension published; `STUDENT_OS_EXTENSION_IDS` set; its default address is the production domain | infra + code | to do |
+| Browser extension published; `QUADERNIO_EXTENSION_IDS` set; its default address is the production domain | infra + code | to do |
 | Shared rate limiting across instances / WAF | infra | to do if scaling out |
 | Security headers (CSP, frame, nosniff, …) | code | done |
 | Production build succeeds | code | done |

@@ -1,11 +1,11 @@
 import { importBlackboardFromExtension } from "@/server/integrations/extension/blackboard-import"
 import { extensionImportRoute } from "@/server/integrations/extension/import-route"
 
-// POST /api/extension/blackboard/import: the Student OS browser extension sends the
+// POST /api/extension/blackboard/import: the Quadernio browser extension sends the
 // student's Blackboard courses, grade columns, grades and recent attempts (read with
-// their own Blackboard login), for the Student OS account logged in in that browser.
+// their own Blackboard login), for the Quadernio account logged in in that browser.
 //
-//   X-Student-OS-Extension: 1          (plus the Student OS login cookies)
+//   X-Quadernio-Extension: 1          (plus the Quadernio login cookies)
 //   { "baseUrl": "https://school.blackboard.com", "timeZone": "America/New_York",
 //     "courses": [...memberships with course expanded],
 //     "columns": { "<course id>": [...grade columns] },

@@ -10,7 +10,7 @@ import { canPushHere } from "@/lib/push-client"
 
 // The reminder settings in Settings > Notifications. Desktop notifications ask the
 // browser for permission only when the student turns them on here (never on load),
-// and Student OS works the same without them (the bell always has every reminder).
+// and Quadernio works the same without them (the bell always has every reminder).
 
 const timingLabel: Record<(typeof reminderMinuteOptions)[number], string> = {
   5: "5 minutes before",
@@ -82,12 +82,12 @@ export function NotificationSettingsFields({
     if (!checked) return onChange({ ...value, browserNotifications: false })
     let permission = browserPermission()
     if (permission === "unsupported") {
-      return setPermissionNote("This browser doesn't support desktop notifications. You'll still see every reminder in Student OS.")
+      return setPermissionNote("This browser doesn't support desktop notifications. You'll still see every reminder in Quadernio.")
     }
     if (permission === "default") permission = await Notification.requestPermission().catch(() => "denied" as const)
     if (permission !== "granted") {
       return setPermissionNote(
-        "Desktop notifications are blocked for this site. You can allow them in your browser's site settings; reminders still show in Student OS."
+        "Desktop notifications are blocked for this site. You can allow them in your browser's site settings; reminders still show in Quadernio."
       )
     }
     onChange({ ...value, browserNotifications: true })
@@ -129,7 +129,7 @@ export function NotificationSettingsFields({
           <CheckRow
             id="notifications-desktop"
             label="Enable desktop notifications"
-            hint="Shows new reminders on your computer while Student OS is open in a browser tab."
+            hint="Shows new reminders on your computer while Quadernio is open in a browser tab."
             checked={value.browserNotifications}
             disabled={off}
             onChange={toggleDesktop}

@@ -18,7 +18,7 @@ import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
 import { parseExtensionLmsBaseUrl } from "./base-url"
 
-// A Blackboard Learn import sent by the Student OS browser extension, which reads
+// A Blackboard Learn import sent by the Quadernio browser extension, which reads
 // Learn's REST API with the student's own browser session (Blackboard's own pages
 // use it the same way), for the courses the student chose:
 //   GET v1/users/me, v1/users/{id}/courses?expand=course    -> courses

@@ -165,7 +165,7 @@ describe("external events on the student's calendar", () => {
     expect(externalEventsAsCalendarItems([record("2026-09-29T18:00:00Z", "2026-09-29T20:00:00Z", { hidden: true })], NY)).toEqual([])
   })
 
-  it("Canvas, Blackboard and Student OS events sit side by side, even with the same title and time", () => {
+  it("Canvas, Blackboard and Quadernio events sit side by side, even with the same title and time", () => {
     const external = externalEventsAsCalendarItems(
       [
         record("2026-09-29T18:00:00Z", "2026-09-29T20:00:00Z", { id: "canvas-1" }),

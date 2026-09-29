@@ -1,6 +1,6 @@
 # Long-term personalization
 
-Student OS gradually learns how one student works and uses it to plan better.
+Quadernio gradually learns how one student works and uses it to plan better.
 It stays deterministic, explainable and under the student's control, and it
 never replaces the Planner. This builds on adaptive planning
 (docs/adaptive-planning.md) and the AI planning layer (docs/ai-planning.md).

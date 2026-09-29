@@ -17,13 +17,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s · Student OS",
-    default: "Student OS",
+    template: "%s · Quadernio",
+    default: "Quadernio",
   },
   description: "Know what to do today: deadlines, classes and commitments in one plan.",
   // Installed on a phone's home screen (see app/manifest.ts).
-  applicationName: "Student OS",
-  appleWebApp: { capable: true, title: "Student OS", statusBarStyle: "default" },
+  applicationName: "Quadernio",
+  appleWebApp: { capable: true, title: "Quadernio", statusBarStyle: "default" },
   icons: { apple: "/icons/apple-touch-icon.png" },
 };
 

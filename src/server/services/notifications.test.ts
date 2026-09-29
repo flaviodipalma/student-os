@@ -248,7 +248,7 @@ describe("each student's notifications are their own", () => {
     ).rejects.toThrow()
   })
 
-  it("links are always inside Student OS (database-enforced)", async () => {
+  it("links are always inside Quadernio (database-enforced)", async () => {
     const { user } = await student()
     for (const link of ["https://evil.example.com", "//evil.example.com", "javascript:alert(1)"]) {
       await expect(

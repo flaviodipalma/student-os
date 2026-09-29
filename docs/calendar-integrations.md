@@ -1,11 +1,11 @@
 # Calendar integrations: Google Calendar and Outlook
 
-Students can bring their personal calendars into Student OS. Events show up in
-the one Student OS calendar next to their own events, weekly commitments, study
+Students can bring their personal calendars into Quadernio. Events show up in
+the one Quadernio calendar next to their own events, weekly commitments, study
 sessions and Canvas / Blackboard events, and the Planner, the Dashboard, "What
 should I do now?" and reminders all treat them as busy time.
 
-**Read-only.** Student OS never creates, changes or deletes a Google or Outlook
+**Read-only.** Quadernio never creates, changes or deletes a Google or Outlook
 event. External events open a details dialog with **Open in Google Calendar /
 Open in Outlook**, never the edit form.
 
@@ -15,7 +15,7 @@ Open in Outlook**, never the edit form.
 | --- | --- | --- |
 | What | Google, Microsoft, Apple, email | Google Calendar, Outlook (and Canvas, Blackboard) |
 | Where | Log in / Sign up; Settings > Account | Integrations > Calendars |
-| Who runs OAuth | Supabase Auth | Student OS (`src/server/integrations/calendar`) |
+| Who runs OAuth | Supabase Auth | Quadernio (`src/server/integrations/calendar`) |
 | Permissions | identity only (`openid email profile`) | read-only calendar access |
 | Stored | Supabase `auth.identities` (no tokens) | `calendar_connections` (tokens encrypted) |
 
@@ -64,7 +64,7 @@ Microsoft: they read the synced copies from the database.
 2. Events in the sync window (`src/lib/calendar/sync-window.ts`: 7 days back, 8
    weeks ahead), all pages. Recurring events come back as their occurrences
    (Google `singleEvents=true`, Graph `calendarView`); they stay Google/Outlook
-   events and never become Student OS weekly commitments.
+   events and never become Quadernio weekly commitments.
 3. Normalized: title, description (text), start/end as real instants, location,
    a link to the event (Google/Outlook hosts only). Skipped, not guessed:
    cancelled events, events the student declined, events shown as **free**
@@ -96,7 +96,7 @@ Revokes the token at Google (Microsoft has no endpoint for this: students can
 remove access at account.microsoft.com/privacy/app-access or myapps.microsoft.com),
 deletes the connection and its tokens, and **deletes that calendar's copied
 events** (they can be private appointments; connecting again downloads them
-again). Nothing else changes: Student OS events, Canvas / Blackboard events,
+again). Nothing else changes: Quadernio events, Canvas / Blackboard events,
 tasks, courses and study sessions stay.
 
 ## Security
@@ -118,7 +118,7 @@ tasks, courses and study sessions stay.
 
 1. [Google Cloud Console](https://console.cloud.google.com/): create (or pick) a
    project. **APIs & Services > Library > Google Calendar API > Enable**.
-2. **OAuth consent screen**: app name "Student OS", support email, and the scopes
+2. **OAuth consent screen**: app name "Quadernio", support email, and the scopes
    `.../auth/calendar.calendarlist.readonly` and `.../auth/calendar.events.readonly`
    (Google lists them as sensitive: while the app is in **Testing**, add each
    Google account that may connect as a test user; for everyone, submit it for
@@ -140,7 +140,7 @@ tasks, courses and study sessions stay.
 ## Setup: Outlook (Microsoft Graph)
 
 1. [Microsoft Entra admin center](https://entra.microsoft.com/) > Identity >
-   Applications > **App registrations > New registration**: "Student OS Calendar".
+   Applications > **App registrations > New registration**: "Quadernio Calendar".
    - Supported account types: **Accounts in any organizational directory and
      personal Microsoft accounts**.
    - Redirect URI (platform **Web**):
@@ -149,7 +149,7 @@ tasks, courses and study sessions stay.
        (add under **Authentication** after creating it).
 2. **API permissions > Add a permission > Microsoft Graph > Delegated**:
    `Calendars.Read` and `offline_access` (User.Read, added by default, can stay
-   or be removed; Student OS doesn't use it). Some schools require an admin to
+   or be removed; Quadernio doesn't use it). Some schools require an admin to
    consent before students can connect.
 3. **Certificates & secrets > New client secret**: copy the **Value**. It
    expires: note the date and replace it before then.

@@ -1,4 +1,4 @@
-# Student OS
+# Quadernio
 
 A planner for college students that answers "What should I do today?", built with
 Next.js, TypeScript, Tailwind, Supabase (Postgres + Auth) and Drizzle.
@@ -29,7 +29,7 @@ with sample data. Real accounts always start empty.
 - **Browser state:** `src/lib/app-store.tsx` starts from the user's data and saves every change
   through a server action.
 - **Browser extension:** `extension/` syncs Canvas with the student's own Canvas login, to the
-  Student OS account logged in in the same browser. Build with `npm run build:extension`, then load
+  Quadernio account logged in in the same browser. Build with `npm run build:extension`, then load
   `extension/dist` in `chrome://extensions` ([extension/README.md](extension/README.md)).
 
 ## Database changes

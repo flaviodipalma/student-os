@@ -6,7 +6,7 @@ import { updateTask } from "../../../services/tasks"
 import { importCanvasFromExtension } from "../../extension/canvas-import"
 import { canvasAssignmentToLms, canvasCourseToLms, canvasDueToLocal, htmlToText } from "./mapping"
 
-// Canvas data in Student OS: the mapping (canvas/mapping.ts) and whole syncs through
+// Canvas data in Quadernio: the mapping (canvas/mapping.ts) and whole syncs through
 // the only way in, the browser extension's import, against a real Postgres. TEST
 // FIXTURES are hand-written, shaped after the fields documented in the Canvas REST
 // API (Courses, Assignments); they aren't real Canvas data.
@@ -143,7 +143,7 @@ const sync = (user: string, canvas: ReturnType<typeof fakeCanvas>) =>
     { now: NOW }
   )
 
-describe("syncing Canvas into Student OS", () => {
+describe("syncing Canvas into Quadernio", () => {
   it("imports courses and assignments as normal courses and tasks", async () => {
     const user = await connected("Alex")
     const canvas = fakeCanvas({
@@ -328,7 +328,7 @@ describe("syncing over time", () => {
 
   it("one item that can't be saved doesn't stop the rest (partial failure)", async () => {
     const user = await connected("Alex")
-    // Two Canvas courses whose codes are the same to Student OS ("CSC215" and "CSC215"):
+    // Two Canvas courses whose codes are the same to Quadernio ("CSC215" and "CSC215"):
     // the second can't be created, but everything else still syncs.
     const canvas = fakeCanvas({
       courses: [course(1, { course_code: "CSC215", name: "Data Structures" }), course(2, { course_code: "CSC215", name: "Data Structures (lab)" }), course(3)],

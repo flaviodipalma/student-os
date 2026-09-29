@@ -1,6 +1,6 @@
 # Security and privacy
 
-How Student OS protects student data, and what must be in place before real
+How Quadernio protects student data, and what must be in place before real
 users. Details for each area live next to the code (linked below).
 
 ## Authentication
@@ -14,13 +14,13 @@ users. Details for each area live next to the code (linked below).
   action or route accepts a user id from the browser.
 - Redirects after sign-in only go to in-app paths (`safeNextPath`).
 - **The browser extension** (`extension/`) uses the same login: Chrome sends the
-  Student OS session cookies with the extension's requests because it has
-  permission for the Student OS address. Its endpoints (`/api/extension/*`) check
+  Quadernio session cookies with the extension's requests because it has
+  permission for the Quadernio address. Its endpoints (`/api/extension/*`) check
   the session like everything else and also require the extension
-  (`src/server/integrations/extension/http.ts`): the `X-Student-OS-Extension`
+  (`src/server/integrations/extension/http.ts`): the `X-Quadernio-Extension`
   header (a website can't add it to a cross-site request: no CORS headers are
   sent), and an Origin, when present, of a Chrome extension (in production, only
-  the ids in `STUDENT_OS_EXTENSION_IDS`). Chrome omits Origin on the extension's
+  the ids in `QUADERNIO_EXTENSION_IDS`). Chrome omits Origin on the extension's
   GETs, so a missing Origin is accepted only for GET; a website's POST always has
   one. With the SameSite=Lax cookies, other websites can't use a student's login
   here (checked in a real browser from another site: blocked or 403, nothing
@@ -94,14 +94,14 @@ users. Details for each area live next to the code (linked below).
   the server for a sync/disconnect, sent only in `Authorization` headers to the
   provider's own hosts. Never returned to the browser, put in URLs, stored in the
   browser or logged. Disconnecting deletes them (Google tokens are also revoked).
-- **Login providers**: secrets live in Supabase; Student OS stores no provider
+- **Login providers**: secrets live in Supabase; Quadernio stores no provider
   tokens for login.
 - **Canvas and Blackboard** connect only through the browser extension, and nothing
   secret is stored for them anywhere: the student's LMS login stays in their browser
   (the extension reads the LMS in its own tab), the server never contacts the LMS,
   and a connection row holds only the LMS address and the last sync's status. The
-  extension keeps only the Student OS address and the chosen course ids. It reads
-  only the fields Student OS uses, and the server validates everything (same-host
+  extension keeps only the Quadernio address and the chosen course ids. It reads
+  only the fields Quadernio uses, and the server validates everything (same-host
   links, size limits). The school's address may be any public HTTPS address (schools
   run Canvas and Blackboard on their own domains), since the server never contacts
   it; no IPs, ports or local names. Automatic sync is opt-in and asks Chrome for
@@ -113,7 +113,7 @@ users. Details for each area live next to the code (linked below).
 ## Browser protections (`next.config.ts`)
 
 Content-Security-Policy (`default-src 'self'`, no plugins, no framing,
-`connect-src 'self'`: the browser only talks to Student OS), X-Frame-Options
+`connect-src 'self'`: the browser only talks to Quadernio), X-Frame-Options
 DENY, nosniff, strict-origin-when-cross-origin referrers, a restrictive
 Permissions-Policy, COOP same-origin, and in production HSTS and
 upgrade-insecure-requests. `form-action` is intentionally not set (OAuth sign-ins
@@ -159,7 +159,7 @@ password reset are limited by Supabase Auth.
   reviewed, database backups / point-in-time recovery on.
 - OAuth apps: production redirect URIs only; Google consent screen verified;
   Microsoft/Apple secrets' expiry dates tracked.
-- Browser extension: publish it, then set `STUDENT_OS_EXTENSION_IDS` to its id so
+- Browser extension: publish it, then set `QUADERNIO_EXTENSION_IDS` to its id so
   only it can use a student's login (the config check warns in production until
   it's set). Point its default address at the production domain.
 - **Rate limiting across instances**: the in-memory limiter is per server; with

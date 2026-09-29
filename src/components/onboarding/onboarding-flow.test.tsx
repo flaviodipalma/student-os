@@ -70,7 +70,7 @@ beforeEach(() => {
   mocks.reloadCourses.mockResolvedValue([])
   mocks.setClassTimes.mockImplementation(async (courseId: string, times: unknown[]) => ({ ok: true, data: times.map((t, i) => ({ id: `${courseId}-${i}`, courseId })) }))
   localStorage.clear()
-  delete document.documentElement.dataset.studentOsExtension
+  delete document.documentElement.dataset.quadernioExtension
   window.scrollTo = vi.fn()
 })
 afterEach(() => {
@@ -80,7 +80,7 @@ afterEach(() => {
 
 // Skips the intro (a click), then goes through the three detail steps.
 async function toCourses(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByText("Welcome to Student OS!"))
+  await user.click(screen.getByText("Welcome to Quadernio!"))
   await user.click(await screen.findByRole("button", { name: "Continue" }))
   await user.click(screen.getByRole("button", { name: "Use defaults" }))
   await user.click(screen.getByRole("button", { name: "Skip for now" }))
@@ -88,21 +88,21 @@ async function toCourses(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("the intro", () => {
-  it("'Welcome to Student OS!' for 3 seconds, then 'Let's get started' for 3, then setup, on its own", () => {
+  it("'Welcome to Quadernio!' for 3 seconds, then 'Let's get started' for 3, then setup, on its own", () => {
     vi.useFakeTimers()
     render(<OnboardingFlow />)
     act(() => vi.advanceTimersByTime(100))
-    expect(screen.getByText("Welcome to Student OS!").className).toMatch(/opacity-100/)
+    expect(screen.getByText("Welcome to Quadernio!").className).toMatch(/opacity-100/)
     expect(screen.getByText("Let's get started").className).toMatch(/opacity-0/)
     act(() => vi.advanceTimersByTime(2900)) // 3.0 s: still the welcome
-    expect(screen.getByText("Welcome to Student OS!").className).toMatch(/opacity-100/)
+    expect(screen.getByText("Welcome to Quadernio!").className).toMatch(/opacity-100/)
     act(() => vi.advanceTimersByTime(600)) // 3.6 s
-    expect(screen.getByText("Welcome to Student OS!").className).toMatch(/opacity-0/)
+    expect(screen.getByText("Welcome to Quadernio!").className).toMatch(/opacity-0/)
     expect(screen.getByText("Let's get started").className).toMatch(/opacity-100/)
     act(() => vi.advanceTimersByTime(2900)) // 6.5 s: still "Let's get started"
     expect(screen.getByText("Let's get started").className).toMatch(/opacity-100/)
     act(() => vi.advanceTimersByTime(600)) // 7.1 s
-    expect(screen.queryByText("Welcome to Student OS!")).toBeNull()
+    expect(screen.queryByText("Welcome to Quadernio!")).toBeNull()
     expect(screen.getByRole("heading", { name: "Welcome, Alex!" })).toBeTruthy()
   })
 
@@ -118,7 +118,7 @@ describe("step 1: the school is required", () => {
   it("without a school (or its website) setup doesn't continue, and says why", async () => {
     const user = userEvent.setup()
     render(<OnboardingFlow />)
-    await user.click(screen.getByText("Welcome to Student OS!"))
+    await user.click(screen.getByText("Welcome to Quadernio!"))
     const school = await screen.findByRole("combobox", { name: "School" })
     await user.clear(school)
     await user.click(screen.getByRole("button", { name: "Continue" }))
@@ -182,22 +182,22 @@ describe("connecting through the extension", () => {
     render(<OnboardingFlow />)
     await toCourses(user)
     await user.click(screen.getByRole("button", { name: "Connect Blackboard" }))
-    expect(await screen.findByRole("heading", { name: "Get the Student OS extension" })).toBeTruthy()
+    expect(await screen.findByRole("heading", { name: "Get the Quadernio extension" })).toBeTruthy()
     expect(screen.getByText(/Waiting for the extension/)).toBeTruthy()
 
     // The extension marks the page (extension/src/marker.ts).
     act(() => {
-      document.documentElement.dataset.studentOsExtension = "0.1.0"
-      document.dispatchEvent(new CustomEvent("student-os-extension"))
+      document.documentElement.dataset.quadernioExtension = "0.1.0"
+      document.dispatchEvent(new CustomEvent("quadernio-extension"))
     })
     expect(await screen.findByRole("heading", { name: "Sync your Blackboard courses" })).toBeTruthy()
     expect(screen.getByText("Open your Blackboard in another tab")).toBeTruthy()
-    expect(screen.getByText("Click the Student OS extension")).toBeTruthy()
+    expect(screen.getByText("Click the Quadernio extension")).toBeTruthy()
     expect(screen.getByText("Click Sync now")).toBeTruthy()
   })
 
   it("already installed: straight to the tutorial", async () => {
-    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    document.documentElement.dataset.quadernioExtension = "0.1.0"
     const user = userEvent.setup()
     render(<OnboardingFlow />)
     await toCourses(user)
@@ -206,7 +206,7 @@ describe("connecting through the extension", () => {
   })
 
   it("waits for the first sync, then 'Your courses are in!' and (no course needing class times) the Dashboard", async () => {
-    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    document.documentElement.dataset.quadernioExtension = "0.1.0"
     const user = userEvent.setup()
     render(<OnboardingFlow />)
     await toCourses(user)
@@ -241,7 +241,7 @@ const COURSES = [
 
 describe("class times, one course at a time", () => {
   async function synced(user: ReturnType<typeof userEvent.setup>) {
-    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    document.documentElement.dataset.quadernioExtension = "0.1.0"
     mocks.reloadCourses.mockResolvedValue(COURSES)
     mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 2 } })
     render(<OnboardingFlow />)
@@ -287,7 +287,7 @@ describe("class times, one course at a time", () => {
   it("the semester's dates: from the LMS when it gave them", async () => {
     const user = userEvent.setup()
     mocks.reloadCourses.mockResolvedValue([{ ...COURSES[0], termStart: "2026-08-31", termEnd: "2026-12-18", source: { provider: "canvas", externalId: "215" } }])
-    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    document.documentElement.dataset.quadernioExtension = "0.1.0"
     mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 1 } })
     render(<OnboardingFlow />)
     await toCourses(user)
@@ -325,7 +325,7 @@ describe("class times, one course at a time", () => {
     expect(mocks.completeOnboarding).toHaveBeenCalledOnce()
     expect(mocks.setClassTimes).not.toHaveBeenCalled()
     // Answered: the Dashboard notice won't ask about them again.
-    expect(JSON.parse(localStorage.getItem("student-os:class-times-asked") ?? "[]")).toEqual(["c1", "c2"])
+    expect(JSON.parse(localStorage.getItem("quadernio:class-times-asked") ?? "[]")).toEqual(["c1", "c2"])
   })
 })
 
@@ -337,7 +337,7 @@ describe("the academic calendar during setup", () => {
   it("looked for as soon as steps 1-3 are saved; checked and saved before class times", async () => {
     mocks.readCalendar.mockResolvedValue(found)
     mocks.reloadCourses.mockResolvedValue(COURSES)
-    document.documentElement.dataset.studentOsExtension = "0.1.0"
+    document.documentElement.dataset.quadernioExtension = "0.1.0"
     mocks.lmsSyncStatusAction.mockResolvedValue({ ok: true, data: { syncedAt: new Date().toISOString(), courses: 2 } })
     const user = userEvent.setup()
     render(<OnboardingFlow />)

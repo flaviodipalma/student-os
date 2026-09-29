@@ -23,7 +23,7 @@ export type BlackboardRead =
       ok: true
       kind: "courses"
       baseUrl: string
-      // Memberships (course expanded), sent to Student OS for the chosen courses.
+      // Memberships (course expanded), sent to Quadernio for the chosen courses.
       courses: Record<string, unknown>[]
       // The same courses shaped for the course list: id, name, course_code, term.
       choices: Record<string, unknown>[]
@@ -47,7 +47,7 @@ export async function readBlackboard(
   fetchFn: typeof fetch = fetch,
   now: number = Date.now()
 ): Promise<BlackboardRead> {
-  // Same limits as the Student OS import endpoint and the OAuth adapter.
+  // Same limits as the Quadernio import endpoint and the OAuth adapter.
   const MAX_COURSES = 100
   const MAX_COLUMNS = 500
   const MAX_PAGES = 20
@@ -154,7 +154,7 @@ export async function readBlackboard(
           ...pick(membership, ["courseId", "courseRoleId", "availability"]),
           course: {
             ...pick(membership.course, ["id", "courseId", "name", "description", "organization", "availability", "externalAccessUrl"]),
-            // The semester's dates (class times in Student OS default to them).
+            // The semester's dates (class times in Quadernio default to them).
             ...(term ? { term: { start_at: term.start_at, end_at: term.end_at } } : {}),
           },
         }
@@ -193,7 +193,7 @@ export async function readBlackboard(
         return kept
       })
 
-      // The course's instructors: names only (the professor on the course in Student OS).
+      // The course's instructors: names only (the professor on the course in Quadernio).
       // Optional: some schools don't show them to students.
       try {
         const members = await all(`v1/courses/${courseId}/users?role=Instructor&expand=user&fields=courseRoleId,user.name.given,user.name.family`, 10)

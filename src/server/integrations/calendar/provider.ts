@@ -73,7 +73,7 @@ export function calendarErrorMessage(kind: CalendarErrorKind, name: string): str
     case "reconnect":
       return `Your ${name} connection expired or was removed. Please connect ${name} again.`
     case "permission":
-      return `Student OS doesn't have permission to read your ${name} events. Please connect again and allow calendar access.`
+      return `Quadernio doesn't have permission to read your ${name} events. Please connect again and allow calendar access.`
     case "rate-limited":
       return `${name} is receiving too many requests right now. Please try again in a few minutes.`
     case "unavailable":

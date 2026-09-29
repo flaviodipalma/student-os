@@ -88,7 +88,7 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
   if (push && !/^(mailto:|https:\/\/)/.test(env.VAPID_SUBJECT ?? "")) report.errors.push("VAPID_SUBJECT must start with mailto: or https://.")
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) report.errors.push("CRON_SECRET must be at least 32 characters.")
   if (push && !env.CRON_SECRET) {
-    ;(production ? report.errors : report.warnings).push("CRON_SECRET isn't set: push reminders only go out while Student OS is open somewhere.")
+    ;(production ? report.errors : report.warnings).push("CRON_SECRET isn't set: push reminders only go out while Quadernio is open somewhere.")
   }
 
   // ---- Integrations (each is optional; if configured, fully and safely)
@@ -98,11 +98,11 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
 
   // ---- Browser extension: which Chrome extensions may use a student's login
   // (src/server/integrations/extension/http.ts). Unset = any extension.
-  const extensionIds = (env.STUDENT_OS_EXTENSION_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean)
+  const extensionIds = (env.QUADERNIO_EXTENSION_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean)
   if (extensionIds.some((id) => !/^[a-p]{32}$/.test(id))) {
-    report.errors.push("STUDENT_OS_EXTENSION_IDS must be Chrome extension ids (32 letters a-p), comma-separated.")
+    report.errors.push("QUADERNIO_EXTENSION_IDS must be Chrome extension ids (32 letters a-p), comma-separated.")
   } else if (production && extensionIds.length === 0) {
-    report.warnings.push("STUDENT_OS_EXTENSION_IDS isn't set: any Chrome extension can ask to sync with a student's login. Set it to the published extension's id.")
+    report.warnings.push("QUADERNIO_EXTENSION_IDS isn't set: any Chrome extension can ask to sync with a student's login. Set it to the published extension's id.")
   }
 
   // ---- The extension's Chrome Web Store page (onboarding's "Add to Chrome"). Public by design.

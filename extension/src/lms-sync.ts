@@ -5,7 +5,7 @@ import { badgeFor, migrateAutoSync, newSite, type AutoSyncState, type LmsId, typ
 import { readBlackboard, type BlackboardRead, type BlackboardStep } from "./blackboard"
 import { readCanvas, type CanvasRead, type CanvasStep } from "./canvas"
 import type { CourseChoice } from "./courses"
-import { DEFAULT_ADDRESS, sendImport, StudentOsError, summaryLines } from "./student-os"
+import { DEFAULT_ADDRESS, sendImport, QuadernioError, summaryLines } from "./quadernio"
 
 const ADDRESS_KEY = "address"
 const AUTO_SYNC_KEY = "autoSync"
@@ -59,7 +59,7 @@ export async function setLoggedOut(loggedOut: boolean): Promise<AutoSyncState> {
 export async function showBadge(state: AutoSyncState): Promise<void> {
   const text = badgeFor(state)
   const title =
-    text === "!" ? "Student OS: log in to keep syncing" : text === "New" ? "Student OS: new courses to choose from" : "Student OS"
+    text === "!" ? "Quadernio: log in to keep syncing" : text === "New" ? "Quadernio: new courses to choose from" : "Quadernio"
   await chrome.action.setBadgeText({ text })
   await chrome.action.setBadgeBackgroundColor({ color: text === "!" ? "#dc2626" : "#4f46e5" })
   await chrome.action.setTitle({ title })
@@ -150,9 +150,9 @@ export async function readCourses(tabId: number, url: string | undefined): Promi
   try {
     origin = new URL(url ?? "").origin
   } catch {
-    throw new StudentOsError(NOT_AN_LMS)
+    throw new QuadernioError(NOT_AN_LMS)
   }
-  if (!/^https?:/.test(origin)) throw new StudentOsError(NOT_AN_LMS)
+  if (!/^https?:/.test(origin)) throw new QuadernioError(NOT_AN_LMS)
   const state = await loadAutoSync()
   const known = Object.hasOwn(state.sites, origin) ? state.sites[origin].lms : null
   const order: LmsId[] = known ? [known, known === "canvas" ? "blackboard" : "canvas"] : /blackboard/i.test(origin) ? ["blackboard", "canvas"] : ["canvas", "blackboard"]
@@ -160,10 +160,10 @@ export async function readCourses(tabId: number, url: string | undefined): Promi
     const lms = LMS[id]
     const read = await lms.courses(tabId)
     if (read.ok) return { lms, list: read.value }
-    if (read.reason === "logged-out") throw new StudentOsError(loggedOutOf(lms.name))
-    if (read.reason === "error") throw new StudentOsError(noAnswer(lms.name))
+    if (read.reason === "logged-out") throw new QuadernioError(loggedOutOf(lms.name))
+    if (read.reason === "error") throw new QuadernioError(noAnswer(lms.name))
   }
-  throw new StudentOsError(NOT_AN_LMS)
+  throw new QuadernioError(NOT_AN_LMS)
 }
 
 // Reads the chosen courses' assignments and imports them. Records the sync (which
@@ -178,34 +178,34 @@ export async function importChosen(
 ): Promise<string[]> {
   options.onProgress?.(`Reading assignments from ${chosen.length} ${chosen.length === 1 ? "course" : "courses"}…`)
   const read = await lms.assignments(tabId, chosen)
-  if (!read.ok) throw new StudentOsError(read.reason === "logged-out" ? loggedOutOf(lms.name) : noAnswer(lms.name))
+  if (!read.ok) throw new QuadernioError(read.reason === "logged-out" ? loggedOutOf(lms.name) : noAnswer(lms.name))
   const courses = list.courses.filter((course) => chosen.includes(lms.courseId(course)))
 
-  options.onProgress?.("Sending to Student OS…")
+  options.onProgress?.("Sending to Quadernio…")
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const summary = await sendImport(address, lms.id, { baseUrl: list.baseUrl, courses, ...read.value.data }, timeZone, fetch)
   await updateSite(list.baseUrl, lms.id, { lastSuccessAt: Date.now(), lastAutomatic: options.automatic })
-  await tellStudentOsTabs(address)
+  await tellQuadernioTabs(address)
   return summaryLines(summary, read.value.coursesUnreadable, lms.name)
 }
 
-// Open Student OS tabs show the import right away: a "student-os-synced" event on
+// Open Quadernio tabs show the import right away: a "quadernio-synced" event on
 // their page (it reloads the courses). Only an event, with no data; tabs the
 // extension can't reach simply catch up when the student returns to them.
-async function tellStudentOsTabs(address: string) {
+async function tellQuadernioTabs(address: string) {
   try {
     const tabs = await chrome.tabs.query({ url: `${address}/*` })
     await Promise.all(
       tabs.map((tab) =>
         tab.id
           ? chrome.scripting
-              .executeScript({ target: { tabId: tab.id }, func: () => void document.dispatchEvent(new CustomEvent("student-os-synced")) })
+              .executeScript({ target: { tabId: tab.id }, func: () => void document.dispatchEvent(new CustomEvent("quadernio-synced")) })
               .catch(() => {})
           : null
       )
     )
   } catch {
-    // No access to the Student OS address: the page refreshes when it's next focused.
+    // No access to the Quadernio address: the page refreshes when it's next focused.
   }
 }
 

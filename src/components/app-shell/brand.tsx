@@ -10,7 +10,7 @@ export function Brand() {
       <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <GraduationCapIcon className="size-4.5" />
       </span>
-      <span className="text-base font-semibold tracking-tight">Student OS</span>
+      <span className="text-base font-semibold tracking-tight">Quadernio</span>
     </Link>
   )
 }

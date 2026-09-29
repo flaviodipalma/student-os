@@ -2,7 +2,7 @@ import { fromDateKey, toDateKey } from "@/lib/format"
 import type { CourseInput, TaskInput } from "@/lib/types"
 import { defaultEstimateMinutes, type ReviewDraft } from "./review"
 
-// The last step: turning a reviewed, confirmed draft into normal Student OS
+// The last step: turning a reviewed, confirmed draft into normal Quadernio
 // courses and tasks. Nothing here runs until the student confirms.
 
 export type ImportProblem = { itemKey?: string; message: string }

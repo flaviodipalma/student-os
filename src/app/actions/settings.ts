@@ -90,7 +90,7 @@ export async function updateLearningAction(changes: unknown): Promise<ActionResu
   return runAction(({ db, userId }) => saveLearningSettings(db, userId, parse(learningChangesSchema, changes)))
 }
 
-// Settings > Planning: reset what Student OS learned (history from today on counts).
+// Settings > Planning: reset what Quadernio learned (history from today on counts).
 export async function resetLearningAction(): Promise<ActionResult<LearningSettings>> {
   return runAction(async ({ db, userId }) => {
     const { now } = await getStudentClock()

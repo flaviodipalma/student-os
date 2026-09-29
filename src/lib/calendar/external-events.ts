@@ -2,7 +2,7 @@ import { addDays } from "@/lib/format"
 import { wallClockIn } from "@/lib/time-zone"
 import type { CalendarEvent, ExternalCalendarSource, ExternalEventRecord } from "@/lib/types"
 
-// External calendar events (Google Calendar, Outlook, ...) in Student OS.
+// External calendar events (Google Calendar, Outlook, ...) in Quadernio.
 //
 //   provider calendar
 //     -> provider-specific adapter (server/integrations/calendar/google, /outlook)
@@ -12,7 +12,7 @@ import type { CalendarEvent, ExternalCalendarSource, ExternalEventRecord } from 
 //     -> CalendarEvent items         per day, in the student's time zone (below),
 //                                    used by the Calendar, Dashboard and Planner
 //
-// External events are read-only copies: Student OS never changes the original.
+// External events are read-only copies: Quadernio never changes the original.
 // A student can hide one locally; a sync never un-hides it.
 
 // Normalized event from any provider. Only what the source actually says:

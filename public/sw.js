@@ -1,11 +1,11 @@
-// Student OS service worker: shows reminders sent by push (Web Push), even when
-// Student OS isn't open, and opens the right page when one is tapped. Nothing is
+// Quadernio service worker: shows reminders sent by push (Web Push), even when
+// Quadernio isn't open, and opens the right page when one is tapped. Nothing is
 // cached (no offline mode) and nothing is read from the page.
 
 self.addEventListener("install", () => self.skipWaiting())
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()))
 
-// Only paths inside Student OS ("/tasks?task=…"), never another site.
+// Only paths inside Quadernio ("/tasks?task=…"), never another site.
 const safePath = (url) => (typeof url === "string" && url.startsWith("/") && !url.startsWith("//") ? url : "/dashboard")
 
 self.addEventListener("push", (event) => {
@@ -15,7 +15,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = {}
   }
-  const title = typeof data.title === "string" && data.title ? data.title : "Student OS"
+  const title = typeof data.title === "string" && data.title ? data.title : "Quadernio"
   event.waitUntil(
     self.registration.showNotification(title, {
       body: typeof data.body === "string" ? data.body : "",

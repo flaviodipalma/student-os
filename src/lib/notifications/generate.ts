@@ -158,7 +158,7 @@ export function generateNotifications(input: NotificationInput): DesiredNotifica
     }
 
     if (prefs.overdueReminders && due.getTime() <= t && t - due.getTime() <= OVERDUE_WINDOW) {
-      // Imported tasks may have been turned in without Student OS knowing (feeds don't say).
+      // Imported tasks may have been turned in without Quadernio knowing (feeds don't say).
       const unsure = task.source && task.source.submissionStatus !== "not_submitted"
       out.push({
         key: `task_overdue:${task.id}:${dueKey}`,

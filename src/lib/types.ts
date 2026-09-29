@@ -4,7 +4,7 @@
 
 export type CourseColor = "sky" | "emerald" | "violet" | "orange" | "rose"
 
-// Learning management systems Student OS can import from.
+// Learning management systems Quadernio can import from.
 export const lmsProviderIds = ["canvas", "blackboard"] as const
 export type LmsProviderId = (typeof lmsProviderIds)[number]
 export const lmsProviderNames: Record<LmsProviderId, string> = { canvas: "Canvas", blackboard: "Blackboard" }
@@ -88,7 +88,7 @@ export type TaskInput = Omit<Task, "id" | "source">
 export type NativeEventType = "class" | "sports" | "work" | "personal" | "study"
 export type EventType = NativeEventType | "other"
 
-// Where a calendar item comes from. Student OS items (events, weekly commitments,
+// Where a calendar item comes from. Quadernio items (events, weekly commitments,
 // study sessions) are the student's own; the others are read-only copies from an
 // external calendar.
 // Personal calendars a student can connect (Integrations > Calendars).
@@ -101,7 +101,7 @@ export const externalCalendarSources = [...lmsProviderIds, ...calendarProviderId
 export type ExternalCalendarSource = (typeof externalCalendarSources)[number]
 export type EventSource = "student_os" | ExternalCalendarSource
 
-export const eventSourceNames: Record<EventSource, string> = { student_os: "Student OS", ...lmsProviderNames, ...calendarProviderNames }
+export const eventSourceNames: Record<EventSource, string> = { student_os: "Quadernio", ...lmsProviderNames, ...calendarProviderNames }
 
 export type CalendarEvent = {
   id: string
@@ -121,7 +121,7 @@ export type CalendarEvent = {
   completed?: boolean
   // Study sessions done only partly: the minutes actually worked.
   completedMinutes?: number
-  // Unset = Student OS. External items (see src/lib/calendar/external-events.ts)
+  // Unset = Quadernio. External items (see src/lib/calendar/external-events.ts)
   // also carry their stored event's id, and a location and link when the source has them.
   source?: EventSource
   externalEventId?: string
@@ -145,7 +145,7 @@ export type EventInput = Omit<
 > & { type: NativeEventType }
 
 // An event copied from an external calendar, as the app loads it. Instants are
-// ISO 8601 (UTC); `hidden` = the student hid it from Student OS.
+// ISO 8601 (UTC); `hidden` = the student hid it from Quadernio.
 export type ExternalEventRecord = {
   id: string
   source: ExternalCalendarSource

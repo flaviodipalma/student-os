@@ -1,17 +1,17 @@
-// Talking to Student OS from the extension, as the student logged in to Student OS in
+// Talking to Quadernio from the extension, as the student logged in to Quadernio in
 // this browser. No Chrome APIs here, so it can be tested in Node: the popup passes in `fetch`.
 
 export const DEFAULT_ADDRESS = "http://localhost:3000"
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
-// Every request to Student OS: the student's login cookies (Chrome sends them because
+// Every request to Quadernio: the student's login cookies (Chrome sends them because
 // the extension has permission for this address) and the header that marks it as the
 // extension (see src/server/integrations/extension/http.ts).
 const REQUEST = { credentials: "include", cache: "no-store" } as const
-const EXTENSION_HEADERS = { "X-Student-OS-Extension": "1" }
+const EXTENSION_HEADERS = { "X-Quadernio-Extension": "1" }
 
-export class StudentOsError extends Error {
-  // True when nobody is logged in to Student OS in this browser.
+export class QuadernioError extends Error {
+  // True when nobody is logged in to Quadernio in this browser.
   constructor(
     message: string,
     readonly loggedOut = false
@@ -20,7 +20,7 @@ export class StudentOsError extends Error {
   }
 }
 
-// "studentos.app", "https://studentos.app/integrations" -> "https://studentos.app".
+// "quadernio.app", "https://quadernio.app/integrations" -> "https://quadernio.app".
 // HTTPS only, except this computer (development): the login cookies travel to it.
 export function normalizeAddress(input: string): string {
   const raw = input.trim()
@@ -28,26 +28,26 @@ export function normalizeAddress(input: string): string {
   try {
     url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`)
   } catch {
-    throw new StudentOsError("Enter your Student OS address, like studentos.app.")
+    throw new QuadernioError("Enter your Quadernio address, like quadernio.app.")
   }
   const local = LOCAL_HOSTS.has(url.hostname)
   if (url.username || url.password || !(url.protocol === "https:" || (url.protocol === "http:" && local))) {
-    throw new StudentOsError("The Student OS address has to start with https://.")
+    throw new QuadernioError("The Quadernio address has to start with https://.")
   }
-  if (!local && !url.hostname.includes(".")) throw new StudentOsError("Enter your Student OS address, like studentos.app.")
+  if (!local && !url.hostname.includes(".")) throw new QuadernioError("Enter your Quadernio address, like quadernio.app.")
   return url.origin
 }
 
-// Who the extension syncs to: the Student OS account logged in in this browser.
+// Who the extension syncs to: the Quadernio account logged in in this browser.
 export async function currentAccount(address: string, fetchFn: typeof fetch): Promise<{ firstName: string }> {
   const body = await call(address, "/api/extension/me", { headers: EXTENSION_HEADERS }, fetchFn)
   if (!isRecord(body) || typeof body.firstName !== "string") {
-    throw new StudentOsError(`That address doesn't look like Student OS: ${address}`)
+    throw new QuadernioError(`That address doesn't look like Quadernio: ${address}`)
   }
   return { firstName: body.firstName }
 }
 
-// The parts of Student OS's sync summary the popup shows (LmsSyncResult in src/lib/lms/types.ts).
+// The parts of Quadernio's sync summary the popup shows (LmsSyncResult in src/lib/lms/types.ts).
 export type SyncSummary = {
   coursesCreated: number
   coursesUpdated: number
@@ -62,7 +62,7 @@ export type SyncSummary = {
   errors: string[]
 }
 
-// Sends what the extension read from Canvas or Blackboard to Student OS, which
+// Sends what the extension read from Canvas or Blackboard to Quadernio, which
 // imports it (/api/extension/<lms>/import).
 export async function sendImport(
   address: string,
@@ -81,21 +81,21 @@ export async function sendImport(
     },
     fetchFn
   )
-  if (!isRecord(body) || !isRecord(body.result)) throw new StudentOsError("Student OS sent back something unexpected. Please try again.")
+  if (!isRecord(body) || !isRecord(body.result)) throw new QuadernioError("Quadernio sent back something unexpected. Please try again.")
   return body.result as SyncSummary
 }
 
-// One request to Student OS; its JSON, or a StudentOsError with a message for the student.
+// One request to Quadernio; its JSON, or a QuadernioError with a message for the student.
 async function call(address: string, path: string, init: RequestInit, fetchFn: typeof fetch): Promise<unknown> {
   let response: Response
   try {
     response = await fetchFn(`${address}${path}`, { ...REQUEST, ...init })
   } catch {
-    throw new StudentOsError(`Can't reach Student OS at ${address}. Check that it's running and try again.`)
+    throw new QuadernioError(`Can't reach Quadernio at ${address}. Check that it's running and try again.`)
   }
   const body: unknown = await response.json().catch(() => null)
-  if (response.status === 401) throw new StudentOsError(errorOf(body) ?? "Log in to Student OS in this browser.", true)
-  if (!response.ok) throw new StudentOsError(errorOf(body) ?? `Student OS couldn't do that (${response.status}). Please try again.`)
+  if (response.status === 401) throw new QuadernioError(errorOf(body) ?? "Log in to Quadernio in this browser.", true)
+  if (!response.ok) throw new QuadernioError(errorOf(body) ?? `Quadernio couldn't do that (${response.status}). Please try again.`)
   return body
 }
 

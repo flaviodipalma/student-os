@@ -1,4 +1,4 @@
-// Login methods for Student OS accounts (authentication only).
+// Login methods for Quadernio accounts (authentication only).
 //
 // Signing in with Google, Microsoft or Apple proves who the student is; it does
 // NOT connect Google Calendar, Outlook or anything else. Calendar and LMS
@@ -6,7 +6,7 @@
 //
 // Supabase Auth runs the OAuth / OpenID Connect flows (PKCE, state, token
 // exchange) and keeps each login method as an "identity" of the one Supabase
-// user, whose id is the Student OS user id. See docs/authentication.md.
+// user, whose id is the Quadernio user id. See docs/authentication.md.
 
 export const socialProviderIds = ["google", "microsoft", "apple"] as const
 export type SocialProviderId = (typeof socialProviderIds)[number]
@@ -72,7 +72,7 @@ export const authErrorMessages = {
   expired: "That sign-in took too long or was already used. Please try again.",
   "email-exists":
     "An account with this email already exists. Log in with your usual method, then add this one in Settings → Account.",
-  "already-used": "That account is already connected to a different Student OS account.",
+  "already-used": "That account is already connected to a different Quadernio account.",
   failed: "We couldn't sign you in. Please try again.",
 } as const
 export type AuthErrorCode = keyof typeof authErrorMessages

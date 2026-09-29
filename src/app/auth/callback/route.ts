@@ -11,7 +11,7 @@ import { logger } from "@/server/log"
 //   - adding one of those to their account (Settings > Account),
 //   - the "confirm your email" link (when email confirmation is on).
 // Exchanges the one-time code for a session (Supabase checks the OAuth state and
-// the PKCE verifier), makes sure the Student OS profile exists, then opens
+// the PKCE verifier), makes sure the Quadernio profile exists, then opens
 // onboarding (new students), the page they wanted, or Settings.
 
 function readIntent(request: NextRequest): AuthIntent {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   if (intent.kind === "link") return to(`/settings?login=linked&provider=${intent.provider}#account`)
 
   try {
-    // First sign-in with a provider: the Student OS profile (same id as the
+    // First sign-in with a provider: the Quadernio profile (same id as the
     // Supabase user, so all their data hangs off it). Never overwrites a name.
     const db = getDb()
     await ensureProfile(db, userId, firstName)

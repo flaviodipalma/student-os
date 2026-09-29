@@ -12,7 +12,7 @@ import { SocialButtons } from "./social-buttons"
 
 // Log in / sign up: Google, Microsoft and Apple first (the ones this server has
 // set up), then email and password. Every method leads to the same kind of
-// Student OS account; new accounts go through onboarding.
+// Quadernio account; new accounts go through onboarding.
 export function AuthForm({
   mode,
   next,
@@ -38,7 +38,7 @@ export function AuthForm({
 
   return (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight">{isSignup ? "Create your Student OS account" : "Welcome back"}</h1>
+      <h1 className="text-xl font-semibold tracking-tight">{isSignup ? "Create your Quadernio account" : "Welcome back"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {isSignup ? "Your courses, deadlines and plan, in one place." : "Log in to see what's next today."}
       </p>
@@ -123,7 +123,7 @@ export function AuthForm({
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        {isSignup ? "Already have an account? " : "New to Student OS? "}
+        {isSignup ? "Already have an account? " : "New to Quadernio? "}
         <Link href={isSignup ? "/login" : "/signup"} className="font-medium text-primary hover:underline">
           {isSignup ? "Log in" : "Create an account"}
         </Link>

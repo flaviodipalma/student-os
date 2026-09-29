@@ -46,7 +46,7 @@ export function AcademicCalendarCard() {
         {academicEvents.length === 0 && editing !== "new" && (
           <p className="flex items-start gap-2 rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground">
             <CalendarDaysIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
-            No academic calendar yet. Student OS can find it on
+            No academic calendar yet. Quadernio can find it on
             {student.schoolDomain ? ` ${student.schoolDomain}` : " your school's website"}, or you can add dates by hand.
           </p>
         )}

@@ -39,7 +39,7 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
 })
 
 // What the extension sends: its own Origin and the custom header (plus the login cookies).
-const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Student-OS-Extension": "1" }
+const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Quadernio-Extension": "1" }
 const request = (body: unknown, headers: Record<string, string>) =>
   new Request("http://localhost:3000/api/extension/canvas/import", {
     method: "POST",
@@ -99,7 +99,7 @@ describe("POST /api/extension/canvas/import", () => {
 
   it("logged out: 401 with a hint for the extension, and nothing written", async () => {
     const alex = await student("Alex")
-    expect(await send(payload(), null)).toMatchObject({ status: 401, body: { loggedOut: true, error: expect.stringMatching(/Log in to Student OS/) } })
+    expect(await send(payload(), null)).toMatchObject({ status: 401, body: { loggedOut: true, error: expect.stringMatching(/Log in to Quadernio/) } })
     expect(await listCourses(t.db, alex.userId)).toEqual([])
   })
 
@@ -107,11 +107,11 @@ describe("POST /api/extension/canvas/import", () => {
     const alex = await student("Alex")
     const refused: Record<string, string>[] = [
       {},
-      { Origin: "https://evil.example.com", "X-Student-OS-Extension": "1" },
+      { Origin: "https://evil.example.com", "X-Quadernio-Extension": "1" },
       // A POST always has an Origin in a browser; one without isn't the extension.
-      { "X-Student-OS-Extension": "1" },
+      { "X-Quadernio-Extension": "1" },
       { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop" },
-      { ...EXTENSION, "X-Student-OS-Extension": "yes" },
+      { ...EXTENSION, "X-Quadernio-Extension": "yes" },
       { ...EXTENSION, Origin: "chrome-extension://not-an-extension-id" },
       { ...EXTENSION, Origin: "moz-extension://abcdefghijklmnopabcdefghijklmnop" },
     ]
@@ -121,11 +121,11 @@ describe("POST /api/extension/canvas/import", () => {
     expect(await connectionOf(alex.userId)).toBeUndefined()
   })
 
-  it("with STUDENT_OS_EXTENSION_IDS set, only those extensions", async () => {
+  it("with QUADERNIO_EXTENSION_IDS set, only those extensions", async () => {
     const alex = await student("Alex")
-    vi.stubEnv("STUDENT_OS_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba, abcdefghijklmnopabcdefghijklmnop")
+    vi.stubEnv("QUADERNIO_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba, abcdefghijklmnopabcdefghijklmnop")
     expect((await send(payload(), alex.userId)).status).toBe(200)
-    vi.stubEnv("STUDENT_OS_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba")
+    vi.stubEnv("QUADERNIO_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba")
     expect((await send(payload(), alex.userId)).status).toBe(403)
   })
 

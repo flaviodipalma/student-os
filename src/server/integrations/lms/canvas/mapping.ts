@@ -6,8 +6,8 @@ import type { TaskType } from "@/lib/types"
 import { sameOriginUrl } from "../base-url"
 import { htmlToText, termDates, utcToLocalDue } from "../normalize"
 
-// Canvas API objects -> Student OS's normalized LMS types. Only the fields
-// Student OS uses are read (per the Canvas Courses and Assignments API docs),
+// Canvas API objects -> Quadernio's normalized LMS types. Only the fields
+// Quadernio uses are read (per the Canvas Courses and Assignments API docs),
 // each one checked. Anything malformed is left out rather than guessed; nothing
 // Canvas doesn't provide (estimates, priority, due dates) is invented.
 

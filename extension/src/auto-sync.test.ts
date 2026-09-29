@@ -73,7 +73,7 @@ describe("migrateAutoSync", () => {
 })
 
 describe("badgeFor", () => {
-  it("'!' when logged out of Student OS, 'New' when any site has new courses, else nothing", () => {
+  it("'!' when logged out of Quadernio, 'New' when any site has new courses, else nothing", () => {
     expect(badgeFor({ sites: { [CANVAS]: { ...on, newCourses: true } }, loggedOut: true })).toBe("!")
     expect(badgeFor({ sites: { [CANVAS]: on, [BLACKBOARD]: { ...newSite("blackboard"), newCourses: true } }, loggedOut: false })).toBe("New")
     expect(badgeFor({ sites: { [CANVAS]: on }, loggedOut: false })).toBe("")

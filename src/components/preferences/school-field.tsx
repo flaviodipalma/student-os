@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 // (names starting with them first; the list is on the server). Pick one, or keep what
 // you typed ("Use …"). An accessible combobox: arrow keys move, Enter picks, Escape
 // closes. Under it, the school's website: it comes with a school from the list, and
-// is asked for otherwise (Student OS finds the academic calendar there).
+// is asked for otherwise (Quadernio finds the academic calendar there).
 
 export type SchoolValue = { schoolName: string; schoolDomain: string | null }
 type Suggestion = { name: string; domain: string | null; country: string }
@@ -156,7 +156,7 @@ export function SchoolField({ value, onChange }: { value: SchoolValue; onChange:
               value={value.schoolDomain ?? ""}
               onChange={(e) => onChange({ schoolName: value.schoolName, schoolDomain: e.target.value || null })}
             />
-            <p className="text-xs text-muted-foreground">Student OS finds your school&apos;s academic calendar there.</p>
+            <p className="text-xs text-muted-foreground">Quadernio finds your school&apos;s academic calendar there.</p>
           </div>
         ) : (
           <p className="flex items-center gap-1 text-xs text-muted-foreground">

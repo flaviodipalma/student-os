@@ -6,8 +6,8 @@ import type { TaskType } from "@/lib/types"
 import { sameOriginUrl } from "../base-url"
 import { htmlToText, termDates, utcToLocalDue } from "../normalize"
 
-// Blackboard Learn API objects -> Student OS's normalized LMS types. Only the
-// fields Student OS uses are read (per the Learn REST API spec), each one
+// Blackboard Learn API objects -> Quadernio's normalized LMS types. Only the
+// fields Quadernio uses are read (per the Learn REST API spec), each one
 // checked. Anything malformed is left out rather than guessed; nothing Learn
 // doesn't provide (estimates, priority, due dates) is invented.
 //
@@ -31,7 +31,7 @@ const blackboardMembership = z.object({
       organization: z.boolean().nullish(),
       availability: z.object({ available: text }).partial().nullish(),
       externalAccessUrl: text,
-      // Added by the Student OS extension from the course's term (v1/terms), when readable.
+      // Added by the Quadernio extension from the course's term (v1/terms), when readable.
       term: z.object({ start_at: text, end_at: text }).partial().nullish(),
     })
     .nullish(),
@@ -57,7 +57,7 @@ const blackboardGrade = z.object({
 
 const blackboardAttempt = z.object({ status: text })
 
-// Courses Student OS imports: ones the student takes (course role "Student"),
+// Courses Quadernio imports: ones the student takes (course role "Student"),
 // that are open to them. Organizations (clubs, departments), courses they
 // teach or assist in, and unavailable courses are left out.
 export function blackboardCourseToLms(raw: unknown, baseUrl: string, timeZone?: string): LmsCourse | null {

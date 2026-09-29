@@ -7,7 +7,7 @@ import type { LearningSettings, PlanningMode, Priority, StudyPeriod, StudySessio
 // sent back each turn (no tool calls), so the history stays small.
 export type ChatTurn = { role: "user" | "assistant"; content: string }
 
-// Where the Assistant was opened from ("Ask Student OS" on the Dashboard or
+// Where the Assistant was opened from ("Ask Quadernio" on the Dashboard or
 // Planner): ids and a date only. The server looks them up for the signed-in
 // student and ignores anything that isn't theirs.
 export type AssistantPageContext = { taskId?: string; date?: string }

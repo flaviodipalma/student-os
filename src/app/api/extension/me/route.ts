@@ -3,7 +3,7 @@ import { toAppError } from "@/server/errors"
 import { extensionJson as json, extensionUser } from "@/server/integrations/extension/http"
 import { getProfile } from "@/server/services/profiles"
 
-// GET /api/extension/me: who the extension will sync to (the Student OS account
+// GET /api/extension/me: who the extension will sync to (the Quadernio account
 // logged in in this browser). -> 200 { "firstName": "Alex" }, 401 { loggedOut: true }
 // when nobody is, or 403 when the request isn't from the extension. Nothing else
 // about the student is returned.

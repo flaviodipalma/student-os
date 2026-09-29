@@ -9,7 +9,7 @@ import { importCanvasFromExtension } from "../../extension/canvas-import"
 import { disconnectLms, listLmsConnections } from "../connections"
 import { attemptsStatus, blackboardAssignmentToLms, blackboardCourseToLms, gradedColumns, parseBlackboardColumn } from "./mapping"
 
-// Blackboard Learn data in Student OS: the mapping (blackboard/mapping.ts) and whole
+// Blackboard Learn data in Quadernio: the mapping (blackboard/mapping.ts) and whole
 // syncs through the only way in, the browser extension's import, against a real
 // Postgres. Fixtures: src/server/test-utils/fake-blackboard.ts.
 
@@ -152,7 +152,7 @@ const sync = (user: string, bb: ReturnType<typeof fakeBlackboard>) =>
     { now: NOW }
   )
 
-describe("syncing Blackboard into Student OS", () => {
+describe("syncing Blackboard into Quadernio", () => {
   it("imports courses and gradebook items as normal courses and tasks", async () => {
     const user = await connected("Alex")
     const bb = fakeBlackboard({
@@ -263,7 +263,7 @@ describe("syncing Blackboard into Student OS", () => {
     expect((await sync(user, bb)).assignmentsCompleted).toBe(1)
     expect((await status())["_1_1"]).toEqual(["completed", "submitted"])
 
-    // The student reopens it in Student OS; Blackboard still says submitted: left alone.
+    // The student reopens it in Quadernio; Blackboard still says submitted: left alone.
     const reopened = (await loadAppData(t.db, user)).tasks.find((task) => task.source?.externalId === "_1_1")!
     await updateTask(t.db, user, reopened.id, { status: "in_progress" })
     expect((await sync(user, bb)).assignmentsCompleted).toBe(0)

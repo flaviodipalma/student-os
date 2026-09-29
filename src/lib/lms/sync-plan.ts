@@ -3,14 +3,14 @@ import { findDuplicateTask, normalizeCourseCode } from "@/lib/syllabus/duplicate
 import type { Course, LmsProviderId, Task, TaskInput } from "@/lib/types"
 import type { LmsAssignment, LmsCourse, LmsSubmissionStatus, LmsSyncConflict } from "./types"
 
-// How LMS data becomes normal Student OS data, as a PLAN: pure functions that
+// How LMS data becomes normal Quadernio data, as a PLAN: pure functions that
 // compare what the LMS says with what the student has, and decide what to do.
 // The sync service (src/server/integrations/lms/sync.ts) carries the plan out.
 // Nothing here talks to an LMS or the database, so it's easy to test.
 //
 // Mapping
-//   LMS course      -> Student OS course   (one per LMS course, per student)
-//   LMS assignment  -> Student OS task     (the same Task the Planner, Dashboard
+//   LMS course      -> Quadernio course   (one per LMS course, per student)
+//   LMS assignment  -> Quadernio task     (the same Task the Planner, Dashboard
 //                                           and Tasks page already use)
 //
 // Matching, in order
@@ -45,7 +45,7 @@ import type { LmsAssignment, LmsCourse, LmsSubmissionStatus, LmsSyncConflict } f
 //                           the same disagreement isn't reported again, but a
 //                           later LMS change is.
 //
-// Deleted in the LMS: never deleted in Student OS automatically. Imported tasks
+// Deleted in the LMS: never deleted in Quadernio automatically. Imported tasks
 // the LMS stopped listing are reported as "missing" for the student to decide.
 
 // ---- Values compared between syncs --------------------------------------------
@@ -68,7 +68,7 @@ export function courseFieldsFrom(lms: LmsCourse, options: { fullCode?: boolean }
   const name = courseNameWithoutCode(lms.courseName).slice(0, 150) || "Untitled course"
   const code = lms.courseCode?.trim()
   return {
-    // Every Student OS course has a code; without one, the name stands in. "PS28301_26/FA"
+    // Every Quadernio course has a code; without one, the name stands in. "PS28301_26/FA"
     // becomes "PS283" (src/lib/course-code.ts).
     code: (code ? (options.fullCode ? code : shortCourseCode(code)) : name).slice(0, 30),
     name,
@@ -191,9 +191,9 @@ export type TaskPlan = {
 export function planTasks(
   existing: ExistingTask[],
   assignments: LmsAssignment[],
-  // The Student OS course for an LMS course id (after the course plan is applied).
+  // The Quadernio course for an LMS course id (after the course plan is applied).
   courseIdFor: (courseExternalId: string) => string | undefined,
-  // What was synced: the provider, and the Student OS courses its assignments were fetched for.
+  // What was synced: the provider, and the Quadernio courses its assignments were fetched for.
   // missingFrom: only tasks due on/after this date can be "missing" (for sources
   // that may leave out older items).
   scope: { provider: LmsProviderId; courseIds: string[]; missingFrom?: string }
@@ -207,7 +207,7 @@ export function planTasks(
     if (!lms.dueDate) return { kind: "skip", lms, reason: "no-due-date" }
     const remote = taskFieldsFrom({ ...lms, dueDate: lms.dueDate })
     const snapshot: TaskSnapshot = { ...remote, submissionStatus: lms.submissionStatus }
-    // Newly turned in since the last sync, and not already done in Student OS.
+    // Newly turned in since the last sync, and not already done in Quadernio.
     const completes = (task: ExistingTask) =>
       turnedIn(lms.submissionStatus) && !turnedIn(task.synced?.submissionStatus) && task.status !== "completed"
 
@@ -230,7 +230,7 @@ export function planTasks(
         : { kind: "unchanged", taskId: imported.id, lms, synced: snapshot, complete }
     }
 
-    // Already in Student OS (added by hand or from a syllabus): link it, don't duplicate it.
+    // Already in Quadernio (added by hand or from a syllabus): link it, don't duplicate it.
     const unlinked = existing.filter((task) => !task.source && !claimed.has(task.id))
     const same = findDuplicateTask({ title: remote.title, dueDate: remote.dueDate, type: lms.type }, courseId, unlinked)
     if (same) {
@@ -249,7 +249,7 @@ export function planTasks(
         type: lms.type,
         dueDate: remote.dueDate,
         dueTime: remote.dueTime ?? undefined,
-        // The Student OS default: the LMS doesn't set priority.
+        // The Quadernio default: the LMS doesn't set priority.
         priority: "medium",
         // Only the LMS's own estimate; otherwise none (never guessed).
         estimateMinutes: lms.estimatedMinutes,

@@ -110,7 +110,7 @@ describe("Push reminders", () => {
     browser({ permission: "denied" })
     const PushSettingsCard = await load()
     render(<PushSettingsCard />)
-    expect(await screen.findByText(/Notifications are blocked for Student OS/)).toBeTruthy()
+    expect(await screen.findByText(/Notifications are blocked for Quadernio/)).toBeTruthy()
   })
 
   it("not set up on the server: says so", async () => {

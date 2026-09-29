@@ -5,9 +5,9 @@ calendar items** (`scheduleBetween` in the app store). Each item has a **source*
 
 | Source | What | Stored in | Editable |
 | --- | --- | --- | --- |
-| Student OS | the student's events | `events` (local date + times) | yes |
-| Student OS | weekly commitments | `recurring_commitments` (a rule, expanded per day) | yes |
-| Student OS | study sessions | `study_sessions` | yes (Planner) |
+| Quadernio | the student's events | `events` (local date + times) | yes |
+| Quadernio | weekly commitments | `recurring_commitments` (a rule, expanded per day) | yes |
+| Quadernio | study sessions | `study_sessions` | yes (Planner) |
 | Canvas | Canvas calendar events | `external_calendar_events` (`source = canvas`) | no (read-only) |
 | Blackboard | Blackboard calendar events | `external_calendar_events` (`source = blackboard`) | no (read-only) |
 | Google Calendar | the student's Google calendars | `external_calendar_events` (`source = google`) | no (read-only) |
@@ -16,14 +16,14 @@ calendar items** (`scheduleBetween` in the app store). Each item has a **source*
 Google Calendar and Outlook are connected with OAuth on the Integrations page
 (Calendars, separate from login); see `docs/calendar-integrations.md`.
 
-`CalendarEvent.source` is unset for Student OS items and `"canvas"` / `"blackboard"` /
+`CalendarEvent.source` is unset for Quadernio items and `"canvas"` / `"blackboard"` /
 `"google"` / `"outlook"` for external ones (`EventSource` in `src/lib/types.ts`). Events, tasks and study
 sessions stay distinct: a **task** is something to get done (Canvas assignments and
 Blackboard gradable items become tasks, as before); an **event** occupies time (the
 calendar events below); a **study session** is time set aside for a task.
 
 **Where events come from:** Google Calendar and Outlook (connected on the
-Integrations page). Canvas and Blackboard connect only through the Student OS
+Integrations page). Canvas and Blackboard connect only through the Quadernio
 browser extension, which imports courses and assignments (as tasks), not calendar
 events yet; see `src/server/integrations/lms/README.md`. The `canvas` and
 `blackboard` sources remain for events imported earlier by the removed
@@ -67,7 +67,7 @@ Only what the source has: missing optional fields are `null`, nothing is invente
 ## Duplicates, updates, removals
 
 - Unique key `(user_id, source, external_id)`: the same Canvas event synced twice is
-  one row; Canvas `123` and Blackboard `123` are two rows; a Student OS event with the
+  one row; Canvas `123` and Blackboard `123` are two rows; a Quadernio event with the
   same title and time as a Canvas event is a separate item (different source).
   Nothing is ever de-duplicated by title.
 - Changed in the provider (e.g. 2:00 PM -> 3:00 PM) -> the same row is updated.
@@ -86,10 +86,10 @@ External events open a details dialog (source, time, location, description,
 **Open in Canvas / Blackboard** when there's a valid link), never the edit form.
 Nothing is ever sent to Canvas or Blackboard.
 
-**Hide from Student OS** sets `hidden` on the student's own copy: the event leaves
+**Hide from Quadernio** sets `hidden` on the student's own copy: the event leaves
 the Calendar, the Dashboard and the Planner's busy time, and stays hidden through
 later syncs even if the event changes. The Calendar's "N hidden" button lists hidden
-events with **Restore**. Filters (All / Student OS / Canvas / Blackboard / Google Calendar /
+events with **Restore**. Filters (All / Quadernio / Canvas / Blackboard / Google Calendar /
 Outlook; default All) appear once an external calendar is connected.
 
 ## Time zones
@@ -103,7 +103,7 @@ Outlook; default All) appear once an external calendar is connected.
 - An event crossing midnight appears on both days (until 24:00, then from 00:00).
   On the night clocks fall back, a 1:30-1:30 AM (EDT -> EST) event keeps its real
   one-hour length.
-- Student OS's own events keep their local date + times, as before.
+- Quadernio's own events keep their local date + times, as before.
 
 ## Security
 

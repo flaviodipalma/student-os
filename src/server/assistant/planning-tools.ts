@@ -29,7 +29,7 @@ function intentProblem(problem: IntentProblem): ToolOutput {
     case "ambiguous":
       return { result: { status: "ambiguous", about: problem.about, instruction: "Ask the student which one they mean. Plan nothing yet.", options: problem.options } }
     case "not_found":
-      return { result: { status: "not_found", about: problem.about, problem: "Nothing in Student OS matches that. Don't make it up; ask the student." } }
+      return { result: { status: "not_found", about: problem.about, problem: "Nothing in Quadernio matches that. Don't make it up; ask the student." } }
     case "invalid":
       return { result: { status: "not_possible", problem: problem.problem } }
   }
@@ -382,7 +382,7 @@ function sessionsKey(day: PlanningScenario["days"][number] | undefined) {
 export const correctPersonalization = defineTool({
   name: "correctPersonalization",
   description:
-    "Propose a correction to how Student OS personalizes planning, when the student asks: their preferred study times (\"I actually prefer studying at night\": explicit, beats anything learned), their planning mode, switching learned estimates / study times / pacing on or off (\"stop adapting my task durations\"), turning off one learned pattern (\"don't use this pattern\": an insight id from getLearnedPatterns) or turning it back on, or always using their own estimate for a task (\"this estimate is wrong\"). The student confirms before it's saved. Only include what they asked for.",
+    "Propose a correction to how Quadernio personalizes planning, when the student asks: their preferred study times (\"I actually prefer studying at night\": explicit, beats anything learned), their planning mode, switching learned estimates / study times / pacing on or off (\"stop adapting my task durations\"), turning off one learned pattern (\"don't use this pattern\": an insight id from getLearnedPatterns) or turning it back on, or always using their own estimate for a task (\"this estimate is wrong\"). The student confirms before it's saved. Only include what they asked for.",
   input: z
     .object({
       preferredPeriods: z.array(z.enum(studyPeriods)).max(4).optional().describe("The full list of times the student prefers (empty = no preference)."),
@@ -403,12 +403,12 @@ export const correctPersonalization = defineTool({
       if ("ambiguous" in found) {
         return { result: { status: "ambiguous", instruction: "Ask which task. Change nothing.", options: found.ambiguous.map((t) => taskBrief(ctx, t)) } }
       }
-      if ("notFound" in found) return { result: { status: "not_found", problem: "No open task matches that in Student OS." } }
+      if ("notFound" in found) return { result: { status: "not_found", problem: "No open task matches that in Quadernio." } }
       taskId = found.found.id
     }
     const pattern = /^[a-z]+(:[a-z0-9-]+){0,3}$/i
     if ((rest.dismissPattern && !pattern.test(rest.dismissPattern)) || (rest.restorePattern && !pattern.test(rest.restorePattern))) {
-      return { result: { status: "not_possible", problem: "Student OS hasn't learned that pattern." } }
+      return { result: { status: "not_possible", problem: "Quadernio hasn't learned that pattern." } }
     }
     const check = prepareAction(ctx, { kind: "update-personalization", changes: { ...rest, ...(taskId ? { useOwnEstimateFor: taskId } : {}) } })
     if (!check.ok) return { result: { status: "not_possible", problem: check.problem } }

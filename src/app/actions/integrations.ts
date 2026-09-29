@@ -9,7 +9,7 @@ import { listCourses } from "@/server/services/courses"
 import { removeExternalEventsFrom, setExternalEventHidden } from "@/server/services/external-events"
 
 // Server actions for Canvas and Blackboard (the Integrations page). Connecting and
-// syncing happen in the Student OS browser extension, with the student's own LMS
+// syncing happen in the Quadernio browser extension, with the student's own LMS
 // login (src/server/integrations/extension); here the student can only disconnect.
 // The student is always the signed-in one (from the session), never from the request.
 
@@ -28,7 +28,7 @@ export async function disconnectLmsAction(provider: unknown): Promise<ActionResu
 }
 
 // Onboarding's tutorial waits for the student's first sync from the extension:
-// has this LMS synced yet, and how many of its courses are in Student OS.
+// has this LMS synced yet, and how many of its courses are in Quadernio.
 export async function lmsSyncStatusAction(provider: unknown): Promise<ActionResult<{ syncedAt: string | null; courses: number }>> {
   return runAction(async ({ db, userId }) => {
     const id = parse(providerSchema, provider)
@@ -38,7 +38,7 @@ export async function lmsSyncStatusAction(provider: unknown): Promise<ActionResu
   })
 }
 
-// "Hide from Student OS" / "Restore" for an external calendar event: a local
+// "Hide from Quadernio" / "Restore" for an external calendar event: a local
 // flag on the student's own copy. Nothing is sent to the calendar or LMS.
 const eventIdSchema = z.string().uuid()
 

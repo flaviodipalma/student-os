@@ -68,7 +68,7 @@ describe("Settings > Account", () => {
 
   it("errors from linking are plain messages; unknown codes show nothing", () => {
     const { unmount } = render(<AccountCard account={account} available={[]} outcome={{ code: "already-used" }} />)
-    expect(screen.getByRole("alert").textContent).toBe("That account is already connected to a different Student OS account.")
+    expect(screen.getByRole("alert").textContent).toBe("That account is already connected to a different Quadernio account.")
     unmount()
     render(<AccountCard account={account} available={[]} outcome={{ code: "<script>" }} />)
     expect(screen.queryByRole("alert")).toBeNull()

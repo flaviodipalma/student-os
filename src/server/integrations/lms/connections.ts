@@ -6,7 +6,7 @@ import { lmsConnections } from "../../db/schema"
 import type { Database } from "../../db/types"
 import { NotFoundError } from "../../errors"
 
-// A student's Canvas and Blackboard connections. They're made by the Student OS
+// A student's Canvas and Blackboard connections. They're made by the Quadernio
 // browser extension, which reads the LMS with the student's own login: the server
 // stores no LMS secret, only where the LMS is and how the last sync went. Every
 // function takes the signed-in student's id (from the verified session, never

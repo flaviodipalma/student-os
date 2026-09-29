@@ -7,7 +7,7 @@ export type LmsId = "canvas" | "blackboard"
 export const LMS_NAMES: Record<LmsId, string> = { canvas: "Canvas", blackboard: "Blackboard" }
 
 // At most one automatic sync per half hour per site (Canvas and Blackboard load a
-// new page on every click; Student OS allows 20 syncs an hour). Sync now in the
+// new page on every click; Quadernio allows 20 syncs an hour). Sync now in the
 // popup works any time.
 export const AUTO_SYNC_GAP_MS = 30 * 60_000
 // After an attempt that didn't finish (logged out, offline), wait a little before
@@ -30,7 +30,7 @@ export type SiteSync = {
 // Kept in chrome.storage.local (this computer only).
 export type AutoSyncState = {
   sites: Record<string, SiteSync>
-  // Nobody logged in to Student OS when an automatic sync tried.
+  // Nobody logged in to Quadernio when an automatic sync tried.
   loggedOut: boolean
 }
 

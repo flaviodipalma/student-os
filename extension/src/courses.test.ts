@@ -18,7 +18,7 @@ const canvasCourses = [
 ]
 
 describe("courseOptions", () => {
-  it("labels courses by code and name, and leaves out ones Student OS wouldn't import", () => {
+  it("labels courses by code and name, and leaves out ones Quadernio wouldn't import", () => {
     const options = courseOptions(canvasCourses)
     expect(options.map((o) => o.label)).toEqual([
       "CSC215 · Data Structures",
@@ -29,7 +29,7 @@ describe("courseOptions", () => {
     expect(options[0]).toMatchObject({ id: "215", term: { key: "11", name: "Fall 2026" } })
   })
 
-  it("shows short course codes, as Student OS does", () => {
+  it("shows short course codes, as Quadernio does", () => {
     const [option] = courseOptions([{ id: 283, name: "Intro to Forensic Psych (PS28301_26/FA)", course_code: "PS28301_26/FA", term: fall }])
     expect(option.label).toBe("PS283 · Intro to Forensic Psych")
   })

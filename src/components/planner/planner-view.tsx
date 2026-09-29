@@ -79,7 +79,7 @@ export function PlannerView({ initialDate }: { initialDate?: string }) {
             Recommended study around your classes and commitments. You decide what to keep.
           </p>
           <AskAssistantLink date={date} className="mt-2 text-primary">
-            Ask Student OS about this plan
+            Ask Quadernio about this plan
           </AskAssistantLink>
         </div>
         <div className="flex flex-wrap items-center gap-2">

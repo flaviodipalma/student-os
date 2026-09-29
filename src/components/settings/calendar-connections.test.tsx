@@ -45,7 +45,7 @@ describe("Calendars on the Integrations page", () => {
     mocks.sync.mockResolvedValue({ ok: true, data: { result: { added: 12, updated: 3, removed: 1, skipped: 0, failed: 0 }, externalEvents: [{ id: "e" }], status: [] } })
     mocks.disconnect.mockResolvedValue({ ok: true, data: { externalEvents: [] } })
     render(<CalendarConnections calendars={[google(connected), outlook]} outcomes={{ google: "connected" }} timeZone="America/New_York" />)
-    expect(screen.getByText("Google Calendar connected. Its events are now in your Student OS calendar.")).toBeTruthy()
+    expect(screen.getByText("Google Calendar connected. Its events are now in your Quadernio calendar.")).toBeTruthy()
     const g = screen.getAllByRole("listitem")[0]
     expect(within(g).getByText("Connected")).toBeTruthy()
     expect(within(g).getByText(/alex@gmail\.com/)).toBeTruthy()

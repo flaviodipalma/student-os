@@ -210,7 +210,7 @@ function TaskForm({
           {learned && (
             <p id="task-estimate-learned" className="text-xs text-muted-foreground">
               {learned.explanation}
-              {learned.confidence === "low" ? " Student OS is still learning your pattern." : ""}{" "}
+              {learned.confidence === "low" ? " Quadernio is still learning your pattern." : ""}{" "}
               <button
                 type="button"
                 className="font-medium text-primary underline-offset-2 hover:underline"

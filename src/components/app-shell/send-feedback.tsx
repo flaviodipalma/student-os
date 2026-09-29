@@ -68,7 +68,7 @@ export function SendFeedback({ onOpen }: { onOpen?: () => void }) {
             <DialogHeader>
               <DialogTitle>Send feedback</DialogTitle>
               <DialogDescription>
-                Student OS is in beta, and this goes straight to the team. We&apos;ll also see which page you were on.
+                Quadernio is in beta, and this goes straight to the team. We&apos;ll also see which page you were on.
               </DialogDescription>
             </DialogHeader>
             <fieldset>
@@ -96,7 +96,7 @@ export function SendFeedback({ onOpen }: { onOpen?: () => void }) {
                 maxLength={2000}
                 rows={5}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="What happened, or what would make Student OS better for you?"
+                placeholder="What happened, or what would make Quadernio better for you?"
                 aria-invalid={Boolean(error) || undefined}
                 aria-describedby={error ? "feedback-error" : undefined}
               />

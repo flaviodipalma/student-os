@@ -77,7 +77,7 @@ describe("readCanvas", () => {
     expect(vi.mocked(fetchFn).mock.calls).toHaveLength(1)
   })
 
-  it("keeps only the fields Student OS uses (no grades, scores or anything else)", async () => {
+  it("keeps only the fields Quadernio uses (no grades, scores or anything else)", async () => {
     const fetchFn = fakeCanvas({
       "/api/v1/users/self": { body: { id: 42 } },
       "/api/v1/courses": { body: [course(1, { enrollments: [{ computed_current_score: 91 }], calendar: { ics: "secret" } })] },

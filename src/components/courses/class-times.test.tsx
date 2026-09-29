@@ -147,7 +147,7 @@ describe("the notice", () => {
   })
 
   it("nothing to ask: no notice", () => {
-    stored.set("student-os:class-times-asked", JSON.stringify(["c1", "c2"]))
+    stored.set("quadernio:class-times-asked", JSON.stringify(["c1", "c2"]))
     const { container } = render(<ClassTimesNotice />)
     expect(container.textContent).toBe("")
   })

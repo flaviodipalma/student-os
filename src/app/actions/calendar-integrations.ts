@@ -92,7 +92,7 @@ export async function syncCalendarAction(provider: unknown): Promise<ActionResul
 
 // Revokes the access at Google (best effort; Microsoft has no revocation
 // endpoint), deletes the tokens and this calendar's copied events. Only
-// this calendar: Student OS events, Canvas / Blackboard, tasks, courses and
+// this calendar: Quadernio events, Canvas / Blackboard, tasks, courses and
 // study sessions are untouched.
 export async function disconnectCalendarAction(provider: unknown): Promise<ActionResult<{ externalEvents: ExternalEventRecord[] }>> {
   return runAction(async ({ db, userId }) => {

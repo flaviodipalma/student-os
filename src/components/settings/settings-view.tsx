@@ -35,7 +35,7 @@ export function ProfileSettings() {
     <Section
       id="profile"
       title="About you"
-      description="Your name is used in greetings. Student OS finds your school's academic calendar on its website."
+      description="Your name is used in greetings. Quadernio finds your school's academic calendar on its website."
       onSave={async () => {
         const parsed = profileSchema.safeParse(profile)
         if (!parsed.success) return firstIssue(parsed.error)

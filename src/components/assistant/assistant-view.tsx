@@ -19,7 +19,7 @@ import {
 import { formatRelativeDay, fromDateKey } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-// The Assistant page: a conversation with Student OS about the student's own
+// The Assistant page: a conversation with Quadernio about the student's own
 // plan, deadlines and schedule. Answers come from the server (the Assistant
 // service and its tools); this component only shows them. A change the
 // Assistant proposes is saved only when the student presses Confirm (or types
@@ -39,7 +39,7 @@ type Entry = {
 
 type Saved = { entries: Entry[]; focusTaskId?: string }
 
-const STORAGE_KEY = "student-os.assistant"
+const STORAGE_KEY = "quadernio.assistant"
 const YES = /^(yes|yeah|yep|yup|y|sure|ok|okay|confirm|do it|go ahead|please do)[\s.!]*$/i
 const NO = /^(no|nope|n|cancel|don'?t|stop|never ?mind)[\s.!]*$/i
 
@@ -168,7 +168,7 @@ export function AssistantView({ initialContext }: { initialContext: AssistantPag
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Assistant</h1>
           <p className="mt-1.5 text-muted-foreground">
-            Ask about your plan, deadlines and schedule. Answers come from your Student OS data and your Planner.
+            Ask about your plan, deadlines and schedule. Answers come from your Quadernio data and your Planner.
           </p>
         </div>
         {entries.length > 0 && (
@@ -234,7 +234,7 @@ export function AssistantView({ initialContext }: { initialContext: AssistantPag
             ) : (
               <div key={entry.id} className="max-w-[92%] space-y-2">
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  <span className="sr-only">Student OS: </span>
+                  <span className="sr-only">Quadernio: </span>
                   {entry.content}
                 </p>
                 {entry.pending && (
@@ -254,7 +254,7 @@ export function AssistantView({ initialContext }: { initialContext: AssistantPag
           {busy === "thinking" && (
             <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2Icon aria-hidden className="size-4 animate-spin" />
-              Checking Student OS…
+              Checking Quadernio…
             </p>
           )}
           {error && (
@@ -278,7 +278,7 @@ export function AssistantView({ initialContext }: { initialContext: AssistantPag
           }}
         >
           <label htmlFor="assistant-input" className="sr-only">
-            Message Student OS
+            Message Quadernio
           </label>
           <Textarea
             id="assistant-input"
@@ -301,7 +301,7 @@ export function AssistantView({ initialContext }: { initialContext: AssistantPag
         </form>
       </Card>
       <p className="text-xs text-muted-foreground">
-        The Assistant reads your Student OS data and explains your Planner. It only changes something after you confirm.
+        The Assistant reads your Quadernio data and explains your Planner. It only changes something after you confirm.
       </p>
     </div>
   )

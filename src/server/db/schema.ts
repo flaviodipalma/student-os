@@ -18,7 +18,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { authUsers } from "drizzle-orm/supabase"
 
-// The Student OS database. Every user-owned table has a user_id, and every query
+// The Quadernio database. Every user-owned table has a user_id, and every query
 // in src/server/services filters by it. Row Level Security is enabled on all
 // tables with no policies, so Supabase's public API can't read them at all;
 // only the server (DATABASE_URL) can.
@@ -44,7 +44,7 @@ export const taskType = pgEnum("task_type", [
 ])
 export const eventType = pgEnum("event_type", ["class", "sports", "work", "personal", "study"])
 export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "completed", "skipped"])
-// Learning management systems Student OS can import from (see src/server/integrations/lms).
+// Learning management systems Quadernio can import from (see src/server/integrations/lms).
 export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
 // What a day on the school's academic calendar is (see src/lib/academic-calendar.ts).
 export const academicEventKind = pgEnum("academic_event_kind", ["term", "no_classes", "exams", "deadline", "other"])
@@ -54,7 +54,7 @@ export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected",
 // and "blackboard" are from the removed LMS calendar-feed links (hidden since migration 0017).
 export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook"])
 export const calendarProvider = pgEnum("calendar_provider", ["google", "outlook"])
-// How Student OS reads the LMS: only the Student OS browser extension now ("extension",
+// How Quadernio reads the LMS: only the Quadernio browser extension now ("extension",
 // with the student's own browser session). "oauth" and "calendar_feed" are no longer
 // used (migration 0017 removed them), but Postgres can't drop enum values.
 export const lmsConnectionMethod = pgEnum("lms_connection_method", ["oauth", "calendar_feed", "extension"])
@@ -317,7 +317,7 @@ export const courses = pgTable(
   },
   (t) => [
     index("courses_user_id_idx").on(t.userId),
-    // One Student OS course per LMS course, per student.
+    // One Quadernio course per LMS course, per student.
     unique("courses_user_external_key").on(t.userId, t.externalSource, t.externalId),
     check("courses_external_pair", sql`(${t.externalSource} is null) = (${t.externalId} is null)`),
     // Lets tasks reference (course, owner) so a task can't point at another user's course.
@@ -355,7 +355,7 @@ export const tasks = pgTable(
   },
   (t) => [
     index("tasks_user_id_due_date_idx").on(t.userId, t.dueDate),
-    // One Student OS task per LMS assignment, per student.
+    // One Quadernio task per LMS assignment, per student.
     unique("tasks_user_external_key").on(t.userId, t.externalSource, t.externalId),
     check("tasks_external_pair", sql`(${t.externalSource} is null) = (${t.externalId} is null)`),
     index("tasks_course_id_idx").on(t.courseId),
@@ -453,10 +453,10 @@ export const syllabusImports = pgTable(
 ).enableRLS()
 
 // A student's connection to a learning management system (one per provider),
-// made by the Student OS browser extension, which reads the LMS with the student's
+// made by the Quadernio browser extension, which reads the LMS with the student's
 // own login. No LMS secret is stored: just the LMS address and how the last sync
 // went. Disconnecting deletes the row; imported courses and tasks stay, as normal
-// Student OS data. (`method` is always "extension" now; the older "oauth" and
+// Quadernio data. (`method` is always "extension" now; the older "oauth" and
 // "calendar_feed" values stay in the enum only because Postgres can't drop them.)
 export const lmsConnections = pgTable(
   "lms_connections",
@@ -511,7 +511,7 @@ export const calendarConnections = pgTable(
 
 // Events copied from a student's external calendar (Canvas, Blackboard, Google
 // Calendar, Outlook). Read-only
-// copies: Student OS never changes the original. One row per (student, source,
+// copies: Quadernio never changes the original. One row per (student, source,
 // external id), so re-syncing never duplicates, and Canvas "123" and Blackboard
 // "123" are different rows. Times are real instants (timestamptz); they're shown
 // in the student's time zone. See src/lib/calendar/external-events.ts.
@@ -530,7 +530,7 @@ export const externalCalendarEvents = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     location: text("location"),
     url: text("url"),
-    // The student hid it from Student OS (kept hidden through later syncs).
+    // The student hid it from Quadernio (kept hidden through later syncs).
     hidden: boolean("hidden").notNull().default(false),
     // When it disappeared from the provider (not shown; comes back if it reappears).
     removedAt: timestamp("removed_at", { withTimezone: true }),

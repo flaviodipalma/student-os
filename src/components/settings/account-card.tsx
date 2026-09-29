@@ -22,7 +22,7 @@ import { authErrorMessages, isAuthErrorCode, isPrivateRelayEmail, socialProvider
 import type { AccountDetails, LoginMethod } from "@/server/social-auth"
 
 // Settings > Account: profile, login methods and log out. Login methods are
-// ways to sign in to this one Student OS account (same data whichever is used);
+// ways to sign in to this one Quadernio account (same data whichever is used);
 // they're not calendar connections (those are under Integrations).
 
 export function AccountCard({

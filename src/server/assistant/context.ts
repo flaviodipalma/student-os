@@ -75,7 +75,7 @@ export const clampTime = (minutes: number) => fromMinutes(Math.max(0, Math.min(m
 export const lengthOf = (item: { startTime: string; endTime: string }) => toMinutes(item.endTime) - toMinutes(item.startTime)
 
 export function sourceName(item: Pick<CalendarEvent, "source">): string {
-  return item.source && item.source !== "student_os" ? eventSourceNames[item.source] : "Student OS"
+  return item.source && item.source !== "student_os" ? eventSourceNames[item.source] : "Quadernio"
 }
 
 export function courseCodeOf(ctx: ToolContext, courseId: string | undefined): string | null {

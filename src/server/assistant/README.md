@@ -1,6 +1,6 @@
-# The Student OS Assistant
+# The Quadernio Assistant
 
-A conversational way into the student's own Student OS data. **The Planner
+A conversational way into the student's own Quadernio data. **The Planner
 decides; the Assistant explains.** The model never sees the database, a user id
 or a way to save anything by itself.
 

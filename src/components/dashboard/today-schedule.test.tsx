@@ -31,11 +31,11 @@ const { TodaySchedule } = await import("./today-schedule")
 afterEach(cleanup)
 
 describe("Dashboard: Today's plan", () => {
-  it("lists Student OS, Canvas and Blackboard events in order, each with its source", () => {
+  it("lists Quadernio, Canvas and Blackboard events in order, each with its source", () => {
     render(<TodaySchedule />)
     const rows = screen.getAllByRole("listitem").map((row) => row.textContent)
     expect(rows).toEqual([
-      "10:30 AM–1:00 PMSoccer PracticeStudent OS",
+      "10:30 AM–1:00 PMSoccer PracticeQuadernio",
       "2:00 PM–3:15 PMCSC215 ClassCanvas",
       "4:00 PM–5:00 PMPsychology MeetingBlackboard",
     ])

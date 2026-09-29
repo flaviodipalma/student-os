@@ -1,4 +1,4 @@
-# Student OS design system
+# Quadernio design system
 
 Clean, calm, quietly premium. The polish comes from hierarchy, spacing,
 typography and restraint, not decoration.

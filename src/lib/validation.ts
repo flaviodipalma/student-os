@@ -141,7 +141,7 @@ export function schoolWebsiteToDomain(text: string): string {
     .replace(/^www\./, "")
 }
 
-// The school is required: Student OS finds its academic calendar on the school's
+// The school is required: Quadernio finds its academic calendar on the school's
 // website (the domain comes with a school picked from the list; otherwise the
 // student types it).
 export const profileSchema = z
@@ -158,7 +158,7 @@ export const profileSchema = z
       .default(null),
   })
   .refine((profile) => profile.schoolDomain, {
-    message: "Add your school's website (for example qu.edu), so Student OS can find its academic calendar.",
+    message: "Add your school's website (for example qu.edu), so Quadernio can find its academic calendar.",
     path: ["schoolDomain"],
   })
 

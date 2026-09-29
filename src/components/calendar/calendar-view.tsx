@@ -21,7 +21,7 @@ import { TimeGrid, type AllDayItem } from "./time-grid"
 
 type View = "day" | "week"
 
-// Which sources to show. Study sessions and weekly commitments are Student OS items.
+// Which sources to show. Study sessions and weekly commitments are Quadernio items.
 type SourceFilter = "all" | EventSource
 const sourceOf = (event: CalendarEvent): EventSource => event.source ?? "student_os"
 

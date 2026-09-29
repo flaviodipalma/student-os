@@ -22,7 +22,7 @@ import { planningModes, studyPeriods, type LearningSettings, type PlanningMode, 
 import { cn } from "@/lib/utils"
 
 // Settings > Personalization. The student's own choices first (planning mode,
-// preferred study times: explicit, always win), then what Student OS may learn
+// preferred study times: explicit, always win), then what Quadernio may learn
 // from their history (each signal can be switched off), what it learned (each
 // pattern can be turned off) and "Reset learning". Nothing here changes tasks,
 // estimates or the calendar.
@@ -66,7 +66,7 @@ export function LearningCard() {
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Personalization</CardTitle>
         <CardDescription>
-          How Student OS plans for you. Your own choices always come first; learning from your history only adjusts the
+          How Quadernio plans for you. Your own choices always come first; learning from your history only adjusts the
           details and never changes your tasks, estimates, limits or calendar.
         </CardDescription>
       </CardHeader>
@@ -222,7 +222,7 @@ export function LearningCard() {
       <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset what Student OS learned?</AlertDialogTitle>
+            <AlertDialogTitle>Reset what Quadernio learned?</AlertDialogTitle>
             <AlertDialogDescription>
               Learned durations and patterns start over from today, and your plan goes back to your own estimates. Your
               planning mode, preferred times, tasks, courses, study sessions and calendar stay exactly as they are.

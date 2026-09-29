@@ -25,7 +25,7 @@ const vault = createCredentialVault(randomBytes(32))
 const NOW = new Date(2026, 8, 21, 8, 0)
 
 // ---------------------------------------------------------------------------------
-// TEST FIXTURE READER. Returns hand-written data already in Student OS's
+// TEST FIXTURE READER. Returns hand-written data already in Quadernio's
 // NORMALIZED format (what the extension imports produce). It isn't Canvas or
 // Blackboard; it only drives the provider-independent sync.
 class FixtureReader implements LmsReader {
@@ -291,7 +291,7 @@ describe("syncing (with a test fixture reader)", () => {
   })
 })
 
-describe("imported tasks in the rest of Student OS", () => {
+describe("imported tasks in the rest of Quadernio", () => {
   it("the Planner plans them like any other task", async () => {
     const user = await connectedStudent()
     await syncWith(user, new FixtureReader([fixtureCourse()], [fixtureAssignment()]))

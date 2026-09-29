@@ -1,8 +1,8 @@
 # Authentication setup
 
-Student OS accounts use **Supabase Auth**. A student can log in with email and
+Quadernio accounts use **Supabase Auth**. A student can log in with email and
 password, **Google**, **Microsoft** or **Apple**. Every method signs in the same
-kind of Student OS user: the Supabase user id is the Student OS user id, and all
+kind of Quadernio user: the Supabase user id is the Quadernio user id, and all
 courses, tasks, events, study sessions, preferences, notifications and LMS
 connections belong to it.
 
@@ -14,7 +14,7 @@ see `docs/calendar-integrations.md`).
 
 ```
 Authentication (Supabase Auth)          Calendar integrations (src/server/integrations)
-├── Email + password                    ├── Student OS
+├── Email + password                    ├── Quadernio
 ├── Google                              ├── Canvas
 ├── Microsoft                           ├── Blackboard
 └── Apple                               ├── Google Calendar
@@ -28,13 +28,13 @@ Authentication (Supabase Auth)          Calendar integrations (src/server/integr
   code verifier and checks them). `linkLoginMethodAction` /
   `unlinkLoginMethodAction` add or remove a login method for the signed-in student.
 - `src/app/auth/callback/route.ts`: exchanges the one-time code for a session,
-  creates the Student OS profile on first sign-in (never overwrites one), and
+  creates the Quadernio profile on first sign-in (never overwrites one), and
   sends new students to onboarding. Errors become short codes
   (`/login?error=cancelled`) shown as plain messages.
 - `src/lib/auth-providers.ts`: the three providers, their Supabase names and
   scopes, and the error messages.
 - The provider's client ids and secrets live in the Supabase project only.
-  Student OS stores no provider passwords or tokens; Supabase keeps each login
+  Quadernio stores no provider passwords or tokens; Supabase keeps each login
   method as an identity (provider + the provider's account id) in `auth.identities`.
 - The log-in and sign-up pages show the providers the Supabase project has
   turned on (read from its public auth settings). In development all three show;
@@ -48,8 +48,8 @@ Authentication (Supabase Auth)          Calendar integrations (src/server/integr
   address alone can't take over an account.
 - **Manual (Settings > Account > Login methods):** a signed-in student can add
   Google, Microsoft or Apple (`linkIdentity`) or remove one (never the last). A
-  provider account already used by another Student OS account can't be added
-  ("That account is already connected to a different Student OS account").
+  provider account already used by another Quadernio account can't be added
+  ("That account is already connected to a different Quadernio account").
   Requires **Enable Manual Linking** in Supabase (below).
 - Apple may hide the real email ("Hide My Email"): the account then has a
   `@privaterelay.appleid.com` address, which works but won't match the student's
@@ -79,7 +79,7 @@ In production also set `SITE_URL` (see `.env.example`).
 ## Google
 
 1. [Google Cloud Console](https://console.cloud.google.com/) > APIs & Services >
-   **OAuth consent screen**: app name "Student OS", support email, scopes
+   **OAuth consent screen**: app name "Quadernio", support email, scopes
    `openid`, `email`, `profile` only. While in "Testing", add the Google accounts
    allowed to sign in; publish it for everyone.
 2. **Credentials > Create credentials > OAuth client ID**, type **Web application**.
@@ -111,7 +111,7 @@ Needs a paid Apple Developer account.
 
 1. [Apple Developer](https://developer.apple.com/account/resources/) >
    Identifiers: an **App ID** with **Sign in with Apple** enabled.
-2. Identifiers > **Services IDs**: create one (e.g. `com.yourname.studentos.web`;
+2. Identifiers > **Services IDs**: create one (e.g. `com.yourname.quadernio.web`;
    this is the **client id**), enable Sign in with Apple, Configure:
    - Primary App ID: the one from step 1.
    - Domains: `<project-ref>.supabase.co` (and your domain).
@@ -127,7 +127,7 @@ Needs a paid Apple Developer account.
    used to generate the secret.
 
 Apple sends the student's name only on their **first** sign-in, and they may
-hide their email. Student OS doesn't rely on either: onboarding asks for the name.
+hide their email. Quadernio doesn't rely on either: onboarding asks for the name.
 
 ## Checking it
 

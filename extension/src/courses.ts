@@ -25,7 +25,7 @@ const time = (value: unknown) => {
 }
 const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null)
 
-// Canvas courses (from readCanvas) -> options. Courses Student OS wouldn't import
+// Canvas courses (from readCanvas) -> options. Courses Quadernio wouldn't import
 // anyway (no name, hidden by date, deleted) are left out.
 export function courseOptions(courses: Record<string, unknown>[]): CourseOption[] {
   return courses.flatMap((course) => {
@@ -33,7 +33,7 @@ export function courseOptions(courses: Record<string, unknown>[]): CourseOption[
     const fullName = text(course.name)
     const name = (fullName && courseNameWithoutCode(fullName)) ?? text(course.course_code)
     if (!id || !name || course.access_restricted_by_date === true || course.workflow_state === "deleted") return []
-    // "PS28301_26/FA" -> "PS283", as Student OS shows it.
+    // "PS28301_26/FA" -> "PS283", as Quadernio shows it.
     const rawCode = text(course.course_code)
     const code = rawCode ? shortCourseCode(rawCode) : null
     const term = typeof course.term === "object" && course.term !== null ? (course.term as Record<string, unknown>) : null

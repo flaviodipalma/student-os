@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
-// The first thing a new student sees: "Welcome to Student OS!" fades in, then gives
+// The first thing a new student sees: "Welcome to Quadernio!" fades in, then gives
 // way to "Let's get started", which fades into setup. Each stays for 3 seconds (about
 // 7 in all, with the fades); a click or any key skips it. With reduced motion the
 // words just change, without fading.
@@ -64,7 +64,7 @@ export function OnboardingIntro({ onDone }: { onDone: () => void }) {
           )}
           aria-hidden={!showWelcome}
         >
-          Welcome to Student OS!
+          Welcome to Quadernio!
         </h1>
         <p
           className={cn(

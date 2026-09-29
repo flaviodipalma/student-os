@@ -9,7 +9,7 @@ import { lmsProviderNames, type LmsProviderId } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 // Onboarding's last step: bring in courses. Canvas and Blackboard connect through the
-// Student OS browser extension (with the student's own login); without either, a
+// Quadernio browser extension (with the student's own login); without either, a
 // syllabus or courses added by hand.
 
 // The published extension's Chrome Web Store page (NEXT_PUBLIC_, it's shown to students).
@@ -59,7 +59,7 @@ export function ChooseSchool({
           <DialogHeader>
             <DialogTitle>Add your classes with a syllabus</DialogTitle>
             <DialogDescription>
-              Not connecting Canvas or Blackboard? Upload a syllabus and Student OS adds the course and its deadlines. You
+              Not connecting Canvas or Blackboard? Upload a syllabus and Quadernio adds the course and its deadlines. You
               review everything first.
             </DialogDescription>
           </DialogHeader>
@@ -84,9 +84,9 @@ export function ChooseSchool({
 
 // ---- Getting the extension ------------------------------------------------------------
 
-// The extension marks Student OS pages once it's installed (extension/src/marker.ts).
+// The extension marks Quadernio pages once it's installed (extension/src/marker.ts).
 export function extensionInstalled(): boolean {
-  return typeof document !== "undefined" && Boolean(document.documentElement.dataset.studentOsExtension)
+  return typeof document !== "undefined" && Boolean(document.documentElement.dataset.quadernioExtension)
 }
 
 export function GetExtension({ provider, onInstalled }: { provider: LmsProviderId; onInstalled: () => void }) {
@@ -96,10 +96,10 @@ export function GetExtension({ provider, onInstalled }: { provider: LmsProviderI
   useEffect(() => {
     if (extensionInstalled()) return onInstalled()
     const check = () => extensionInstalled() && onInstalled()
-    document.addEventListener("student-os-extension", check)
+    document.addEventListener("quadernio-extension", check)
     const timer = setInterval(check, 1000)
     return () => {
-      document.removeEventListener("student-os-extension", check)
+      document.removeEventListener("quadernio-extension", check)
       clearInterval(timer)
     }
   }, [onInstalled])
@@ -107,7 +107,7 @@ export function GetExtension({ provider, onInstalled }: { provider: LmsProviderI
   return (
     <div className="space-y-5">
       <p className="text-muted-foreground">
-        The Student OS extension brings in your {name} courses with your own {name} login. It only reads from {name}, and
+        The Quadernio extension brings in your {name} courses with your own {name} login. It only reads from {name}, and
         you choose which courses come in.
       </p>
       {STORE_URL ? (
@@ -152,19 +152,19 @@ export function SyncTutorial({ provider, onSynced }: { provider: LmsProviderId; 
     const timer = setInterval(() => void check(), 3000)
     // The extension also says when a sync is done (extension/src/lms-sync.ts).
     const onSyncEvent = () => void check()
-    document.addEventListener("student-os-synced", onSyncEvent)
+    document.addEventListener("quadernio-synced", onSyncEvent)
     return () => {
       active = false
       clearInterval(timer)
-      document.removeEventListener("student-os-synced", onSyncEvent)
+      document.removeEventListener("quadernio-synced", onSyncEvent)
     }
   }, [provider, onSynced])
 
   const steps = [
     { title: `Open your ${name} in another tab`, detail: `Log in to ${name} if you aren't already.` },
     {
-      title: "Click the Student OS extension",
-      detail: "It's in Chrome's toolbar. Don't see it? Click the puzzle-piece icon, then the pin next to Student OS.",
+      title: "Click the Quadernio extension",
+      detail: "It's in Chrome's toolbar. Don't see it? Click the puzzle-piece icon, then the pin next to Quadernio.",
     },
     { title: "Click Sync now", detail: "Then choose your courses for this semester and click Import." },
   ]

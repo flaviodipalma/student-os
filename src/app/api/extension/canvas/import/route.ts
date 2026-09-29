@@ -1,11 +1,11 @@
 import { importCanvasFromExtension } from "@/server/integrations/extension/canvas-import"
 import { extensionImportRoute } from "@/server/integrations/extension/import-route"
 
-// POST /api/extension/canvas/import: the Student OS browser extension sends the
+// POST /api/extension/canvas/import: the Quadernio browser extension sends the
 // student's Canvas courses and assignments (read with their own Canvas login), for
-// the Student OS account logged in in that browser.
+// the Quadernio account logged in in that browser.
 //
-//   X-Student-OS-Extension: 1          (plus the Student OS login cookies)
+//   X-Quadernio-Extension: 1          (plus the Quadernio login cookies)
 //   { "baseUrl": "https://school.instructure.com", "timeZone": "America/New_York",
 //     "courses": [...Canvas courses], "assignments": { "<course id>": [...Canvas assignments] } }
 //

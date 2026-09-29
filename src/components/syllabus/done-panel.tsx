@@ -22,7 +22,7 @@ export function DonePanel({
   return (
     <section className="rounded-xl bg-card p-8 text-center ring-1 ring-border">
       <CircleCheckIcon aria-hidden className="mx-auto size-10 text-success" />
-      <h1 className="mt-4 text-xl font-semibold">Imported into Student OS</h1>
+      <h1 className="mt-4 text-xl font-semibold">Imported into Quadernio</h1>
       <p className="mt-1 text-muted-foreground">
         {result.createdCourse ? "Created " : "Updated "}
         <span className="font-medium text-foreground">{name}</span>

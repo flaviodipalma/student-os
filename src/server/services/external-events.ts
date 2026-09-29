@@ -37,7 +37,7 @@ export async function listExternalEvents(db: Database, userId: string): Promise<
   return rows.map(toExternalEventRecord)
 }
 
-// "Hide from Student OS" / "Restore": a local flag only; the original is never touched.
+// "Hide from Quadernio" / "Restore": a local flag only; the original is never touched.
 export async function setExternalEventHidden(
   db: Database,
   userId: string,

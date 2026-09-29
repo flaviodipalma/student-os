@@ -122,7 +122,7 @@ class ScriptedAI implements StudentAssistantAIService {
 }
 const tool = async (request: AssistantAIRequest, name: string, input: unknown = {}) => JSON.parse((await request.callTool(name, input)).content)
 
-describe("read tools: answers come from Student OS and the Planner", () => {
+describe("read tools: answers come from Quadernio and the Planner", () => {
   it("What should I do now? is the Planner's answer (task, free time, remaining work, reasons)", async () => {
     const ctx = await contextFor()
     const planners = whatNow({

@@ -24,7 +24,7 @@ import { CalendarConnections, type CalendarOutcomes } from "./calendar-connectio
 
 // The Integrations page (/integrations). Only safe connection summaries reach this
 // component. Personal calendars connect here; Canvas and Blackboard connect through
-// the Student OS browser extension (with the student's own LMS login), so for them
+// the Quadernio browser extension (with the student's own LMS login), so for them
 // this page only shows the status and a way to disconnect.
 
 export function IntegrationsCard({
@@ -44,7 +44,7 @@ export function IntegrationsCard({
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Integrations</CardTitle>
         <CardDescription>
-          Connected calendars and learning management systems. Everything shows up in one Student OS calendar, and your
+          Connected calendars and learning management systems. Everything shows up in one Quadernio calendar, and your
           Planner works around it.
         </CardDescription>
       </CardHeader>
@@ -60,16 +60,16 @@ export function IntegrationsCard({
         </h3>
         <div className="-mt-1 space-y-2 text-sm text-muted-foreground">
           <p>
-            Connect with the Student OS browser extension. It uses your own Canvas or Blackboard login (no school approval
+            Connect with the Quadernio browser extension. It uses your own Canvas or Blackboard login (no school approval
             needed) and brings in the courses you choose, their assignments, and what you&apos;ve already turned in.
           </p>
           <ol className="list-inside list-decimal space-y-1">
-            <li>Install the Student OS extension in Chrome, and stay logged in to Student OS there.</li>
+            <li>Install the Quadernio extension in Chrome, and stay logged in to Quadernio there.</li>
             <li>
               Open your Canvas or Blackboard, click <PuzzleIcon aria-label="the extension" className="inline size-4 align-text-bottom" />{" "}
-              Student OS, then <span className="font-medium text-foreground">Sync now</span>, and choose your courses.
+              Quadernio, then <span className="font-medium text-foreground">Sync now</span>, and choose your courses.
             </li>
-            <li>Optional: turn on automatic sync in the extension, so opening Canvas or Blackboard keeps Student OS up to date.</li>
+            <li>Optional: turn on automatic sync in the extension, so opening Canvas or Blackboard keeps Quadernio up to date.</li>
           </ol>
         </div>
         {integrations === null ? (
@@ -84,7 +84,7 @@ export function IntegrationsCard({
           </ul>
         )}
         <p className="text-xs text-muted-foreground">
-          Student OS only reads from Canvas and Blackboard, never asks for your password, and stores nothing that could
+          Quadernio only reads from Canvas and Blackboard, never asks for your password, and stores nothing that could
           sign in to them.
         </p>
       </CardContent>
@@ -147,7 +147,7 @@ function LmsRow({ integration, timeZone }: { integration: LmsIntegrationStatus; 
           </p>
           <p className="text-sm text-muted-foreground">
             {!connection ? (
-              `Not connected · open ${name}, click the Student OS extension, then Sync now.`
+              `Not connected · open ${name}, click the Quadernio extension, then Sync now.`
             ) : (
               <>
                 Through the browser extension ·{" "}
@@ -168,7 +168,7 @@ function LmsRow({ integration, timeZone }: { integration: LmsIntegrationStatus; 
         <DisconnectButton
           provider={integration.provider}
           name={name}
-          description={`Student OS will stop syncing with ${name} until you click Sync now in the extension again. Courses and tasks you already imported stay in Student OS.`}
+          description={`Quadernio will stop syncing with ${name} until you click Sync now in the extension again. Courses and tasks you already imported stay in Quadernio.`}
         />
       )}
     </div>
@@ -203,7 +203,7 @@ function DisconnectButton({ provider, name, description }: { provider: LmsProvid
             <AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
             <AlertDialogDescription>
               {description ??
-                `Student OS will stop syncing with ${name} and forget its access. Courses and tasks you already imported stay in Student OS.`}
+                `Quadernio will stop syncing with ${name} and forget its access. Courses and tasks you already imported stay in Quadernio.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

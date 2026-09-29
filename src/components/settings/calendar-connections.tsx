@@ -29,7 +29,7 @@ import { Logo, Notice, SyncedAgo } from "./integrations-card"
 
 // Integrations > Calendars: Google Calendar and Outlook. Connecting is
 // always the student's explicit choice (separate from how they log in), gives
-// Student OS read-only access, and brings the events into the one Student OS
+// Quadernio read-only access, and brings the events into the one Quadernio
 // calendar. Only safe summaries reach this component (no tokens).
 
 // Back from Google / Microsoft (?google-calendar=connected, ...): a short code -> a message.
@@ -37,9 +37,9 @@ export type CalendarOutcomes = Partial<Record<CalendarProviderId, string>>
 
 function outcomeMessage(name: string, outcome: string): { tone: "success" | "error"; text: string } | undefined {
   const messages: Record<string, { tone: "success" | "error"; text: string }> = {
-    connected: { tone: "success", text: `${name} connected. Its events are now in your Student OS calendar.` },
+    connected: { tone: "success", text: `${name} connected. Its events are now in your Quadernio calendar.` },
     denied: { tone: "error", text: `${name} access was canceled. Nothing was connected.` },
-    permission: { tone: "error", text: `Student OS needs permission to read your ${name} events. Please connect again and allow calendar access.` },
+    permission: { tone: "error", text: `Quadernio needs permission to read your ${name} events. Please connect again and allow calendar access.` },
     invalid_state: { tone: "error", text: `That ${name} sign-in expired or didn't match. Please try connecting again.` },
     not_configured: { tone: "error", text: `${name} isn't set up on this server yet.` },
     error: { tone: "error", text: `We couldn't connect ${name}. Please try again.` },
@@ -79,7 +79,7 @@ export function CalendarConnections({
         ))}
       </ul>
       <p className="text-xs text-muted-foreground">
-        Read-only: Student OS never changes your Google or Outlook events. Connecting a calendar is separate from how you
+        Read-only: Quadernio never changes your Google or Outlook events. Connecting a calendar is separate from how you
         log in.
       </p>
     </>
@@ -110,7 +110,7 @@ function CalendarRow({ calendar, timeZone }: { calendar: CalendarIntegrationStat
           <p className="text-sm text-muted-foreground">
             {!connection ? (
               calendar.configured ? (
-                `Show your ${calendar.name} events in Student OS so your plan works around them.`
+                `Show your ${calendar.name} events in Quadernio so your plan works around them.`
               ) : (
                 `${calendar.name} isn't set up on this server yet.`
               )
@@ -173,7 +173,7 @@ function ConnectedActions({ provider, name }: { provider: CalendarProviderId; na
     setResult(null)
     const outcome = await syncCalendarAction(provider).catch(() => null)
     setSyncing(false)
-    if (!outcome) return setError("We couldn't reach Student OS. Check your connection and try again.")
+    if (!outcome) return setError("We couldn't reach Quadernio. Check your connection and try again.")
     if (!outcome.ok) {
       setError(outcome.error)
       return router.refresh()
@@ -235,8 +235,8 @@ function ConnectedActions({ provider, name }: { provider: CalendarProviderId; na
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Student OS will forget its access to {name} and remove the {name} events it copied. Your events in {name}{" "}
-              aren&apos;t changed, and nothing else in Student OS is (your own events, Canvas and Blackboard, tasks, courses
+              Quadernio will forget its access to {name} and remove the {name} events it copied. Your events in {name}{" "}
+              aren&apos;t changed, and nothing else in Quadernio is (your own events, Canvas and Blackboard, tasks, courses
               and study sessions stay).
             </AlertDialogDescription>
           </AlertDialogHeader>

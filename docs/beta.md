@@ -1,4 +1,4 @@
-# Running the Student OS beta
+# Running the Quadernio beta
 
 A small, controlled beta: a handful of students, real accounts, close contact.
 
@@ -62,6 +62,6 @@ single-student audit (`src/server/services/persona-audit.test.ts`).
 - Try the Assistant with real students' questions (with a real key).
 - Connect Google Calendar / Outlook with real accounts if those will be offered
   (OAuth apps in testing mode allow listed test users only).
-- Tell beta students: reminders appear while Student OS is open (no email/push);
+- Tell beta students: reminders appear while Quadernio is open (no email/push);
   all-day calendar events aren't shown yet; Canvas/Blackboard connect through the
-  Student OS browser extension (Chrome, desktop).
+  Quadernio browser extension (Chrome, desktop).

@@ -71,7 +71,7 @@ function graphInstant(value: GraphDateTime | undefined): Date | null {
   return new Date(`${match[1]}${ms}Z`)
 }
 
-// One Outlook event -> a normalized Student OS event (or why not).
+// One Outlook event -> a normalized Quadernio event (or why not).
 export function outlookEventToExternal(event: OutlookEvent): { event: ExternalCalendarEvent } | { skipped: string } {
   if (event.isCancelled) return { skipped: "cancelled" }
   if (event.responseStatus?.response === "declined") return { skipped: "declined" }
@@ -181,7 +181,7 @@ export const outlookCalendarProvider: CalendarProvider = {
     return { events, skipped }
   },
 
-  // Microsoft has no endpoint to revoke one app's refresh token: Student OS
+  // Microsoft has no endpoint to revoke one app's refresh token: Quadernio
   // deletes its copy. Students can remove the app's access at
   // https://account.microsoft.com/privacy/app-access (personal) or myapps.microsoft.com (school/work).
   async revoke() {},

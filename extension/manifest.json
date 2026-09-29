@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Student OS",
+  "name": "Quadernio",
   "version": "0.1.0",
-  "description": "Bring your Canvas courses and assignments into Student OS, using your own Canvas login.",
+  "description": "Bring your Canvas courses and assignments into Quadernio, using your own Canvas login.",
   "action": {
-    "default_title": "Student OS",
+    "default_title": "Quadernio",
     "default_popup": "popup.html"
   },
   "permissions": [

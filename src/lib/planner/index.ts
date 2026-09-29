@@ -1,4 +1,4 @@
-// The Student OS planner: rule-based and deterministic, no AI. Takes the
+// The Quadernio planner: rule-based and deterministic, no AI. Takes the
 // student's tasks, schedule and preferences and answers "What should I do
 // today?" with recommended study sessions. Pure functions only; no React here.
 //

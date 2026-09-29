@@ -19,7 +19,7 @@ import { UploadPanel } from "./upload-panel"
 
 // The syllabus import flow, one screen at a time:
 // upload -> processing -> "we found this" -> review & edit -> confirm -> done.
-// Nothing is added to Student OS until the student confirms on the review screen.
+// Nothing is added to Quadernio until the student confirms on the review screen.
 
 type State =
   | { step: "upload"; error?: string }

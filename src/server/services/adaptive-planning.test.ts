@@ -182,7 +182,7 @@ describe("the Assistant explains only what was learned", () => {
 
   it("the rules tell the model to use only learned data, with its confidence", () => {
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Never infer or invent a pattern that the tools don't return/)
-    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Student OS is still learning your pattern/)
+    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Quadernio is still learning your pattern/)
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Never change the planning mode or any setting on your own/)
   })
 })

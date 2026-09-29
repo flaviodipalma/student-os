@@ -17,7 +17,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   if (view === "academic") {
     return (
       <div className="space-y-4">
-        <title>Academic calendar · Student OS</title>
+        <title>Academic calendar · Quadernio</title>
         <h1 className="sr-only">Academic calendar</h1>
         <CalendarTabs current="academic" />
         <AcademicCalendarCard />

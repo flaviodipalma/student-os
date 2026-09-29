@@ -2,7 +2,7 @@ import type { LmsProviderId, TaskType } from "@/lib/types"
 
 // Normalized LMS data: what every provider adapter (Canvas, Blackboard, …)
 // must turn its own API responses into. Nothing past the adapter ever sees a
-// provider-specific shape, so the sync logic, and the rest of Student OS,
+// provider-specific shape, so the sync logic, and the rest of Quadernio,
 // work the same whichever LMS the data came from.
 //
 // Dates and times follow the rest of the app: the student's local calendar
@@ -25,7 +25,7 @@ export type LmsCourse = {
 }
 
 // Where the student stands on the assignment in the LMS. Recorded for
-// reference; it never changes the Student OS task's own status (see sync-plan.ts).
+// reference; it never changes the Quadernio task's own status (see sync-plan.ts).
 export type LmsSubmissionStatus = "not_submitted" | "submitted" | "graded" | "unknown"
 
 export type LmsAssignment = {
@@ -36,7 +36,7 @@ export type LmsAssignment = {
   title: string
   description: string | null
   // Null when the LMS has no due date; such assignments aren't imported as tasks
-  // (every Student OS task has a due date), and are reported as skipped.
+  // (every Quadernio task has a due date), and are reported as skipped.
   dueDate: string | null
   dueTime: string | null
   // Best guess at the kind of work; adapters default to "assignment".
@@ -63,7 +63,7 @@ export type LmsSyncResult = {
   coursesUpdated: number
   // Couldn't be imported or read this time (see errors).
   coursesSkipped: number
-  // Existing Student OS courses (added by hand or from a syllabus) that were linked to the LMS course.
+  // Existing Quadernio courses (added by hand or from a syllabus) that were linked to the LMS course.
   coursesLinked: number
   assignmentsCreated: number
   assignmentsUpdated: number

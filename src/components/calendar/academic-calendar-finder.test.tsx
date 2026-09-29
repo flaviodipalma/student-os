@@ -79,10 +79,10 @@ describe("finding the academic calendar", () => {
   })
 
   it("a problem is explained", async () => {
-    answer({ ok: false, message: "Student OS is busy right now. Try again in a minute." })
+    answer({ ok: false, message: "Quadernio is busy right now. Try again in a minute." })
     const user = userEvent.setup()
     render(<AcademicCalendarFinder />)
     await user.click(screen.getByRole("button", { name: "Find it on qu.edu" }))
-    expect((await screen.findByRole("alert")).textContent).toBe("Student OS is busy right now. Try again in a minute.")
+    expect((await screen.findByRole("alert")).textContent).toBe("Quadernio is busy right now. Try again in a minute.")
   })
 })

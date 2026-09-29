@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="color-scheme" content="light dark" />
-    <title>Student OS</title>
+    <title>Quadernio</title>
     <link rel="stylesheet" href="popup.css" />
     <script type="module" src="popup.js"></script>
   </head>
@@ -11,24 +11,24 @@
     <main>
       <header class="brand">
         <span class="mark"><i data-icon="graduation-cap"></i></span>
-        <span class="brand-name">Student OS</span>
+        <span class="brand-name">Quadernio</span>
       </header>
 
       <div id="checking" class="card checking" role="status">
         <i data-icon="refresh-cw" class="spin"></i>
-        <span>Checking your Student OS login…</span>
+        <span>Checking your Quadernio login…</span>
       </div>
 
       <section id="logged-out" hidden>
         <div class="card account">
           <span class="avatar avatar-muted"><i data-icon="log-in"></i></span>
           <div class="account-text">
-            <p class="title">Log in to Student OS</p>
+            <p class="title">Log in to Quadernio</p>
             <p id="logged-out-message" class="caption">Log in in this browser. The extension syncs to that account.</p>
           </div>
         </div>
         <div class="row">
-          <button type="button" id="log-in" class="primary grow"><i data-icon="log-in"></i><span>Log in to Student OS</span></button>
+          <button type="button" id="log-in" class="primary grow"><i data-icon="log-in"></i><span>Log in to Quadernio</span></button>
           <button type="button" id="check-again" class="secondary">Check again</button>
         </div>
       </section>
@@ -49,8 +49,8 @@
 
         <form id="picker" class="card picker" hidden>
           <div class="picker-head">
-            <p class="title">Which courses do you want in Student OS?</p>
-            <p class="caption">Courses in the current semester are checked. Student OS remembers your choice.</p>
+            <p class="title">Which courses do you want in Quadernio?</p>
+            <p class="caption">Courses in the current semester are checked. Quadernio remembers your choice.</p>
           </div>
           <div id="picker-groups" class="picker-groups"></div>
           <div class="row">
@@ -87,7 +87,7 @@
         <nav class="links" aria-label="More">
           <a href="#" id="choose-courses">Choose courses</a>
           <span class="sep" aria-hidden="true">·</span>
-          <a href="#" id="open-student-os">Open Student OS</a>
+          <a href="#" id="open-quadernio">Open Quadernio</a>
         </nav>
       </section>
 
@@ -97,11 +97,11 @@
       </div>
 
       <footer>
-        <span class="caption">Student OS · <span id="address-label"></span></span>
+        <span class="caption">Quadernio · <span id="address-label"></span></span>
         <a href="#" id="change-address">Change</a>
       </footer>
       <form id="address-form" class="card address-form" hidden novalidate>
-        <label for="address">Student OS address</label>
+        <label for="address">Quadernio address</label>
         <input id="address" name="address" autocomplete="url" inputmode="url" spellcheck="false" />
         <div class="row">
           <button type="submit" id="save-address" class="primary grow">Save</button>

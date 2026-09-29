@@ -39,7 +39,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
 
   return (
     <div className="space-y-6">
-      <title>{`${course.code} ${course.name} · Student OS`}</title>
+      <title>{`${course.code} ${course.name} · Quadernio`}</title>
       <Link
         href="/courses"
         className="inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -118,7 +118,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
 function CourseNotFound() {
   return (
     <div className="rounded-xl border border-dashed px-6 py-12 text-center">
-      <title>Course not found · Student OS</title>
+      <title>Course not found · Quadernio</title>
       <h1 className="text-lg font-semibold">Course not found</h1>
       <p className="mt-1 text-sm text-muted-foreground">It may have been removed, or the link is wrong.</p>
       <Link href="/courses" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">

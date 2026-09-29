@@ -7,7 +7,7 @@ import { parse, runAction } from "@/server/actions"
 import { saveSyllabusImport, type SyllabusImportSaved } from "@/server/services/syllabus"
 
 // Saves a syllabus import the student has reviewed and confirmed. Only called from
-// the review screen's "Import into Student OS" button.
+// the review screen's "Import into Quadernio" button.
 
 const importRequestSchema = z.object({
   course: z.discriminatedUnion("kind", [

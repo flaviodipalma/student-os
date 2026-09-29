@@ -9,7 +9,7 @@ import {
 } from "./sync-plan"
 import type { LmsAssignment, LmsCourse } from "./types"
 
-// TEST FIXTURES: hand-written data in Student OS's own NORMALIZED LMS format
+// TEST FIXTURES: hand-written data in Quadernio's own NORMALIZED LMS format
 // (src/lib/lms/types.ts). They are not Canvas or Blackboard API responses and
 // don't imitate them; they only exercise the provider-independent logic.
 
@@ -70,7 +70,7 @@ const scope = { provider: "canvas" as const, courseIds: ["c1"] }
 const inCourse1 = (id: string) => (id === "course-1" ? "c1" : undefined)
 
 describe("normalized course mapping", () => {
-  it("fills Student OS course fields from an LMS course", () => {
+  it("fills Quadernio course fields from an LMS course", () => {
     expect(courseFieldsFrom(lmsCourse())).toEqual({
       code: "CSC215",
       name: "Data Structures",
@@ -174,7 +174,7 @@ describe("short course codes", () => {
 })
 
 describe("assignment -> task matching", () => {
-  it("creates a normal Student OS task, with no estimate when the LMS gives none (never guessed)", () => {
+  it("creates a normal Quadernio task, with no estimate when the LMS gives none (never guessed)", () => {
     const { actions } = planTasks([], [lmsAssignment()], inCourse1, scope)
     expect(actions[0]).toMatchObject({
       kind: "create",

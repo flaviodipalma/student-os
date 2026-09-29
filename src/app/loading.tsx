@@ -9,7 +9,7 @@ export default function Loading() {
         <span className="flex size-10 animate-pulse items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <GraduationCapIcon aria-hidden className="size-5" />
         </span>
-        <p className="text-sm font-medium text-muted-foreground">Loading Student OS…</p>
+        <p className="text-sm font-medium text-muted-foreground">Loading Quadernio…</p>
       </div>
     </main>
   )

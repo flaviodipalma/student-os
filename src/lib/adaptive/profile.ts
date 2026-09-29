@@ -4,7 +4,7 @@ import type { LearningSettings, StudySessionRecord, Task, TaskType } from "@/lib
 import type { AdaptivePlanningContext, Confidence, Observation, Pacing, PeriodStats } from "./index"
 import { median, robustSummary } from "./stats"
 
-// The StudentPlanningProfile: everything Student OS knows about how this student
+// The StudentPlanningProfile: everything Quadernio knows about how this student
 // plans, in three clearly separate parts.
 //
 //   explicit   what the student told us (settings, mode, preferred times)
@@ -123,7 +123,7 @@ export function buildProfile(input: ProfileInput): StudentPlanningProfile {
       confidence: byCount(decided.length, 15, 30),
       observations: decided.length,
       updatedAt: o.sessionCompletionRate.updatedAt,
-      source: "Study sessions you moved in Student OS",
+      source: "Study sessions you moved in Quadernio",
       explanation: `You moved ${moved} of your last ${decided.length} study sessions to another time.`,
     }
   }

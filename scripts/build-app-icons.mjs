@@ -1,4 +1,4 @@
-// Builds the installed-app icons in public/icons/ from the Student OS mark (the
+// Builds the installed-app icons in public/icons/ from the Quadernio mark (the
 // graduation cap on the brand indigo), with sharp. Run after changing the mark:
 //   node scripts/build-app-icons.mjs
 import { mkdirSync } from "node:fs"

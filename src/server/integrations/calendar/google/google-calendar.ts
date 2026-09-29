@@ -70,10 +70,10 @@ export type GoogleEvent = {
 }
 
 // Why an event isn't copied: not happening, not taking the student's time, or
-// not a block of time Student OS can show.
+// not a block of time Quadernio can show.
 export type GoogleSkip = "cancelled" | "declined" | "free" | "not-busy-type"
 
-// One Google event -> a normalized Student OS event (or why not). Times keep
+// One Google event -> a normalized Quadernio event (or why not). Times keep
 // their offsets (RFC 3339) and become real instants: no time zone is stripped.
 export function googleEventToExternal(event: GoogleEvent): { event: ExternalCalendarEvent } | { skipped: string } {
   if (event.status === "cancelled") return { skipped: "cancelled" satisfies GoogleSkip }

@@ -68,7 +68,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
   switch (action.kind) {
     case "complete-task": {
       const task = taskOf(action.taskId)
-      if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+      if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
       if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
       return { ok: true, pending: { action, summary: `Mark ${quote(task.title)} as complete.`, confirmLabel: "Mark complete" } }
     }
@@ -77,7 +77,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
       const parsed = taskFields.safeParse({ ...action.task, description: "", status: "not_started" })
       if (!parsed.success) return { ok: false, problem: parsed.error.issues[0]?.message ?? "Some details aren't valid." }
       const course = ctx.data.courses.find((c) => c.id === action.task.courseId)
-      if (!course) return { ok: false, problem: "That course doesn't exist in Student OS." }
+      if (!course) return { ok: false, problem: "That course doesn't exist in Quadernio." }
       if (action.task.dueDate < ctx.today) return { ok: false, problem: "That due date has already passed." }
       const t = parsed.data
       const estimate = t.estimateMinutes ? `, about ${formatDuration(t.estimateMinutes)}` : ", no estimate"
@@ -97,7 +97,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
 
     case "update-task": {
       const task = taskOf(action.taskId)
-      if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+      if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
       const parsed = changesSchema.safeParse(action.changes)
       if (!parsed.success) return { ok: false, problem: parsed.error.issues[0]?.message ?? "Some details aren't valid." }
       const c = parsed.data
@@ -122,12 +122,12 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
 
     case "schedule-session": {
       const task = taskOf(action.taskId)
-      if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+      if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
       if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
       let from = ""
       if (action.sessionId) {
         const stored = ctx.data.studySessions.find((s) => s.id === action.sessionId && s.taskId === task.id)
-        if (!stored) return { ok: false, problem: "That study session doesn't exist in Student OS." }
+        if (!stored) return { ok: false, problem: "That study session doesn't exist in Quadernio." }
         if (stored.status !== "scheduled") return { ok: false, problem: "Only a scheduled study session can be moved." }
         from = ` from ${dueText(ctx, stored.date)} at ${timeLabel(stored.startTime)}`
       }
@@ -149,7 +149,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
 
     case "log-progress": {
       const task = taskOf(action.taskId)
-      if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+      if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
       if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
       const minutes = toMinutes(action.endTime) - toMinutes(action.startTime)
       if (minutes < 5 || minutes > 12 * 60) return { ok: false, problem: "Record between 5 minutes and 12 hours of work." }
@@ -200,7 +200,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
       if (c.dismissPattern) {
         // Only patterns the Planner can act on (estimates, times used last, pacing).
         const insight = insights.find((i) => i.id === c.dismissPattern && /^(estimate|avoid):|^workload$/.test(i.id))
-        if (!insight) return { ok: false, problem: "Student OS hasn't learned that pattern." }
+        if (!insight) return { ok: false, problem: "Quadernio hasn't learned that pattern." }
         parts.push(`stop using this pattern: “${untrusted(insight.text, 160)}”`)
       }
       if (c.restorePattern) {
@@ -209,7 +209,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
       }
       if (c.useOwnEstimateFor) {
         const task = taskOf(c.useOwnEstimateFor)
-        if (!task || task.status === "completed") return { ok: false, problem: "That task doesn't exist in Student OS." }
+        if (!task || task.status === "completed") return { ok: false, problem: "That task doesn't exist in Quadernio." }
         parts.push(`always use your own estimate for ${quote(task.title)}${task.estimateMinutes ? ` (${formatDuration(task.estimateMinutes)})` : ""}`)
       }
       if (parts.length === 0) return { ok: false, problem: "That wouldn't change anything." }
@@ -225,7 +225,7 @@ export function prepareAction(ctx: ToolContext, action: ProposedAction): Check {
       const titles: string[] = []
       for (const block of action.sessions) {
         const task = taskOf(block.taskId)
-        if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+        if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
         if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
         if (toMinutes(block.endTime) <= toMinutes(block.startTime)) return { ok: false, problem: "A session must end after it starts." }
         titles.push(quote(task.title))
@@ -256,7 +256,7 @@ function checkBlocks(ctx: ToolContext, date: string, blocks: PlannedBlock[]): { 
   let minutes = 0
   for (const [i, block] of sorted.entries()) {
     const task = ctx.data.tasks.find((t) => t.id === block.taskId)
-    if (!task) return { ok: false, problem: "That task doesn't exist in Student OS." }
+    if (!task) return { ok: false, problem: "That task doesn't exist in Quadernio." }
     if (task.status === "completed") return { ok: false, problem: `${quote(task.title)} is already complete.` }
     if (i > 0 && toMinutes(block.startTime) < toMinutes(sorted[i - 1].endTime)) return { ok: false, problem: "Two of those sessions overlap." }
     const slot = checkSlot(ctx, date, block.startTime, block.endTime)
@@ -297,7 +297,7 @@ function proposal(check: Check, focusTaskId?: string): ToolOutput {
 function unresolved(ctx: ToolContext, result: { ambiguous: Task[] } | { notFound: true }): ToolOutput {
   return "ambiguous" in result
     ? { result: { status: "ambiguous", instruction: "Ask the student which one they mean. Change nothing.", options: result.ambiguous.map((t) => taskBrief(ctx, t)) } }
-    : { result: { status: "not_found", problem: "No open task matches that in Student OS." } }
+    : { result: { status: "not_found", problem: "No open task matches that in Quadernio." } }
 }
 
 // ---- The tools.
@@ -334,7 +334,7 @@ export const createTask = defineTool({
       if ("ambiguous" in found) {
         return { result: { status: "ambiguous", instruction: "Ask which course. Change nothing.", options: found.ambiguous.map((c) => ({ courseId: c.id, code: untrusted(c.code, 40), name: untrusted(c.name) })) } }
       }
-      if ("notFound" in found) return { result: { status: "not_found", problem: "No course matches that in Student OS.", courses: courses.map((c) => untrusted(c.code, 40)) } }
+      if ("notFound" in found) return { result: { status: "not_found", problem: "No course matches that in Quadernio.", courses: courses.map((c) => untrusted(c.code, 40)) } }
       courseId = found.found.id
     } else if (courses.length === 1) {
       courseId = courses[0].id
@@ -416,7 +416,7 @@ export const rescheduleStudySession = defineTool({
         : undefined
 
     if (!target) {
-      if (sessionId && !ref) return { result: { status: "not_found", problem: "That study session doesn't exist in Student OS." } }
+      if (sessionId && !ref) return { result: { status: "not_found", problem: "That study session doesn't exist in Quadernio." } }
       if (!ref) return { result: { status: "needs_info", instruction: "Ask which task's session to move." } }
       const found = resolveTask(ctx.data.tasks, ref)
       if (!("found" in found)) return unresolved(ctx, found)

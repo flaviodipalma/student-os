@@ -25,7 +25,7 @@ import { createStudySession, deleteStudySession, updateStudySession } from "./st
 import { saveSyllabusImport } from "./syllabus"
 import { createTask, deleteTask, getTaskForUser, updateTask } from "./tasks"
 
-// The whole Student OS flow for one new student, through the real services, the
+// The whole Quadernio flow for one new student, through the real services, the
 // real syllabus pipeline (PDF text -> extraction -> validation -> review ->
 // import) and the real planner, on a real Postgres (PGlite):
 //

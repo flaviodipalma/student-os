@@ -6,7 +6,7 @@ import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { scheduleBetween } from "@/lib/recurring"
 import type { AcademicEvent, CalendarEvent, ExternalEventRecord, Task } from "@/lib/types"
 
-// The Calendar with Student OS, Canvas and Blackboard events, rendered in a
+// The Calendar with Quadernio, Canvas and Blackboard events, rendered in a
 // simulated browser. The app store is stubbed with the same schedule functions
 // the real store uses (scheduleBetween + externalEventsAsCalendarItems).
 
@@ -104,7 +104,7 @@ describe("Calendar with external events", () => {
     expect(screen.queryByRole("button", { name: /^Psychology Exam/ })).toBeNull()
     expect(block(/^CSC215 Exam/)).toBeTruthy()
 
-    await user.click(within(filters).getByRole("button", { name: "Student OS" }))
+    await user.click(within(filters).getByRole("button", { name: "Quadernio" }))
     expect(block(/^Soccer Practice/)).toBeTruthy()
     expect(screen.queryByRole("button", { name: /^CSC215 Exam/ })).toBeNull()
 
@@ -112,7 +112,7 @@ describe("Calendar with external events", () => {
     expect(block(/^Psychology Exam/)).toBeTruthy()
   })
 
-  it("an external event opens read-only details: source, link, and 'Hide from Student OS' (no editing)", async () => {
+  it("an external event opens read-only details: source, link, and 'Hide from Quadernio' (no editing)", async () => {
     render(<CalendarView />)
     const user = userEvent.setup()
     await user.click(block(/^CSC215 Exam/))
@@ -125,7 +125,7 @@ describe("Calendar with external events", () => {
     expect(within(dialog).queryByRole("textbox")).toBeNull()
     expect(within(dialog).queryByRole("button", { name: /Delete|Save/ })).toBeNull()
 
-    await user.click(within(dialog).getByRole("button", { name: "Hide from Student OS" }))
+    await user.click(within(dialog).getByRole("button", { name: "Hide from Quadernio" }))
     expect(state.setExternalEventHidden).toHaveBeenCalledWith("c1", true)
   })
 
@@ -167,7 +167,7 @@ describe("Calendar with external events", () => {
     const filters = screen.getByRole("group", { name: "Show events from" })
     expect(within(filters).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "All",
-      "Student OS",
+      "Quadernio",
       "Canvas",
       "Blackboard",
       "Google Calendar",

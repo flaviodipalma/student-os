@@ -8,7 +8,7 @@ export function DatabaseError() {
         <DatabaseIcon aria-hidden className="mx-auto size-8 text-muted-foreground" />
         <h1 className="mt-4 text-lg font-semibold">We can&apos;t load your data right now</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Student OS couldn&apos;t reach its database. Please try again in a moment.
+          Quadernio couldn&apos;t reach its database. Please try again in a moment.
         </p>
         <a href="" className="mt-5 inline-block text-sm font-medium text-primary hover:underline">
           Try again

@@ -59,7 +59,7 @@ describe("readBlackboard: courses", () => {
     const read = await readBlackboard(COURSES, ORIGIN, fetchFn, NOW)
     if (!read.ok || read.kind !== "courses") throw new Error("expected courses")
     expect(read.courses.map((m) => (m.course as { id: string }).id)).toEqual(["_215_1", "_101_1"])
-    // Only the fields Student OS uses leave the tab.
+    // Only the fields Quadernio uses leave the tab.
     expect(JSON.stringify(read.courses)).not.toMatch(/secret-uuid|enrollment|termId/)
     // Grouped by semester, current first (the same list as Canvas).
     const groups = groupByTerm(courseOptions(read.choices), NOW)
@@ -127,7 +127,7 @@ describe("readBlackboard: assignments", () => {
     "/learn/api/public/v2/courses/_215_1/gradebook/users/_42_1": { body: { results: grades } },
   })
 
-  it("reads columns, the student's grades and recent attempts; keeps only what Student OS uses", async () => {
+  it("reads columns, the student's grades and recent attempts; keeps only what Quadernio uses", async () => {
     const fetchFn = fakeBlackboard({
       ...me,
       ...course(

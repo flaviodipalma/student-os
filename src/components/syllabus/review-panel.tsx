@@ -214,7 +214,7 @@ export function ReviewPanel({
               Cancel
             </Button>
             <Button size="lg" onClick={handleImport} disabled={saving || (tried && problems.length > 0)}>
-              {saving ? "Importing…" : "Import into Student OS"}
+              {saving ? "Importing…" : "Import into Quadernio"}
             </Button>
           </div>
         </div>
@@ -338,7 +338,7 @@ function ItemRow({
                 <li className="flex items-start gap-1.5 text-muted-foreground">
                   <CopyIcon aria-hidden className="mt-px size-3.5 shrink-0" />
                   <span>
-                    Looks like &ldquo;{duplicate.title}&rdquo;, already in Student OS (due {formatDue(duplicate, today)}).
+                    Looks like &ldquo;{duplicate.title}&rdquo;, already in Quadernio (due {formatDue(duplicate, today)}).
                     Importing it would create a duplicate.
                   </span>
                 </li>

@@ -11,11 +11,11 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-        <title>Something went wrong · Student OS</title>
+        <title>Something went wrong · Quadernio</title>
       </head>
       <body className="flex min-h-svh items-center justify-center bg-background px-4 font-sans text-foreground antialiased">
         <main className="max-w-sm space-y-4 text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Student OS couldn&apos;t load</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Quadernio couldn&apos;t load</h1>
           <p className="text-sm text-muted-foreground">
             Something went wrong on our side. Your data is safe. Please try again in a moment.
           </p>

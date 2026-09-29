@@ -162,7 +162,7 @@ export class MockAssistantService implements StudentAssistantAIService {
       const result = await call("completeTask", { task: finished[1] })
       if (result.status === "needs_confirmation") return `${result.summary} Confirm below.`
       if (result.status === "ambiguous") return "Which one do you mean?"
-      return String(result.problem ?? "I don't have that task in Student OS.")
+      return String(result.problem ?? "I don't have that task in Quadernio.")
     }
     return "I'm running in test mode, so I can only answer a few set questions: what to work on now, what's due, how busy your week is and today's plan."
   }

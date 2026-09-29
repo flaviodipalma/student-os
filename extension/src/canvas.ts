@@ -29,7 +29,7 @@ export async function readCanvas(
   origin: string = location.origin,
   fetchFn: typeof fetch = fetch
 ): Promise<CanvasRead> {
-  // Same limits as the Student OS import endpoint.
+  // Same limits as the Quadernio import endpoint.
   const MAX_COURSES = 100
   const MAX_ASSIGNMENTS = 500
   const MAX_PAGES = 20
@@ -66,7 +66,7 @@ export async function readCanvas(
 
   const record = (value: unknown): Record<string, unknown> =>
     typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
-  // Only the fields Student OS uses (see src/server/integrations/lms/canvas/mapping.ts).
+  // Only the fields Quadernio uses (see src/server/integrations/lms/canvas/mapping.ts).
   const pick = (value: unknown, keys: string[]) => {
     const source = record(value)
     return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]))
@@ -79,7 +79,7 @@ export async function readCanvas(
       "workflow_state",
       "access_restricted_by_date",
       "public_description",
-      // For choosing courses by semester (Student OS ignores these).
+      // For choosing courses by semester (Quadernio ignores these).
       "start_at",
       "end_at",
     ])

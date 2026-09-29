@@ -68,13 +68,13 @@ describe("environment checks (server start and `npm run check:env`)", () => {
     const deploy = {
       ...base,
       APP_ENV: "production",
-      SITE_URL: "https://studentos.app",
+      SITE_URL: "https://quadernio.app",
       GOOGLE_CALENDAR_CLIENT_ID: "a",
       GOOGLE_CALENDAR_CLIENT_SECRET: "b",
-      GOOGLE_CALENDAR_REDIRECT_URI: "https://studentos.app/api/integrations/google-calendar/callback",
+      GOOGLE_CALENDAR_REDIRECT_URI: "https://quadernio.app/api/integrations/google-calendar/callback",
     }
     expect(checkEnv(deploy).errors).toEqual([])
-    const bad = checkEnv({ ...deploy, SITE_URL: "http://studentos.app", GOOGLE_CALENDAR_REDIRECT_URI: "http://localhost:3000/cb", SYLLABUS_AI_PROVIDER: "mock", ANTHROPIC_API_KEY: undefined })
+    const bad = checkEnv({ ...deploy, SITE_URL: "http://quadernio.app", GOOGLE_CALENDAR_REDIRECT_URI: "http://localhost:3000/cb", SYLLABUS_AI_PROVIDER: "mock", ANTHROPIC_API_KEY: undefined })
     const text = bad.errors.join("\n")
     expect(text).toMatch(/SITE_URL must use https/)
     expect(text).toMatch(/GOOGLE_CALENDAR_REDIRECT_URI must be an https:\/\/ URL/)
@@ -86,21 +86,21 @@ describe("environment checks (server start and `npm run check:env`)", () => {
   })
 
   it("the extension's store link: https only; a production warning when missing", () => {
-    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://studentos.app" }
+    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://quadernio.app" }
     expect(checkEnv(deploy).warnings.join()).toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL isn't set/)
     expect(checkEnv({ ...deploy, NEXT_PUBLIC_EXTENSION_STORE_URL: "http://example.com" }).errors.join()).toMatch(/must be the extension's https/)
-    const ok = checkEnv({ ...deploy, NEXT_PUBLIC_EXTENSION_STORE_URL: "https://chromewebstore.google.com/detail/student-os/abcdefghijklmnopabcdefghijklmnop" })
+    const ok = checkEnv({ ...deploy, NEXT_PUBLIC_EXTENSION_STORE_URL: "https://chromewebstore.google.com/detail/quadernio/abcdefghijklmnopabcdefghijklmnop" })
     expect([...ok.errors, ...ok.warnings].join()).not.toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL/)
     expect(checkEnv({ ...base }, false).warnings.join()).not.toMatch(/NEXT_PUBLIC_EXTENSION_STORE_URL/)
   })
 
   it("browser extension ids: checked when set; a production warning when not", () => {
-    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://studentos.app" }
-    expect(checkEnv(deploy).warnings.join()).toMatch(/STUDENT_OS_EXTENSION_IDS isn't set/)
-    expect(checkEnv({ ...base, SITE_URL: "https://studentos.app" }, false).warnings.join()).not.toMatch(/STUDENT_OS_EXTENSION_IDS/)
-    const ok = checkEnv({ ...deploy, STUDENT_OS_EXTENSION_IDS: "abcdefghijklmnopabcdefghijklmnop" })
-    expect([...ok.errors, ...ok.warnings].join()).not.toMatch(/STUDENT_OS_EXTENSION_IDS/)
-    expect(checkEnv({ ...deploy, STUDENT_OS_EXTENSION_IDS: "chrome-extension://abc" }).errors.join()).toMatch(/must be Chrome extension ids/)
+    const deploy = { ...base, APP_ENV: "production", SITE_URL: "https://quadernio.app" }
+    expect(checkEnv(deploy).warnings.join()).toMatch(/QUADERNIO_EXTENSION_IDS isn't set/)
+    expect(checkEnv({ ...base, SITE_URL: "https://quadernio.app" }, false).warnings.join()).not.toMatch(/QUADERNIO_EXTENSION_IDS/)
+    const ok = checkEnv({ ...deploy, QUADERNIO_EXTENSION_IDS: "abcdefghijklmnopabcdefghijklmnop" })
+    expect([...ok.errors, ...ok.warnings].join()).not.toMatch(/QUADERNIO_EXTENSION_IDS/)
+    expect(checkEnv({ ...deploy, QUADERNIO_EXTENSION_IDS: "chrome-extension://abc" }).errors.join()).toMatch(/must be Chrome extension ids/)
   })
 })
 

@@ -15,7 +15,7 @@ import { useFeedback } from "@/lib/feedback"
 import { deviceLabel, type PushDevice } from "@/lib/push"
 import { currentSubscription, isInstalled, isIos, PUBLIC_VAPID_KEY, pushSupported, subscribeThisDevice, subscriptionPayload } from "@/lib/push-client"
 
-// Settings > Push reminders: reminders on this phone or computer even when Student OS
+// Settings > Push reminders: reminders on this phone or computer even when Quadernio
 // is closed. On per device (each browser asks for permission); the reminder kinds
 // and timing are the Reminders settings above.
 
@@ -100,7 +100,7 @@ export function PushSettingsCard() {
           Push reminders
         </CardTitle>
         <CardDescription>
-          Reminders on your phone or computer even when Student OS is closed. Which reminders, and how early, are the
+          Reminders on your phone or computer even when Quadernio is closed. Which reminders, and how early, are the
           Reminders settings above.
         </CardDescription>
       </CardHeader>
@@ -115,14 +115,14 @@ export function PushSettingsCard() {
           )}
           {status === "install-first" && (
             <p className="text-sm text-muted-foreground">
-              On iPhone and iPad, add Student OS to your home screen first: tap <span className="font-medium text-foreground">Share</span>,
-              then <span className="font-medium text-foreground">Add to Home Screen</span>. Open Student OS from your home screen and turn
+              On iPhone and iPad, add Quadernio to your home screen first: tap <span className="font-medium text-foreground">Share</span>,
+              then <span className="font-medium text-foreground">Add to Home Screen</span>. Open Quadernio from your home screen and turn
               push reminders on here.
             </p>
           )}
           {status === "blocked" && (
             <p className="text-sm text-muted-foreground">
-              Notifications are blocked for Student OS in this browser. Allow them in the browser&apos;s site settings (the icon
+              Notifications are blocked for Quadernio in this browser. Allow them in the browser&apos;s site settings (the icon
               next to the address), then come back.
             </p>
           )}

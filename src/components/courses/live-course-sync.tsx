@@ -8,8 +8,8 @@ import type { Course } from "@/lib/types"
 import { ClassTimesSteps } from "./class-times"
 
 // Courses imported by the browser extension show up right away, on whatever page
-// the student is on. The extension signals open Student OS tabs after each sync
-// (a "student-os-synced" event, extension/src/lms-sync.ts); coming back to the tab
+// the student is on. The extension signals open Quadernio tabs after each sync
+// (a "quadernio-synced" event, extension/src/lms-sync.ts); coming back to the tab
 // also checks, at most every 30 seconds, in case the signal didn't reach it. New
 // courses that need class times open "Add your class times" straight away.
 
@@ -50,10 +50,10 @@ export function LiveCourseSync() {
     const onVisible = () => {
       if (document.visibilityState === "visible" && Date.now() - lastCheck > FOCUS_CHECK_MS) void refresh()
     }
-    document.addEventListener("student-os-synced", onSynced)
+    document.addEventListener("quadernio-synced", onSynced)
     document.addEventListener("visibilitychange", onVisible)
     return () => {
-      document.removeEventListener("student-os-synced", onSynced)
+      document.removeEventListener("quadernio-synced", onSynced)
       document.removeEventListener("visibilitychange", onVisible)
     }
   }, [])

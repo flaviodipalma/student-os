@@ -76,7 +76,7 @@ describe("reading an academic calendar", () => {
 
   it("AI trouble gets a plain message", async () => {
     state.school.mockRejectedValue(new CalendarReadError("busy"))
-    expect(await json(await post({ mode: "school" }))).toEqual({ ok: false, message: "Student OS is busy right now. Try again in a minute." })
+    expect(await json(await post({ mode: "school" }))).toEqual({ ok: false, message: "Quadernio is busy right now. Try again in a minute." })
   })
 
   it("limited per student (each read can be an AI request)", async () => {

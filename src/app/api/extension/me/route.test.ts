@@ -11,7 +11,7 @@ vi.mock("@/server/auth", () => ({ getCurrentUser: async () => (state.userId ? { 
 
 const { GET } = await import("./route")
 
-const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Student-OS-Extension": "1" }
+const EXTENSION = { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop", "X-Quadernio-Extension": "1" }
 const get = async (userId: string | null, headers: Record<string, string> = EXTENSION) => {
   state.userId = userId
   const response = await GET(new Request("http://localhost:3000/api/extension/me", { headers }))
@@ -40,11 +40,11 @@ describe("GET /api/extension/me", () => {
   it("403 for anything that isn't the extension", async () => {
     const alex = await t.addUser("Alex")
     expect(await get(alex, {})).toMatchObject({ status: 403 })
-    expect(await get(alex, { Origin: "https://evil.example.com", "X-Student-OS-Extension": "1" })).toMatchObject({ status: 403 })
+    expect(await get(alex, { Origin: "https://evil.example.com", "X-Quadernio-Extension": "1" })).toMatchObject({ status: 403 })
     expect(await get(alex, { Origin: "chrome-extension://abcdefghijklmnopabcdefghijklmnop" })).toMatchObject({ status: 403 })
   })
 
   it("Chrome sends the extension's GETs without an Origin: the header is enough", async () => {
-    expect(await get(await t.addUser("Alex"), { "X-Student-OS-Extension": "1" })).toEqual({ status: 200, body: { firstName: "Alex" } })
+    expect(await get(await t.addUser("Alex"), { "X-Quadernio-Extension": "1" })).toEqual({ status: 200, body: { firstName: "Alex" } })
   })
 })

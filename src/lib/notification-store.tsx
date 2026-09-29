@@ -22,7 +22,7 @@ import type { AppNotification, NotificationPreferences } from "@/lib/types"
 //     student's tasks or study sessions change, it asks the server to sync
 //   - new reminders appear in the notification center and on the Dashboard, and
 //     as desktop notifications if the student turned those on and the browser
-//     allows it (only while Student OS is open in a tab; see the README)
+//     allows it (only while Quadernio is open in a tab; see the README)
 
 const SYNC_EVERY_MS = 60_000
 const AFTER_CHANGE_MS = 1_500

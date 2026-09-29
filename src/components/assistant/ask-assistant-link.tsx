@@ -2,13 +2,13 @@ import Link from "next/link"
 import { MessageSquareTextIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// "Ask Student OS": opens the Assistant about a task or a Planner day. Only the
+// "Ask Quadernio": opens the Assistant about a task or a Planner day. Only the
 // id / date go in the link; the server looks them up for the signed-in student.
 export function AskAssistantLink({
   taskId,
   date,
   className,
-  children = "Ask Student OS",
+  children = "Ask Quadernio",
 }: {
   taskId?: string
   date?: string

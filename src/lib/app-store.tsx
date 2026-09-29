@@ -620,7 +620,7 @@ export function AppStoreProvider({
         setExternalEventHiddenAction(id, hidden),
         (saved) => setExternalEvents((prev) => replaceById(prev, saved)),
         () => toggle(before.hidden),
-        hidden ? "Hidden from Student OS." : "Event restored."
+        hidden ? "Hidden from Quadernio." : "Event restored."
       )
     },
 

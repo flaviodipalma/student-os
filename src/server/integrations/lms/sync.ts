@@ -21,7 +21,7 @@ import { createTask, updateTask } from "../../services/tasks"
 import { recordLmsSync } from "./connections"
 import { LmsError } from "./provider"
 
-// Syncs one student's LMS data into their normal Student OS courses and tasks.
+// Syncs one student's LMS data into their normal Quadernio courses and tasks.
 // The data comes from the browser extension (src/server/integrations/extension),
 // already validated and normalized:
 //
@@ -35,7 +35,7 @@ import { LmsError } from "./provider"
 //   10. return a summary (LmsSyncResult)
 //
 // Reading happens first; all saving happens in one transaction, so a failure
-// part-way leaves Student OS as it was. Writes go through the normal course and
+// part-way leaves Quadernio as it was. Writes go through the normal course and
 // task services, so the same ownership checks and validation apply.
 // Imported records are ordinary courses and tasks: the Planner, Dashboard and
 // Tasks page need nothing LMS-specific.

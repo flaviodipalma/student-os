@@ -159,7 +159,7 @@ describe("Google Calendar sync", () => {
     expect(rows.map((r) => r.title).sort()).toEqual(["Advisor call", "Dentist", "Soccer Practice", "Soccer Practice"])
     const [connection] = await t.db.select().from(calendarConnections).where(eq(calendarConnections.userId, alex))
     expect(connection.lastSyncedAt?.toISOString()).toBe(NOW.toISOString())
-    // External recurring events stay external: no Student OS weekly commitment was created.
+    // External recurring events stay external: no Quadernio weekly commitment was created.
     expect((await loadAppData(t.db, alex)).recurringCommitments).toEqual([])
   })
 
@@ -272,7 +272,7 @@ describe("all sources together", () => {
   })
 })
 
-describe("the rest of Student OS uses the same events", () => {
+describe("the rest of Quadernio uses the same events", () => {
   // The student's wall clock in New York, as the app computes it.
   const localNow = dateFromWallClock(wallClockIn(NY, NOW))
   const today = toDateKey(localNow)

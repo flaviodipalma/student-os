@@ -40,7 +40,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-const synced = () => act(() => void document.dispatchEvent(new CustomEvent("student-os-synced")))
+const synced = () => act(() => void document.dispatchEvent(new CustomEvent("quadernio-synced")))
 
 describe("live refresh after an extension sync", () => {
   it("the extension's signal reloads the courses; a new one opens 'add class times' (online ones don't)", async () => {

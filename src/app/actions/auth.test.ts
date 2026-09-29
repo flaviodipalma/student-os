@@ -158,7 +158,7 @@ describe("Continue with Google / Microsoft / Apple", () => {
 })
 
 describe("the sign-in callback", () => {
-  it("a new Google user becomes a normal Student OS user and goes to onboarding", async () => {
+  it("a new Google user becomes a normal Quadernio user and goes to onboarding", async () => {
     const id = crypto.randomUUID()
     await t.client.query("insert into auth.users (id) values ($1)", [id])
     mocks.auth.exchangeCodeForSession = vi.fn(async () => ({ data: { user: { id, user_metadata: { given_name: "Maya", email: "maya@gmail.com" } } }, error: null }))
@@ -239,7 +239,7 @@ describe("login methods (Settings > Account)", () => {
     mocks.user = { id: "u1", email: null }
     mocks.auth.linkIdentity = vi.fn(async () => ({ data: { url: null }, error: { code: "manual_linking_disabled" } }))
     expect((await actions.linkLoginMethodAction({}, form({ provider: "apple" }))).error).toBe(
-      "Adding login methods isn't turned on for this Student OS server yet."
+      "Adding login methods isn't turned on for this Quadernio server yet."
     )
   })
 
@@ -249,7 +249,7 @@ describe("login methods (Settings > Account)", () => {
     expect(location(await callback(callbackRequest("?code=l", { kind: "link", provider: "microsoft" })))).toBe(
       "/settings?login=linked&provider=microsoft#account"
     )
-    // A Microsoft account that already belongs to another Student OS account: not moved, not merged.
+    // A Microsoft account that already belongs to another Quadernio account: not moved, not merged.
     expect(location(await callback(callbackRequest("?error=invalid_request&error_code=identity_already_exists", { kind: "link", provider: "microsoft" })))).toBe(
       "/settings?login=already-used#account"
     )

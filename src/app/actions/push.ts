@@ -62,7 +62,7 @@ export async function sendTestPushAction(): Promise<ActionResult<{ sent: number 
   return runAction(async ({ db, userId }) => {
     limitRate(userId, "push-test", [{ limit: 5, windowMs: 10 * 60_000 }])
     const { sent } = await pushToStudent(db, userId, [
-      { title: "Student OS", body: "Push reminders work on this device.", url: "/dashboard", tag: `test:${Date.now()}` },
+      { title: "Quadernio", body: "Push reminders work on this device.", url: "/dashboard", tag: `test:${Date.now()}` },
     ])
     return { sent }
   })

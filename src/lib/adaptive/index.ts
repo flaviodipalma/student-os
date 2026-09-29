@@ -5,7 +5,7 @@ import { DEFAULT_LEARNING_SETTINGS, type Course, type LearningSettings, type Stu
 import { buildProfile, type StudentPlanningProfile } from "./profile"
 import { recencyWeight, robustSummary, weightedMedian, type Weighted } from "./stats"
 
-// Adaptive planning ("AdaptivePlanningService"): what Student OS learns from one
+// Adaptive planning ("AdaptivePlanningService"): what Quadernio learns from one
 // student's own planning history, and how it feeds the deterministic Planner.
 //
 //   history (tasks + study sessions) -> analyzeHistory -> AdaptivePlanningContext

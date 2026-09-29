@@ -16,7 +16,7 @@ export function GettingStarted() {
         <GraduationCapIcon className="size-5" />
       </span>
       <div className="flex-1">
-        <h2 className="font-semibold">Welcome to Student OS</h2>
+        <h2 className="font-semibold">Welcome to Quadernio</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
           Start by adding your courses. Importing a syllabus adds its deadlines too.
         </p>

@@ -1,9 +1,9 @@
 # LMS integrations (Canvas, Blackboard)
 
-**The Student OS browser extension is the only way to connect Canvas and
+**The Quadernio browser extension is the only way to connect Canvas and
 Blackboard Learn** (`extension/`, see `extension/README.md`). It reads the LMS's own
 API inside the student's tab, with their own LMS login, and sends the data to
-Student OS, logged in as that student in the same browser. No school approval, no
+Quadernio, logged in as that student in the same browser. No school approval, no
 app keys, and no LMS secret stored anywhere: the server never contacts Canvas or
 Blackboard. Read-only. Canvas and Blackboard can be connected at the same time.
 
@@ -16,7 +16,7 @@ calendar events; imported courses and tasks stayed). They're in git history.
 ```
 extension (Canvas tab)      readCanvas     ──> POST /api/extension/canvas/import      ──┐
 extension (Blackboard tab)  readBlackboard ──> POST /api/extension/blackboard/import  ──┤
-                                                                                         ├─> runSync (sync.ts) ──> normal Student OS courses & tasks
+                                                                                         ├─> runSync (sync.ts) ──> normal Quadernio courses & tasks
             validated + mapped: canvas/mapping.ts, blackboard/mapping.ts ──> normalized  │    planCourses / planTasks (src/lib/lms/sync-plan.ts)
             data (src/lib/lms/types.ts)                                                  ┘
 ```
@@ -39,8 +39,8 @@ Dashboard, Tasks and Courses only ever see normal courses and tasks.
 
 ## Mapping
 
-- LMS course -> Student OS **course** (one per LMS course, per student)
-- LMS assignment -> Student OS **task** (the same `tasks` table the syllabus importer fills)
+- LMS course -> Quadernio **course** (one per LMS course, per student)
+- LMS assignment -> Quadernio **task** (the same `tasks` table the syllabus importer fills)
 
 Imported records carry `external_source` (`canvas` | `blackboard`),
 `external_id`, `external_url`, and `external_synced` (the values last synced).
@@ -59,7 +59,7 @@ else **created**.
 | title, description, due date, due time, link, submission status (course: code, name, professor, description, link) | **LMS-controlled**: synced from the LMS (with the three-way rule below) |
 | type | set once when created |
 | estimate | set once, only if the LMS states one; otherwise **null** (never guessed; the Planner uses its fallback and asks the student to add one) |
-| priority, estimate, notes, planned date, study sessions | **student-controlled**: never changed by a sync (priority starts at the Student OS default, medium) |
+| priority, estimate, notes, planned date, study sessions | **student-controlled**: never changed by a sync (priority starts at the Quadernio default, medium) |
 | status | the student's, with one conservative exception (below) |
 
 **Submission status → task status (conservative):**
@@ -80,7 +80,7 @@ kept; if both changed a field, the student's value is kept, the conflict is
 reported in `LmsSyncResult.conflicts`, and the base moves to the LMS value (so
 it isn't re-reported until the LMS changes it again).
 
-**Deleted in the LMS:** never deleted in Student OS automatically. Such tasks
+**Deleted in the LMS:** never deleted in Quadernio automatically. Such tasks
 are counted in `assignmentsMissing` for the student to review.
 
 **No due date:** not imported (every task needs one); counted as skipped.
@@ -109,11 +109,11 @@ courses no longer in the LMS, safe error messages, and the sync time.
 
 ## Security review
 
-- The extension uses the student's own LMS login inside their browser; Student OS
+- The extension uses the student's own LMS login inside their browser; Quadernio
   never asks for, sees or stores an LMS password, token or feed link, and never
   contacts the LMS. A connection row holds only the LMS address and the last sync's
   status.
-- The import endpoints require the Student OS login and the extension (header,
+- The import endpoints require the Quadernio login and the extension (header,
   Origin; `src/server/integrations/extension/http.ts`), limit size and rate, and
   treat everything as untrusted: the LMS address must be a public HTTPS address (no
   IPs, ports, credentials or local names), links must stay on it, and every course
@@ -128,9 +128,9 @@ courses no longer in the LMS, safe error messages, and the sync time.
 
 ### How it connects
 
-The Student OS Chrome extension (`extension/`, see `extension/README.md`) reads
+The Quadernio Chrome extension (`extension/`, see `extension/README.md`) reads
 Canvas's own API **inside the student's Canvas tab**, with their Canvas login, then
-sends the data to Student OS, logged in as that student in the same browser. No
+sends the data to Quadernio, logged in as that student in the same browser. No
 pairing, no secrets stored.
 
 1. The student opens Canvas, clicks the extension, then **Sync now**. It reads the
@@ -140,12 +140,12 @@ pairing, no secrets stored.
    the extension; a course it hasn't seen before brings the list back.
 2. It reads the chosen courses' assignments (`GET /api/v1/courses/:id/assignments?
    include[]=submission&order_by=due_at`), following pagination on the same host,
-   a few courses at a time. Only the fields Student OS uses are kept (no grades,
+   a few courses at a time. Only the fields Quadernio uses are kept (no grades,
    scores or points).
 3. `POST /api/extension/canvas/import` (`src/app/api/extension/canvas/import`):
-   the student from the Student OS session; the extension check in
+   the student from the Quadernio session; the extension check in
    `src/server/integrations/extension/http.ts` (required header, extension Origin,
-   optional `STUDENT_OS_EXTENSION_IDS`); size limits (2 MB, 100 courses, 500
+   optional `QUADERNIO_EXTENSION_IDS`); size limits (2 MB, 100 courses, 500
    assignments per course) and the Sync now rate limit (shared route:
    `extension/import-route.ts`); the Canvas address must be a public HTTPS address
    (`extension/base-url.ts`: any school domain, since the server never contacts it
@@ -186,7 +186,7 @@ real grade or a turned-in attempt means done, "unknown" otherwise.
 
 ## Known limitations
 
-- Syncing needs Chrome with the extension (desktop), logged in to both Student OS
+- Syncing needs Chrome with the extension (desktop), logged in to both Quadernio
   and the LMS. Automatic sync runs when the student opens the LMS, at most every
   30 minutes; nothing syncs while they don't.
 - Course matching is by LMS id, then exact course code (normalized). Codes often

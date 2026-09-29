@@ -12,7 +12,7 @@ export async function register() {
   // In a real deployment (APP_ENV=production) a broken configuration stops the
   // server here, with the reasons above, instead of failing on a student's request.
   if (errors.length > 0 && isDeployment()) {
-    throw new Error(`Student OS can't start: ${errors.length} environment problem(s). See the log above (npm run check:env).`)
+    throw new Error(`Quadernio can't start: ${errors.length} environment problem(s). See the log above (npm run check:env).`)
   }
 }
 

@@ -60,7 +60,7 @@ export function useTheme(): ThemeContextValue {
 }
 
 // A signed-in student's saved choice wins over this device's cookie (e.g. they
-// picked Dark on their laptop, and now open Student OS on a new phone).
+// picked Dark on their laptop, and now open Quadernio on a new phone).
 export function SavedThemeSync({ saved }: { saved: ThemePreference | null }) {
   const { setPreference } = useTheme()
   useEffect(() => {

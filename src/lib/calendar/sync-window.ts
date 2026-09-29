@@ -1,6 +1,6 @@
 import { addDays, fromDateKey, toDateKey } from "@/lib/format"
 
-// How much of a personal calendar (Google Calendar, Outlook) Student OS copies:
+// How much of a personal calendar (Google Calendar, Outlook) Quadernio copies:
 // the last week (so "today" and recent days look right) and the next 8 weeks
 // (the Planner plans 14 days ahead; the Calendar lets students look further).
 // Never the whole history. Change it here, not in the UI or the providers.

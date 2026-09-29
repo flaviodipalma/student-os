@@ -128,7 +128,7 @@ describe("Google Calendar: events", () => {
     })
   })
 
-  it("recurring occurrences get their own stable id (original start), not a new Student OS commitment", () => {
+  it("recurring occurrences get their own stable id (original start), not a new Quadernio commitment", () => {
     const a = googleEventToExternal(event({ id: "rec_20260921", recurringEventId: "rec", iCalUID: "rec@google.com", originalStartTime: { dateTime: "2026-09-21T10:30:00-04:00" } }))
     const b = googleEventToExternal(event({ id: "rec_20260928", recurringEventId: "rec", iCalUID: "rec@google.com", originalStartTime: { dateTime: "2026-09-28T10:30:00-04:00" } }))
     expect("event" in a && a.event.externalId).toBe("rec@google.com@2026-09-21T14:30:00.000Z")
