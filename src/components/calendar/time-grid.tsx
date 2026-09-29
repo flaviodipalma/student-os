@@ -1,14 +1,18 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Link from "next/link"
 import { RepeatIcon } from "lucide-react"
 import { formatTime, formatWeekday, fromDateKey } from "@/lib/format"
 import { eventTypeLabel, eventsOn, layoutDay, toMinutes } from "@/lib/events"
-import { academicKindLabel, type AcademicDayItem } from "@/lib/academic-calendar"
 import { eventSourceNames, type CalendarEvent } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { academicKindStyle } from "./academic-style"
 import { eventStyle } from "./event-style"
+
+// One item in the all-day row: an academic calendar date (a break, exams…) or a task
+// due that day. `tag` says what it is in words; `href` makes it a link.
+// `showTag`: show the tag too (e.g. "Due"), not only to screen readers.
+export type AllDayItem = { id: string; label: string; tag: string; className: string; href?: string; done?: boolean; showTag?: boolean }
 
 const HOUR_PX = 52
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
@@ -33,8 +37,8 @@ export function TimeGrid({
 }: {
   days: string[]
   events: CalendarEvent[]
-  // The academic calendar's items per day (breaks, exams, a semester's first and last day).
-  allDay?: (date: string) => AcademicDayItem[]
+  // All-day items per day: the academic calendar's dates and the tasks due.
+  allDay?: (date: string) => AllDayItem[]
   today: string
   nowMinutes: number
   onSelectDay?: (date: string) => void
@@ -112,17 +116,32 @@ export function TimeGrid({
                 All day
               </div>
               {days.map((date) => (
-                <ul key={date} aria-label={`All day, ${formatWeekday(fromDateKey(date))}`} className="grid content-start gap-1 border-l p-1">
-                  {allDay(date).map((item) => (
-                    <li
-                      key={item.id}
-                      title={`${academicKindLabel[item.kind]}: ${item.label}`}
-                      className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-medium", academicKindStyle[item.kind])}
-                    >
-                      <span className="sr-only">{academicKindLabel[item.kind]}: </span>
-                      {item.label}
-                    </li>
-                  ))}
+                <ul key={date} aria-label={`All day, ${formatWeekday(fromDateKey(date))}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-1 border-l p-1">
+                  {allDay(date).map((item) => {
+                    const style = cn("block max-w-full truncate rounded px-1.5 py-0.5 text-[11px] font-medium", item.className, item.done && "line-through opacity-60")
+                    const content = (
+                      <>
+                        {item.showTag ? <span className="font-semibold">{item.tag}:</span> : <span className="sr-only">{item.tag}:</span>} {item.label}
+                        {item.done && (
+                          <>
+                            {" "}
+                            <span className="sr-only">(done)</span>
+                          </>
+                        )}
+                      </>
+                    )
+                    return (
+                      <li key={item.id} title={`${item.tag}: ${item.label}`} className="min-w-0">
+                        {item.href ? (
+                          <Link href={item.href} className={cn(style, "outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50")}>
+                            {content}
+                          </Link>
+                        ) : (
+                          <span className={style}>{content}</span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               ))}
             </>

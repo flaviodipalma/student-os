@@ -383,7 +383,7 @@ describe("the academic calendar during setup", () => {
     expect(mocks.replaceAcademicCalendar).not.toHaveBeenCalled()
   })
 
-  it("not found: no calendar screen at all (it can be added later in Settings)", async () => {
+  it("not found: no calendar screen at all (it can be added later in Calendar)", async () => {
     const user = userEvent.setup()
     render(<OnboardingFlow />)
     await toCourses(user)

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { AcademicEvent } from "@/lib/types"
 
-// Settings > Academic calendar in a simulated browser. The app store is mocked.
+// Calendar > Academic calendar in a simulated browser. The app store is mocked.
 
 const FALL: AcademicEvent = { id: "t1", kind: "term", title: "Fall 2026", startDate: "2026-08-24", endDate: "2026-12-18", term: "Fall 2026" }
 const LABOR_DAY: AcademicEvent = { id: "e1", kind: "no_classes", title: "Labor Day", startDate: "2026-09-07", endDate: "2026-09-07", term: "Fall 2026" }
@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-describe("Settings > Academic calendar", () => {
+describe("Calendar > Academic calendar", () => {
   it("empty: says so, naming the school's website", () => {
     render(<AcademicCalendarCard />)
     expect(screen.getByText(/No academic calendar yet/).textContent).toMatch(/qu\.edu/)

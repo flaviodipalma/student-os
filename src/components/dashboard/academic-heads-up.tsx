@@ -38,7 +38,7 @@ export function AcademicHeadsUp({ className }: { className?: string }) {
           <CardTitle className="text-lg font-semibold">At school</CardTitle>
           <CardDescription>{student.schoolName ? `${student.schoolName}, the next two weeks` : "The next two weeks"}</CardDescription>
         </div>
-        <Link href="/settings#academic-calendar" className="text-sm font-medium text-primary hover:underline">
+        <Link href="/calendar?view=academic" className="text-sm font-medium text-primary hover:underline">
           Academic calendar
         </Link>
       </CardHeader>

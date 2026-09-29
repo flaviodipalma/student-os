@@ -412,7 +412,7 @@ export const getAcademicCalendar = defineTool({
   run(ctx, { from = ctx.today, to = addDays(ctx.today, 183) }) {
     const events = ctx.data.academicEvents ?? []
     if (events.length === 0) {
-      return { result: { calendar: "none", note: "No academic calendar yet. The student can add it in Settings > Academic calendar (found on their school's website, from a link or PDF, or by hand)." } }
+      return { result: { calendar: "none", note: "No academic calendar yet. The student can add it in Calendar > Academic calendar (found on their school's website, from a link or PDF, or by hand)." } }
     }
     const semester = semesterFor(events, ctx.today)
     const view = (event: (typeof events)[number]) => ({

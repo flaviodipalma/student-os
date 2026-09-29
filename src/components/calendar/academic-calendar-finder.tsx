@@ -154,7 +154,7 @@ export function AcademicCalendarFinder({ onSaved }: { onSaved?: () => void }) {
 }
 
 // A calendar to check before it's saved: where it was found, its dates by semester
-// (remove what doesn't apply), then "Save this calendar". Used by Settings and onboarding.
+// (remove what doesn't apply), then "Save this calendar". Used by Calendar > Academic calendar and onboarding.
 export function AcademicCalendarReview({
   events: found,
   sources,

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { BookOpenIcon, CheckIcon, CircleAlertIcon, FileUpIcon, GraduationCapIcon, Loader2Icon } from "lucide-react"
 import { CourseTag } from "@/components/course-tag"
 import { ClassTimesSteps } from "@/components/courses/class-times"
-import { AcademicCalendarReview, readCalendar } from "@/components/settings/academic-calendar-finder"
+import { AcademicCalendarReview, readCalendar } from "@/components/calendar/academic-calendar-finder"
 import { CourseFormDialog } from "@/components/courses/course-form-dialog"
 import { CommitmentsEditor, type EditableCommitment } from "@/components/preferences/commitments-editor"
 import { ProfileFields } from "@/components/preferences/profile-fields"
@@ -465,7 +465,7 @@ function OptionCard({
 }
 
 // The academic calendar during setup: still looking (with a way to skip), found (check
-// and save it), or not found (it can be added later in Settings).
+// and save it), or not found (it can be added later in Calendar).
 function CalendarStep({ domain, result, onDone }: { domain: string; result: ReadCalendarResponse | null; onDone: () => void }) {
   if (result === null) {
     return (
@@ -497,7 +497,7 @@ function CalendarStep({ domain, result, onDone }: { domain: string; result: Read
         {result.ok
           ? `We couldn't find your academic calendar on ${domain}.`
           : result.message}{" "}
-        You can add it later in Settings, from a link, a PDF or by hand.
+        You can add it later in Calendar → Academic calendar, from a link, a PDF or by hand.
       </p>
       <Button className="w-fit" onClick={onDone}>
         Continue

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { externalEventsAsCalendarItems } from "@/lib/calendar/external-events"
 import { scheduleBetween } from "@/lib/recurring"
-import type { CalendarEvent, ExternalEventRecord } from "@/lib/types"
+import type { AcademicEvent, CalendarEvent, ExternalEventRecord, Task } from "@/lib/types"
 
 // The Calendar with Student OS, Canvas and Blackboard events, rendered in a
 // simulated browser. The app store is stubbed with the same schedule functions
@@ -14,15 +14,19 @@ const NY = "America/New_York"
 const state = vi.hoisted(() => ({
   externalEvents: [] as ExternalEventRecord[],
   events: [] as CalendarEvent[],
+  tasks: [] as Task[],
+  academic: [] as AcademicEvent[],
   setExternalEventHidden: vi.fn(),
 }))
+vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a> }))
 
 vi.mock("@/lib/app-store", () => ({
   useAppStore: () => {
     const items = () => [...state.events, ...externalEventsAsCalendarItems(state.externalEvents, NY)]
     return {
       externalEvents: state.externalEvents,
-      academicEvents: [],
+      academicEvents: state.academic,
+      tasks: state.tasks,
       timeZone: NY,
       setExternalEventHidden: state.setExternalEventHidden,
       scheduleBetween: (from: string, to: string) => scheduleBetween(items(), [], from, to),
@@ -30,7 +34,7 @@ vi.mock("@/lib/app-store", () => ({
       updateEvent: vi.fn(),
       deleteEvent: vi.fn(),
       courses: [],
-      getCourse: vi.fn(),
+      getCourse: (id: string) => (id === "c1" ? { id: "c1", code: "CSC215", name: "Data Structures", professor: "", description: "", color: "sky" } : undefined),
       recurringCommitments: [],
       getCommitment: vi.fn(),
       addCommitment: vi.fn(),
@@ -186,5 +190,34 @@ describe("Calendar with external events", () => {
     state.externalEvents = []
     render(<CalendarView />)
     expect(screen.queryByRole("group", { name: "Show events from" })).toBeNull()
+  })
+})
+
+describe("going to a date, and what's due", () => {
+  const task = (id: string, dueDate: string, status: Task["status"] = "not_started") =>
+    ({ id, courseId: "c1", title: `Project ${id}`, description: "", type: "project", dueDate, priority: "medium", estimateMinutes: 60, status }) as Task
+
+  it("'Go to date' opens that day", async () => {
+    state.tasks = []
+    state.academic = []
+    const user = userEvent.setup()
+    render(<CalendarView />)
+    const picker = screen.getByLabelText("Go to date")
+    fireEvent.change(picker, { target: { value: "2026-12-03" } })
+    void user
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Thursday, December 3, 2026")
+  })
+
+  it("tasks due show in the all-day row, as links to the task (done ones struck through), next to academic dates", () => {
+    state.tasks = [task("1", "2026-09-30"), task("2", "2026-09-30", "completed"), task("3", "2026-11-11")]
+    state.academic = [{ id: "a1", kind: "no_classes", title: "Fall break", startDate: "2026-09-30", endDate: "2026-09-30" }]
+    render(<CalendarView initialDate="2026-09-30" />)
+    const row = screen.getByRole("list", { name: /All day, Wednesday/ })
+    expect(within(row).getByText("Fall break")).toBeTruthy()
+    const due = within(row).getByRole("link", { name: /Due: CSC215 · Project 1/ })
+    expect(due.getAttribute("href")).toBe("/tasks?task=1")
+    expect(within(row).getByRole("link", { name: /Project 2 \(done\)/ }).className).toMatch(/line-through/)
+    // Only that week's tasks.
+    expect(screen.queryByText(/Project 3/)).toBeNull()
   })
 })

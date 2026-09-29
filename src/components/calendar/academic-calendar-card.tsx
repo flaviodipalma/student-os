@@ -14,7 +14,7 @@ import { AcademicCalendarFinder } from "./academic-calendar-finder"
 import { cn } from "@/lib/utils"
 import { academicEventSchema, firstIssue } from "@/lib/validation"
 
-// Settings > Academic calendar: the school's semesters, days without classes,
+// Calendar > Academic calendar: the school's semesters, days without classes,
 // exam periods and deadlines. Class times follow them: they start and end with the
 // semester and don't meet on breaks, holidays or during exams.
 

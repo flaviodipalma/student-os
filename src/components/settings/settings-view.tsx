@@ -13,7 +13,6 @@ import { useNotifications } from "@/lib/notification-store"
 import { DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_STUDENT_PREFERENCES } from "@/lib/preferences"
 import type { NotificationPreferences, ProfileInput, StudentPreferences } from "@/lib/types"
 import { firstIssue, notificationPreferencesSchema, preferencesSchema, profileSchema } from "@/lib/validation"
-import { AcademicCalendarCard } from "./academic-calendar-card"
 import { NotificationSettingsFields } from "./notification-settings-fields"
 
 // Profile, study preferences and weekly commitments. Same fields, validation and
@@ -46,8 +45,6 @@ export function SettingsView() {
       >
         <ProfileFields value={profile} onChange={setProfile} />
       </Section>
-
-      <AcademicCalendarCard />
 
       <Section
         id="study-preferences"

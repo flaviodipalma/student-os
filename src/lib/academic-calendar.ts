@@ -28,13 +28,41 @@ export function noClassDates(events: AcademicEvent[]): string[] {
   return [...days].sort()
 }
 
-// Class times (commitments with a courseId) skip the days without classes.
+// The semester a class time belongs to: the one it overlaps the most (its own dates
+// may be a guess, or run past the semester). Undefined without semesters.
+export function semesterOf(commitment: Pick<RecurringCommitment, "startDate" | "endDate">, events: AcademicEvent[]): AcademicEvent | undefined {
+  const start = commitment.startDate ?? "0000-01-01"
+  const end = commitment.endDate ?? "9999-12-31"
+  let best: AcademicEvent | undefined
+  let bestDays = 0
+  for (const term of events) {
+    if (term.kind !== "term") continue
+    const from = term.startDate > start ? term.startDate : start
+    const to = term.endDate < end ? term.endDate : end
+    const days = to >= from ? daysFrom(from, to) + 1 : 0
+    if (days > bestDays) {
+      best = term
+      bestDays = days
+    }
+  }
+  return best
+}
+
+// Class times (commitments with a courseId) meet only inside their semester (not in
+// the week between finals and winter break, even if their own dates run longer), and
+// skip the days without classes.
 export function withAcademicCalendar(commitments: RecurringCommitment[], events: AcademicEvent[]): RecurringCommitment[] {
   const skip = noClassDates(events)
   return commitments.map((commitment) => {
     if (!commitment.courseId) return commitment
     const next: RecurringCommitment = { ...commitment, skipDates: skip }
     if (skip.length === 0) delete next.skipDates
+    // (Class times always have dates; one without wouldn't know its semester.)
+    const semester = commitment.startDate && commitment.endDate ? semesterOf(commitment, events) : undefined
+    if (semester) {
+      if (next.startDate! < semester.startDate) next.startDate = semester.startDate
+      if (next.endDate! > semester.endDate) next.endDate = semester.endDate
+    }
     return next
   })
 }

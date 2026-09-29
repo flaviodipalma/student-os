@@ -48,6 +48,24 @@ describe("days without classes", () => {
     expect(sports).not.toHaveProperty("skipDates")
   })
 
+  it("classes stop when the semester ends, even if their own dates run longer (the week after finals)", () => {
+    // Saved before the calendar existed: a guessed Aug 25 – Dec 20.
+    const guessed = { ...lecture, startDate: "2026-08-25", endDate: "2026-12-20" }
+    const [classes] = withAcademicCalendar([guessed], CALENDAR)
+    expect(classes).toMatchObject({ startDate: "2026-08-25", endDate: "2026-12-18" })
+    // Quinnipiac's real dates: the semester (with finals) ends Dec 12; Dec 14-18 has no classes.
+    const QU = [{ ...FALL, endDate: "2026-12-12" }, { ...FINALS, startDate: "2026-12-07", endDate: "2026-12-12" }, SPRING]
+    const [qu] = withAcademicCalendar([guessed], QU)
+    expect(commitmentsBetween([qu], "2026-12-14", "2026-12-20")).toEqual([])
+    expect(commitmentsBetween([qu], "2026-11-30", "2026-12-04").map((item) => item.date)).toEqual(["2026-11-30", "2026-12-02", "2026-12-04"])
+  })
+
+  it("a class time without dates of its own is left as it is (it can't tell its semester)", () => {
+    const [classes] = withAcademicCalendar([{ ...lecture, startDate: undefined, endDate: undefined }], CALENDAR)
+    expect(classes.startDate).toBeUndefined()
+    expect(classes.endDate).toBeUndefined()
+  })
+
   it("without a calendar, classes are unchanged", () => {
     expect(withAcademicCalendar([lecture], [])).toEqual([lecture])
   })

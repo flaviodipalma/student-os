@@ -24,7 +24,7 @@ describe("At school", () => {
     expect(screen.getByText("Quinnipiac University, the next two weeks")).toBeTruthy()
     expect(screen.getByText("Thanksgiving recess").nextElementSibling?.textContent).toBe("No classes until Sat, Nov 28")
     expect(screen.getByText("Final exams").nextElementSibling?.textContent).toBe("In 13 days · Mon, Dec 7 – Sat, Dec 12")
-    expect(screen.getByRole("link", { name: "Academic calendar" }).getAttribute("href")).toBe("/settings#academic-calendar")
+    expect(screen.getByRole("link", { name: "Academic calendar" }).getAttribute("href")).toBe("/calendar?view=academic")
   })
 
   it("nothing coming up (or no calendar): no card", () => {

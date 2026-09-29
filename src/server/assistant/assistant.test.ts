@@ -213,7 +213,7 @@ describe("read tools: answers come from Student OS and the Planner", () => {
   })
 
   it("the academic calendar: the current semester and what's coming (none yet: says where to add it)", async () => {
-    expect(call(await contextFor(), "getAcademicCalendar").json).toMatchObject({ calendar: "none", note: expect.stringMatching(/Settings > Academic calendar/) })
+    expect(call(await contextFor(), "getAcademicCalendar").json).toMatchObject({ calendar: "none", note: expect.stringMatching(/Calendar > Academic calendar/) })
     const sam = await t.addUser("Sam")
     await replaceAcademicEvents(t.db, sam, [
       { kind: "term", title: "Fall 2026", startDate: "2026-08-24", endDate: "2026-12-12", term: "Fall 2026" },

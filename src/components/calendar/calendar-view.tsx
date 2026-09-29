@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, EyeOffIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { academicItemsOn } from "@/lib/academic-calendar"
+import { Input } from "@/components/ui/input"
+import { academicItemsOn, academicKindLabel } from "@/lib/academic-calendar"
 import { useAppStore } from "@/lib/app-store"
 import { useNow } from "@/lib/clock"
 import { useMediaQuery } from "@/lib/use-media-query"
@@ -15,7 +16,8 @@ import { cn } from "@/lib/utils"
 import { EventFormDialog, type EventDraft } from "./event-form-dialog"
 import { ExternalEventDialog, HiddenEventsDialog } from "./external-event-dialog"
 import { eventStyle } from "./event-style"
-import { TimeGrid } from "./time-grid"
+import { academicKindStyle } from "./academic-style"
+import { TimeGrid, type AllDayItem } from "./time-grid"
 
 type View = "day" | "week"
 
@@ -44,7 +46,7 @@ function rangeTitle(view: View, days: string[]): string {
 // event reminder) open that day and, for a Canvas/Blackboard event, its details.
 export function CalendarView({ initialDate, initialExternalId }: { initialDate?: string; initialExternalId?: string } = {}) {
   const { scheduleBetween } = useEvents()
-  const { externalEvents, academicEvents } = useAppStore()
+  const { externalEvents, academicEvents, tasks, getCourse } = useAppStore()
   const now = useNow()
   const today = toDateKey(now)
   // Phones start on the Day view (a week doesn't fit); the student's own choice wins.
@@ -76,6 +78,31 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
   const events = filter === "all" ? all : all.filter((event) => sourceOf(event) === filter)
   const step = view === "week" ? 7 : 1
   const showsToday = days.includes(today)
+
+  // The all-day row: the academic calendar's dates, then the tasks due that day.
+  function allDayOn(date: string): AllDayItem[] {
+    const academic = academicItemsOn(academicEvents, date).map((item) => ({
+      id: item.id,
+      label: item.label,
+      tag: academicKindLabel[item.kind],
+      className: academicKindStyle[item.kind],
+    }))
+    const due = tasks
+      .filter((task) => task.dueDate === date)
+      .map((task) => {
+        const code = getCourse(task.courseId)?.code
+        return {
+          id: `task-${task.id}`,
+          label: code ? `${code} · ${task.title}` : task.title,
+          tag: "Due",
+          showTag: true,
+          className: "bg-card text-foreground ring-1 ring-border ring-inset",
+          href: `/tasks?task=${task.id}`,
+          done: task.status === "completed",
+        }
+      })
+    return [...academic, ...due]
+  }
 
   function openNew(date: string, startTime: string) {
     setEditing(undefined)
@@ -139,6 +166,19 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
           >
             <ChevronRightIcon />
           </Button>
+          {/* Any date: opens that day (its events, study sessions and what's due). */}
+          <Input
+            type="date"
+            aria-label="Go to date"
+            title="Go to date"
+            className="ml-1 h-8 w-[9.5rem]"
+            value={anchor}
+            onChange={(e) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) return
+              setAnchor(e.target.value)
+              setView("day")
+            }}
+          />
         </div>
 
         {/* The color key (hidden on phones, where every block says what it is). */}
@@ -231,7 +271,7 @@ export function CalendarView({ initialDate, initialExternalId }: { initialDate?:
         }
         onSelectSlot={openNew}
         onSelectEvent={openEdit}
-        allDay={academicEvents.length > 0 ? (date) => academicItemsOn(academicEvents, date) : undefined}
+        allDay={allDayOn}
       />
 
       <EventFormDialog
