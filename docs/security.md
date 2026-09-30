@@ -140,6 +140,11 @@ are mapped (`src/server/errors.ts`) and never returned raw.
 | Syllabus PDF / text | extraction | **not stored** (import history: file name + counts) | the text, once, for extraction |
 | Assistant conversation | follow-ups | the browser tab only | the last 12 messages |
 
+Deleting an account (Settings > Profile > Delete account, typed DELETE to confirm;
+`src/server/services/account.ts`) revokes connected calendars, then deletes the
+Supabase Auth user, which cascades to the profile and every table. The browser
+then forgets its saved `quadernio*` keys and its push subscription.
+
 ## Rate limits (`src/server/rate-limit.ts`)
 
 Assistant (20/min, 300/day), syllabus import (10/hour), Sync now for any

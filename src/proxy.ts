@@ -8,7 +8,7 @@ import { supabaseEnv } from "@/lib/supabase/env"
 // This is only a first, fast check. Every data load and server action verifies
 // the user again on the server (src/server/auth.ts).
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth"]
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/privacy", "/terms"]
 
 export async function proxy(request: NextRequest) {
   // Health checks answer on their own (no session, no Supabase call).

@@ -1,7 +1,9 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { PageTabs } from "@/components/app-shell/page-tabs"
 import { AccountCard } from "@/components/settings/account-card"
+import { DeleteAccountCard } from "@/components/settings/delete-account-card"
 import { LearningCard } from "@/components/settings/learning-card"
 import { NotificationSettings, PlanningSettings, ProfileSettings } from "@/components/settings/settings-view"
 import { getNavItem } from "@/lib/navigation"
@@ -42,6 +44,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               available={await enabledSocialProviders()}
               outcome={typeof params.login === "string" ? { code: params.login, provider: typeof params.provider === "string" ? params.provider : undefined } : undefined}
             />
+            <DeleteAccountCard />
           </>
         )}
         {tab === "planning" && (
@@ -52,6 +55,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         )}
         {tab === "notifications" && <NotificationSettings />}
       </div>
+      <nav aria-label="Legal" className="mt-10 flex gap-4 text-xs text-muted-foreground">
+        <Link href="/privacy" className="hover:text-foreground hover:underline">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="hover:text-foreground hover:underline">
+          Terms of Service
+        </Link>
+      </nav>
     </>
   )
 }

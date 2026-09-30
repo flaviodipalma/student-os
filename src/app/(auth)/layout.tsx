@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { connection } from "next/server"
 import { GraduationCapIcon } from "lucide-react"
 import { supabaseEnv } from "@/lib/supabase/env"
@@ -25,6 +26,14 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         )}
         {children}
       </div>
+      <nav aria-label="Legal" className="mt-6 flex gap-4 text-xs text-muted-foreground">
+        <Link href="/privacy" className="hover:text-foreground hover:underline">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="hover:text-foreground hover:underline">
+          Terms of Service
+        </Link>
+      </nav>
     </main>
   )
 }

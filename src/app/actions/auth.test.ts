@@ -296,19 +296,49 @@ describe("email and password still work", () => {
   })
 })
 
+describe("delete account", () => {
+  const exists = async (id: string) => (await t.client.query("select id from auth.users where id = $1", [id])).rows.length === 1
+
+  it("needs a signed-in student and DELETE typed to confirm", async () => {
+    expect(await actions.deleteAccountAction("DELETE")).toMatchObject({ ok: false, code: "unauthorized" })
+    const id = await t.addUser("Sam")
+    mocks.user = { id, email: "sam@example.com" }
+    mocks.auth.signOut = vi.fn(async () => ({ error: null }))
+    for (const wrong of ["", "delete it", "yes", 1, null]) {
+      expect(await actions.deleteAccountAction(wrong)).toEqual({ ok: false, code: "validation", error: "Type DELETE to confirm." })
+    }
+    expect(await exists(id)).toBe(true)
+    expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it("deletes the account and its data, then clears this browser's session", async () => {
+    const id = await t.addUser("Sam")
+    await createCourse(t.db, id, { code: "BIO101", name: "Biology", professor: "", description: "" })
+    mocks.user = { id, email: "sam@example.com" }
+    mocks.auth.signOut = vi.fn(async () => ({ error: null }))
+    expect(await actions.deleteAccountAction(" delete ")).toEqual({ ok: true, data: null })
+    expect(await exists(id)).toBe(false)
+    expect((await t.client.query("select id from courses where user_id = $1", [id])).rows).toEqual([])
+    expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: "local" })
+    // Deleting again (e.g. a second click): nothing left, a safe message.
+    expect(await actions.deleteAccountAction("DELETE")).toMatchObject({ ok: false, code: "not-found" })
+  })
+})
+
 describe("protected routes", () => {
-  it("signed out (or an expired session): app pages go to log in; sign-in pages and the callback stay open", async () => {
+  it("signed out (or an expired session): app pages go to log in; sign-in, legal pages and the callback stay open", async () => {
     mocks.claims = null
     const page = await proxy(new NextRequest("http://localhost:3000/planner?date=2026-09-22"))
     expect(page.headers.get("location")).toBe("http://localhost:3000/login?next=%2Fplanner%3Fdate%3D2026-09-22")
-    for (const open of ["/login", "/signup", "/auth/callback?code=x"]) {
+    for (const open of ["/login", "/signup", "/auth/callback?code=x", "/privacy", "/terms"]) {
       expect((await proxy(new NextRequest(`http://localhost:3000${open}`))).headers.get("location")).toBeNull()
     }
   })
 
-  it("signed in: app pages open; the log-in page goes to the Dashboard", async () => {
+  it("signed in: app and legal pages open; the log-in page goes to the Dashboard", async () => {
     mocks.claims = { sub: "u1" }
     expect((await proxy(new NextRequest("http://localhost:3000/planner"))).headers.get("location")).toBeNull()
+    expect((await proxy(new NextRequest("http://localhost:3000/privacy"))).headers.get("location")).toBeNull()
     expect((await proxy(new NextRequest("http://localhost:3000/login"))).headers.get("location")).toBe("http://localhost:3000/dashboard")
   })
 })

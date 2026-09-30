@@ -122,6 +122,20 @@ export function AuthForm({
         </Button>
       </form>
 
+      {isSignup && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          By creating an account, you agree to the{" "}
+          <Link href="/terms" className="font-medium text-primary hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-medium text-primary hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      )}
+
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {isSignup ? "Already have an account? " : "New to Quadernio? "}
         <Link href={isSignup ? "/login" : "/signup"} className="font-medium text-primary hover:underline">

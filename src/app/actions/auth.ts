@@ -6,7 +6,13 @@ import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
 import { authErrorFromCode, authErrorMessages, isSocialProvider, safeNextPath, socialProviders } from "@/lib/auth-providers"
 import { createSupabaseServerClient, getCurrentUser } from "@/server/auth"
+import { runAction } from "@/server/actions"
 import { getDb } from "@/server/db"
+import { NotFoundError, ValidationError } from "@/server/errors"
+import { loadCalendarCredentials } from "@/server/integrations/calendar/connections"
+import { getCalendarProvider } from "@/server/integrations/calendar/registry"
+import { getCredentialVault } from "@/server/integrations/lms/credential-vault"
+import { deleteAccount } from "@/server/services/account"
 import { ensureProfile } from "@/server/services/profiles"
 import { authCallbackUrl, enabledSocialProviders, rememberAuthIntent } from "@/server/social-auth"
 import { logger } from "@/server/log"
@@ -189,4 +195,34 @@ export async function unlinkLoginMethodAction(identityId: unknown): Promise<Acti
     logger.error("auth", "unlink failed", { name: error instanceof Error ? error.name : typeof error })
     return { ok: false, code: "database", error: "We couldn't remove that login method. Please try again." }
   }
+}
+
+// ---- Delete account
+
+// Settings > Delete account: deletes the signed-in student's account and all their
+// data (src/server/services/account.ts), then clears the session cookies. The
+// student types DELETE to confirm; the page then goes to the log-in page.
+export async function deleteAccountAction(confirmation: unknown): Promise<ActionResult<null>> {
+  const result = await runAction(async ({ db, userId }) => {
+    if (typeof confirmation !== "string" || confirmation.trim().toUpperCase() !== "DELETE") {
+      throw new ValidationError("Type DELETE to confirm.")
+    }
+    const deleted = await deleteAccount(db, userId, async (provider) => {
+      const credentials = await loadCalendarCredentials(db, userId, provider, getCredentialVault())
+      await getCalendarProvider(provider).revoke(credentials)
+    })
+    if (!deleted) throw new NotFoundError("account")
+    logger.info("auth", "account deleted")
+    return null
+  })
+  if (result.ok) {
+    try {
+      const supabase = await createSupabaseServerClient()
+      await supabase.auth.signOut({ scope: "local" })
+    } catch (error) {
+      // The account is already gone; its session can't be used any more either way.
+      logger.warn("auth", "sign-out after delete failed", { name: error instanceof Error ? error.name : typeof error })
+    }
+  }
+  return result
 }
