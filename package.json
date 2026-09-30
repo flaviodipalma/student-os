@@ -13,6 +13,7 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "check:env": "tsx scripts/check-env.ts",
     "build:extension": "tsc -p extension && node extension/build.mjs",
+    "build:extension:store": "tsc -p extension && node extension/build.mjs --store",
     "reminders:run": "node --env-file=.env.local scripts/run-reminders.mjs"
   },
   "dependencies": {

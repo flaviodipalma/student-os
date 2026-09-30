@@ -1,7 +1,10 @@
 // Talking to Quadernio from the extension, as the student logged in to Quadernio in
 // this browser. No Chrome APIs here, so it can be tested in Node: the popup passes in `fetch`.
 
-export const DEFAULT_ADDRESS = "http://localhost:3000"
+// The store build (npm run build:extension:store) sets __QUADERNIO_ADDRESS__ to the
+// live site; development builds and tests use the local server.
+declare const __QUADERNIO_ADDRESS__: string | undefined
+export const DEFAULT_ADDRESS = typeof __QUADERNIO_ADDRESS__ === "string" ? __QUADERNIO_ADDRESS__ : "http://localhost:3000"
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
 // Every request to Quadernio: the student's login cookies (Chrome sends them because

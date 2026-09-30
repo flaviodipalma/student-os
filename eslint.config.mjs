@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The built browser extension.
     "extension/dist/**",
+    "extension/dist-store/**",
   ]),
 ]);
 

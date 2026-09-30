@@ -32,13 +32,21 @@ you open them. The popup tells which one the tab is.
 After changing the extension's code, run `npm run build:extension` again and click the reload icon on the
 extension's card in `chrome://extensions`.
 
+## Publishing
+
+`npm run build:extension:store` builds `extension/dist-store` and a ready-to-upload
+`extension/quadernio-extension-<version>.zip`: the same code, pointed at `https://quadernio.com`,
+with permission for that site only. The store listing texts, permission justifications and
+screenshots are in `docs/chrome-web-store.md`.
+
 ## Permissions
 
 | Permission | Why |
 | --- | --- |
 | `activeTab`, `scripting` | When you click the extension on a Canvas or Blackboard page, it can read that one tab, with your login, only then. No standing access to any site. |
 | `storage` | Remembers the Quadernio address and your course choice, on this computer only. |
-| `http://localhost/*`, `http://127.0.0.1/*` | Reaching Quadernio during development. |
+| `http://localhost/*`, `http://127.0.0.1/*` | Reaching Quadernio during development (development build only). |
+| `https://quadernio.com/*` | Reaching Quadernio (store build only, instead of localhost). |
 | `https://*/*` (optional) | Asked for only for specific addresses: the Quadernio address you enter, and your Canvas or Blackboard address when you turn on its automatic sync (so it can read it without a click). |
 
 Having permission for the Quadernio address is also what makes Chrome send your Quadernio login with the

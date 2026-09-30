@@ -21,6 +21,8 @@
 /build
 # the built browser extension (npm run build:extension)
 /extension/dist
+/extension/dist-store
+/extension/quadernio-extension-*.zip
 
 # misc
 .DS_Store
