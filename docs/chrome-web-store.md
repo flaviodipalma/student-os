@@ -49,6 +49,10 @@ development build (`npm run build:extension`) keeps using localhost. For an upda
 - Store icon: `extension/icons/icon-128.png`
 - Screenshots (1280×800): `docs/chrome-web-store/screenshot-1-choose-courses.png`,
   `docs/chrome-web-store/screenshot-2-synced.png`
+- Small promo tile (440×280): `docs/chrome-web-store/promo-small-440x280.png`
+- Marquee promo tile (1400×560): `docs/chrome-web-store/promo-marquee-1400x560.png`
+
+All are 24-bit PNGs without transparency, as the store requires.
 
 **Additional fields:** Official URL / homepage `https://quadernio.com` · Support URL: `mailto:hello@quadernio.com`
 (or leave empty and use the contact email on the account).
