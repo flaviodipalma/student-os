@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
-import { authErrorFromCode, firstNameFrom, isPrivateRelayEmail, loginMethodOf, safeNextPath, socialProviders } from "@/lib/auth-providers"
+import { authErrorFromCode, authErrorMessages, firstNameFrom, isPrivateRelayEmail, loginMethodOf, safeNextPath, socialProviders } from "@/lib/auth-providers"
 import type { Database } from "@/server/db/types"
 import { createTestDb } from "@/server/test-utils/test-db"
 
@@ -34,6 +34,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: () => ({ auth: { getClaims
 
 const actions = await import("./auth")
 const { GET: callback } = await import("@/app/auth/callback/route")
+const { GET: signedOut } = await import("@/app/auth/signed-out/route")
 const { proxy } = await import("@/proxy")
 const { resetEnabledProvidersCache } = await import("@/server/social-auth")
 const { ensureProfile, getProfile, completeOnboarding } = await import("@/server/services/profiles")
@@ -322,6 +323,32 @@ describe("delete account", () => {
     expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: "local" })
     // Deleting again (e.g. a second click): nothing left, a safe message.
     expect(await actions.deleteAccountAction("DELETE")).toMatchObject({ ok: false, code: "not-found" })
+  })
+})
+
+describe("a session whose account was deleted", () => {
+  const visit = async () => (await signedOut(new NextRequest("http://localhost:3000/auth/signed-out"))).headers.get("location")
+
+  it("logs this browser out and explains on the log-in page", async () => {
+    const id = await t.addUser("Gone")
+    await t.client.query("delete from auth.users where id = $1", [id])
+    mocks.user = { id, email: "gone@example.com" }
+    mocks.auth.signOut = vi.fn(async () => ({ error: null }))
+    expect(await visit()).toBe("http://localhost:3000/login?error=account-gone")
+    expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: "local" })
+    expect(authErrorMessages["account-gone"]).toMatch(/no longer exists/)
+  })
+
+  it("never logs out a student whose account exists (another site can't force it)", async () => {
+    const id = await t.addUser("Here")
+    mocks.user = { id, email: "here@example.com" }
+    mocks.auth.signOut = vi.fn(async () => ({ error: null }))
+    expect(await visit()).toBe("http://localhost:3000/dashboard")
+    expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it("signed out already: just the log-in page", async () => {
+    expect(await visit()).toBe("http://localhost:3000/login")
   })
 })
 

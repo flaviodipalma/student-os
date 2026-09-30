@@ -22,3 +22,11 @@ export async function deleteAccount(
   const deleted = await db.delete(authUsers).where(eq(authUsers.id, userId)).returning({ id: authUsers.id })
   return deleted.length > 0
 }
+
+// Whether the login account behind a session still exists. A session can outlive
+// its account for up to an hour (e.g. deleted on another device, or in the
+// Supabase dashboard). Throws if the database can't be reached.
+export async function accountExists(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db.select({ id: authUsers.id }).from(authUsers).where(eq(authUsers.id, userId))
+  return Boolean(row)
+}

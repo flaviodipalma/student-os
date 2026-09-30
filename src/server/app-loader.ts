@@ -1,9 +1,11 @@
 import "server-only"
 
+import { redirect } from "next/navigation"
 import type { ThemePreference } from "@/lib/theme"
 import type { WallClock } from "@/lib/time-zone"
 import { requireUser, type SessionUser } from "./auth"
 import { getDb } from "./db"
+import { accountExists } from "./services/account"
 import { loadAppData, type AppData } from "./services/app-data"
 import { getThemePreference } from "./services/preferences"
 import { ensureProfile } from "./services/profiles"
@@ -18,6 +20,8 @@ export type SignedInApp = { user: SessionUser; wallClock: WallClock; timeZone: s
 
 // Everything a signed-in page needs: who is signed in (or a redirect to /login)
 // and their data from the database. Returns null if the database can't be reached.
+// A session whose account was deleted (it stays valid for up to an hour) goes to
+// /auth/signed-out, which logs this browser out, instead of the database error.
 export async function loadSignedInApp(): Promise<SignedInApp | null> {
   const user = await requireUser()
   const { wallClock } = await getStudentClock()
@@ -28,7 +32,17 @@ export async function loadSignedInApp(): Promise<SignedInApp | null> {
     const [data, theme] = await Promise.all([loadAppData(db, user.id), getThemePreference(db, user.id)])
     return { user, wallClock, timeZone, theme, data }
   } catch (error) {
+    if (await accountIsGone(user.id)) redirect("/auth/signed-out")
     logger.error("app", "couldn't load user data", { name: error instanceof Error ? error.name : typeof error })
     return null
+  }
+}
+
+async function accountIsGone(userId: string): Promise<boolean> {
+  try {
+    return !(await accountExists(getDb(), userId))
+  } catch {
+    // The database itself is unreachable: that's the real problem to show.
+    return false
   }
 }

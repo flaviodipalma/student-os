@@ -74,6 +74,7 @@ export const authErrorMessages = {
     "An account with this email already exists. Log in with your usual method, then add this one in Settings → Account.",
   "already-used": "That account is already connected to a different Quadernio account.",
   failed: "We couldn't sign you in. Please try again.",
+  "account-gone": "That account no longer exists. Log in with another account, or create a new one.",
 } as const
 export type AuthErrorCode = keyof typeof authErrorMessages
 

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { calendarConnections, courses, profiles } from "../db/schema"
 import { createTestDb } from "../test-utils/test-db"
-import { deleteAccount } from "./account"
+import { accountExists, deleteAccount } from "./account"
 import { createCourse } from "./courses"
 
 let t: Awaited<ReturnType<typeof createTestDb>>
@@ -42,5 +42,12 @@ describe("deleting an account", () => {
 
   it("an account that doesn't exist (or was already deleted) reports false", async () => {
     expect(await deleteAccount(t.db, crypto.randomUUID(), async () => {})).toBe(false)
+  })
+
+  it("tells whether the account behind a session still exists", async () => {
+    const kim = await t.addUser("Kim")
+    expect(await accountExists(t.db, kim)).toBe(true)
+    await deleteAccount(t.db, kim, async () => {})
+    expect(await accountExists(t.db, kim)).toBe(false)
   })
 })

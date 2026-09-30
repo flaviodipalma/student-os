@@ -1,6 +1,8 @@
 import { DatabaseIcon } from "lucide-react"
+import { logOutAction } from "@/app/actions/auth"
 
-// Shown instead of the app when the database can't be reached.
+// Shown instead of the app when the database can't be reached. Logging out is
+// always possible from here, so nobody is stuck on this page.
 export function DatabaseError() {
   return (
     <main className="flex min-h-svh items-center justify-center bg-muted/40 px-4">
@@ -10,9 +12,16 @@ export function DatabaseError() {
         <p className="mt-1 text-sm text-muted-foreground">
           Quadernio couldn&apos;t reach its database. Please try again in a moment.
         </p>
-        <a href="" className="mt-5 inline-block text-sm font-medium text-primary hover:underline">
-          Try again
-        </a>
+        <div className="mt-5 flex items-center justify-center gap-4 text-sm font-medium">
+          <a href="" className="text-primary hover:underline">
+            Try again
+          </a>
+          <form action={logOutAction}>
+            <button type="submit" className="text-muted-foreground hover:text-foreground hover:underline">
+              Log out
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   )
