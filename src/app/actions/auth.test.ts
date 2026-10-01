@@ -353,19 +353,20 @@ describe("a session whose account was deleted", () => {
 })
 
 describe("protected routes", () => {
-  it("signed out (or an expired session): app pages go to log in; sign-in, legal pages and the callback stay open", async () => {
+  it("signed out (or an expired session): app pages go to log in; the homepage, sign-in, legal pages and the callback stay open", async () => {
     mocks.claims = null
     const page = await proxy(new NextRequest("http://localhost:3000/planner?date=2026-09-22"))
     expect(page.headers.get("location")).toBe("http://localhost:3000/login?next=%2Fplanner%3Fdate%3D2026-09-22")
-    for (const open of ["/login", "/signup", "/auth/callback?code=x", "/privacy", "/terms"]) {
+    for (const open of ["/", "/login", "/signup", "/auth/callback?code=x", "/privacy", "/terms"]) {
       expect((await proxy(new NextRequest(`http://localhost:3000${open}`))).headers.get("location")).toBeNull()
     }
   })
 
-  it("signed in: app and legal pages open; the log-in page goes to the Dashboard", async () => {
+  it("signed in: app and legal pages open; the homepage and log-in page go to the Dashboard", async () => {
     mocks.claims = { sub: "u1" }
     expect((await proxy(new NextRequest("http://localhost:3000/planner"))).headers.get("location")).toBeNull()
     expect((await proxy(new NextRequest("http://localhost:3000/privacy"))).headers.get("location")).toBeNull()
     expect((await proxy(new NextRequest("http://localhost:3000/login"))).headers.get("location")).toBe("http://localhost:3000/dashboard")
+    expect((await proxy(new NextRequest("http://localhost:3000/"))).headers.get("location")).toBe("http://localhost:3000/dashboard")
   })
 })

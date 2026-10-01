@@ -4,11 +4,14 @@ import { supabaseEnv } from "@/lib/supabase/env"
 
 // Runs before every page request. It does two things:
 //   1. keeps the Supabase session fresh (refreshes the token and updates cookies)
-//   2. sends signed-out visitors to /login, and signed-in ones away from /login
+//   2. sends signed-out visitors to /login, and signed-in ones away from the
+//      homepage and /login (to the Dashboard)
 // This is only a first, fast check. Every data load and server action verifies
 // the user again on the server (src/server/auth.ts).
 
 const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/privacy", "/terms"]
+// The homepage is public too (exactly "/", not everything under it).
+const isPublicPath = (path: string) => path === "/" || PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))
 
 export async function proxy(request: NextRequest) {
   // Health checks answer on their own (no session, no Supabase call).
@@ -34,7 +37,7 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub)
 
   const path = request.nextUrl.pathname
-  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))
+  const isPublic = isPublicPath(path)
   const isApi = path.startsWith("/api/")
 
   if (!signedIn && !isPublic && !isApi) {
@@ -43,7 +46,7 @@ export async function proxy(request: NextRequest) {
     url.search = path === "/" ? "" : `?next=${encodeURIComponent(path + request.nextUrl.search)}`
     return redirectWithCookies(url, response)
   }
-  if (signedIn && (path === "/login" || path === "/signup")) {
+  if (signedIn && (path === "/" || path === "/login" || path === "/signup")) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     url.search = ""
