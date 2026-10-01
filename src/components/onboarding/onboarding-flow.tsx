@@ -83,7 +83,7 @@ function courseHeading(view: CourseView): { title: string; description: string }
     return { title: "Add your class times", description: "When each class meets, so it's on your calendar and the Planner keeps it free." }
   }
   if (view.kind === "manual") return { title: "Add your courses", description: "Upload a syllabus or add your classes by hand." }
-  return { title: "Connect your school", description: "Bring in your courses and assignments from Canvas or Blackboard." }
+  return { title: "Connect your school", description: "Bring in your courses and assignments from Canvas, Blackboard or Brightspace." }
 }
 
 export function OnboardingFlow() {

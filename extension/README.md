@@ -1,13 +1,13 @@
 # Quadernio browser extension
 
-Brings Canvas and Blackboard Learn courses and assignments into Quadernio using the
+Brings Canvas, Blackboard Learn and D2L Brightspace courses and assignments into Quadernio using the
 student's own login, with no school-approved API key. It syncs to the Quadernio account
 logged in in the same browser: there's nothing to pair or paste. The extension reads the
-LMS's own API (Canvas `/api/v1`, Blackboard `/learn/api/public`) in the tab the student is
+LMS's own API (Canvas `/api/v1`, Blackboard `/learn/api/public`, Brightspace `/d2l/api`) in the tab the student is
 on, then sends that data to Quadernio, which validates it and imports it like any other
 sync (`src/server/integrations/extension`).
 
-**Status:** Canvas and Blackboard: **Sync now** with course choice, and **automatic sync** when
+**Status:** Canvas, Blackboard and Brightspace: **Sync now** with course choice, and **automatic sync** when
 you open them. The popup tells which one the tab is.
 
 ## Try it (development)
@@ -62,6 +62,7 @@ and a Chrome-extension `Origin` (limited to the published extension with `QUADER
 | `src/popup.html`, `popup.css`, `popup.ts` | The toolbar popup: who's logged in, Sync now, choosing courses, the Quadernio address |
 | `src/canvas.ts` | `readCanvas`: runs **inside the Canvas tab** (copied there by `chrome.scripting.executeScript`, so it must stay self-contained). In two steps: your active courses (with their term), then the assignments of the courses you chose (with submission status). It follows next-page links, reads a few courses at a time, and keeps only the fields Quadernio uses (no grades or scores). Tested in `canvas.test.ts` |
 | `src/blackboard.ts` | `readBlackboard`: the same for Blackboard Learn, inside the Blackboard tab's main page. Courses you take as a student with their term, then the chosen courses' instructors (names only, for the course's professor), grade columns, your own grades, and recent attempts (at most 25 per course, due within the last 30 days or later). Always full addresses: Ultra sets a `<base href>` to its CDN. Tested in `blackboard.test.ts` |
+| `src/brightspace.ts` | `readBrightspace`: the same for D2L Brightspace (Valence API), inside the Brightspace tab. Detects Brightspace by its public version list (`/d2l/api/versions/`, so any school address works), then course offerings (`lp/…/enrollments/myenrollments/`) with each one's semester (`lp/…/courses/{id}`), then the chosen courses' assignment folders, quizzes (optional) and the student's own submissions to recent folders (at most 25 per course). Uses the session's cookies, or, where a school only accepts tokens, the page's own short-lived token. Tested in `brightspace.test.ts` |
 | `src/background.ts` | The background worker: automatic sync when a known site's tab finishes loading, the badge |
 | `src/auto-sync.ts` | Automatic sync, per site: when (30-minute gap, retries, the switch), which courses (exactly the saved choice), the badge, and carrying over the older single-Canvas settings. Tested in `auto-sync.test.ts` |
 | `src/lms-sync.ts` | Shared by the popup and the worker: what's stored, one adapter per LMS, telling which LMS a tab is, running the reader in the tab, sending the import, the badge |
@@ -76,5 +77,5 @@ and a Chrome-extension `Origin` (limited to the published extension with `QUADER
 Depth comes from quiet inner shadows (a light rim on cards, a raised primary button, inset fields).
 Only movement animates, never colors, so a theme switch never shows a half-finished fade.
 
-Endpoints: `GET /api/extension/me` (who's logged in) and `POST /api/extension/canvas/import` (the import).
+Endpoints: `GET /api/extension/me` (who's logged in) and `POST /api/extension/<canvas|blackboard|brightspace>/import` (the import).
 Both use the Quadernio login and accept only the extension (403 otherwise; 401 when logged out).

@@ -111,11 +111,12 @@ describe("LMS connections", () => {
     ])
   })
 
-  it("shows Canvas and Blackboard, each with the student's connection if any", async () => {
+  it("shows Canvas, Blackboard and Brightspace, each with the student's connection if any", async () => {
     const user = await connectedStudent()
     expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
       { provider: "canvas", name: "Canvas", connection: expect.objectContaining({ provider: "canvas" }) },
       { provider: "blackboard", name: "Blackboard", connection: null },
+      { provider: "brightspace", name: "Brightspace", connection: null },
     ])
   })
 

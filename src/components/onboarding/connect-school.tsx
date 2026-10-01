@@ -5,7 +5,7 @@ import { CheckIcon, ExternalLinkIcon, FileUpIcon, Loader2Icon, PuzzleIcon, Refre
 import { lmsSyncStatusAction } from "@/app/actions/integrations"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { lmsProviderNames, type LmsProviderId } from "@/lib/types"
+import { lmsProviderIds, lmsProviderNames, type LmsProviderId } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 // Onboarding's last step: bring in courses. Canvas and Blackboard connect through the
@@ -15,7 +15,10 @@ import { cn } from "@/lib/utils"
 // The published extension's Chrome Web Store page (NEXT_PUBLIC_, it's shown to students).
 const STORE_URL = process.env.NEXT_PUBLIC_EXTENSION_STORE_URL
 
-// ---- Choosing Canvas or Blackboard (or skipping) ------------------------------------
+// ---- Choosing Canvas, Blackboard or Brightspace (or skipping) ------------------------------------
+
+// A small distinct mark per system (two of them start with B).
+const MONOGRAMS: Record<LmsProviderId, string> = { canvas: "C", blackboard: "Bb", brightspace: "D2L" }
 
 export function ChooseSchool({
   onConnect,
@@ -31,13 +34,14 @@ export function ChooseSchool({
   const [skipping, setSkipping] = useState(false)
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(["canvas", "blackboard"] as const).map((provider) => (
+      <div className="grid gap-3 sm:grid-cols-3">
+        {lmsProviderIds.map((provider) => (
           <div key={provider} className="flex flex-col rounded-xl border p-4">
-            <span aria-hidden className="flex size-10 items-center justify-center rounded-lg bg-muted text-base font-semibold text-muted-foreground">
-              {lmsProviderNames[provider][0]}
+            <span aria-hidden className="flex size-10 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground">
+              {MONOGRAMS[provider]}
             </span>
             <h2 className="mt-3 font-medium">{lmsProviderNames[provider]}</h2>
+            {provider === "brightspace" && <p className="text-xs text-muted-foreground">by D2L; your school may call it something else, like eCampus</p>}
             <p className="mt-1 flex-1 text-sm text-muted-foreground">
               Your {lmsProviderNames[provider]} courses and assignments, and what you&apos;ve already turned in.
             </p>
@@ -59,7 +63,7 @@ export function ChooseSchool({
           <DialogHeader>
             <DialogTitle>Add your classes with a syllabus</DialogTitle>
             <DialogDescription>
-              Not connecting Canvas or Blackboard? Upload a syllabus and Quadernio adds the course and its deadlines. You
+              Not connecting Canvas, Blackboard or Brightspace? Upload a syllabus and Quadernio adds the course and its deadlines. You
               review everything first.
             </DialogDescription>
           </DialogHeader>

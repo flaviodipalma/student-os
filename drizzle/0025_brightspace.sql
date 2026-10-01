@@ -1,0 +1,1 @@
+ALTER TYPE "public"."lms_provider" ADD VALUE 'brightspace';

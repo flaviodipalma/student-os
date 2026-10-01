@@ -15,7 +15,7 @@ describe("legal pages", () => {
       expect(screen.getByRole("heading", { level: 2, name: section })).toBeTruthy()
     }
     expect(screen.getByText(/Limited Use requirements/)).toBeTruthy()
-    expect(screen.getByText(/Your Canvas or Blackboard login never leaves your browser/)).toBeTruthy()
+    expect(screen.getByText(/Your school login never leaves your browser/)).toBeTruthy()
     expect(screen.getAllByRole("link", { name: LEGAL_CONTACT_EMAIL })[0].getAttribute("href")).toBe(`mailto:${LEGAL_CONTACT_EMAIL}`)
     expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe("/terms")
   })

@@ -45,7 +45,7 @@ export const taskType = pgEnum("task_type", [
 export const eventType = pgEnum("event_type", ["class", "sports", "work", "personal", "study"])
 export const studySessionStatus = pgEnum("study_session_status", ["scheduled", "completed", "skipped"])
 // Learning management systems Quadernio can import from (see src/server/integrations/lms).
-export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard"])
+export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard", "brightspace"])
 // What a day on the school's academic calendar is (see src/lib/academic-calendar.ts).
 export const academicEventKind = pgEnum("academic_event_kind", ["term", "no_classes", "exams", "deadline", "other"])
 export const schoolCalendarStatus = pgEnum("school_calendar_status", ["found", "not_found"])

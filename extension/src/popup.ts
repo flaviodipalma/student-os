@@ -16,7 +16,7 @@ import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, QuadernioError } fro
 
 // The popup. It syncs to the Quadernio account logged in in this browser (Chrome
 // sends that login with the extension's requests), so there's nothing to set up:
-// it checks who's logged in, then syncs Canvas or Blackboard from the tab the
+// it checks who's logged in, then syncs Canvas, Blackboard or Brightspace from the tab the
 // student is on. Sync reads the course list, lets the student choose (the first
 // time, and when a new semester shows up), then imports those courses. After a
 // site's first sync, a switch turns on automatic sync (background.ts) for it.

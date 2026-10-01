@@ -59,7 +59,7 @@ describe("Calendars on the Integrations page", () => {
 
     await user.click(within(g).getByRole("button", { name: "Disconnect" }))
     const dialog = await screen.findByRole("alertdialog")
-    expect(within(dialog).getByText(/Canvas and Blackboard, tasks, courses and study sessions stay/)).toBeTruthy()
+    expect(within(dialog).getByText(/Canvas, Blackboard and Brightspace, tasks, courses and study sessions stay/)).toBeTruthy()
     await user.click(within(dialog).getByRole("button", { name: "Disconnect" }))
     expect(mocks.disconnect).toHaveBeenCalledWith("google")
   })

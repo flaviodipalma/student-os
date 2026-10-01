@@ -1,8 +1,9 @@
 // The Chrome side of syncing, shared by the popup (Sync now) and the background
-// worker (automatic sync): what's stored, reading Canvas or Blackboard inside a tab
+// worker (automatic sync): what's stored, reading Canvas, Blackboard or Brightspace inside a tab
 // (and telling which one it is), sending the import, and the badge on the icon.
-import { badgeFor, migrateAutoSync, newSite, type AutoSyncState, type LmsId, type SiteSync } from "./auto-sync"
+import { badgeFor, detectionOrder, migrateAutoSync, newSite, type AutoSyncState, type LmsId, type SiteSync } from "./auto-sync"
 import { readBlackboard, type BlackboardRead, type BlackboardStep } from "./blackboard"
+import { readBrightspace, type BrightspaceRead, type BrightspaceStep } from "./brightspace"
 import { readCanvas, type CanvasRead, type CanvasStep } from "./canvas"
 import type { CourseChoice } from "./courses"
 import { DEFAULT_ADDRESS, sendImport, QuadernioError, summaryLines } from "./quadernio"
@@ -65,9 +66,10 @@ export async function showBadge(state: AutoSyncState): Promise<void> {
   await chrome.action.setTitle({ title })
 }
 
-// ---- Reading Canvas or Blackboard in a tab ------------------------------------------
+// ---- Reading Canvas, Blackboard or Brightspace in a tab ------------------------------------------
 
-export const NOT_AN_LMS = "This tab isn't Canvas or Blackboard. Open your school's Canvas or Blackboard, then click Sync now."
+export const NOT_AN_LMS =
+  "This tab isn't Canvas, Blackboard or Brightspace. Open your school's Canvas, Blackboard or Brightspace, then click Sync now."
 const loggedOutOf = (name: string) => `You're logged out of ${name}. Log in, then click Sync now.`
 const noAnswer = (name: string) => `${name} didn't answer. Reload the page and try again.`
 
@@ -75,7 +77,7 @@ type CoursesRead = { baseUrl: string; courses: Record<string, unknown>[]; choice
 type AssignmentsRead = { data: Record<string, unknown>; coursesUnreadable: number }
 type Attempt<T> = { ok: true; value: T } | { ok: false; reason: "wrong-site" | "logged-out" | "error" }
 
-// What differs between Canvas and Blackboard. Everything else (choosing courses,
+// What differs between Canvas, Blackboard and Brightspace. Everything else (choosing courses,
 // automatic sync, the import) is shared.
 export type Lms = {
   id: LmsId
@@ -141,10 +143,25 @@ export const LMS: Record<LmsId, Lms> = {
       }),
     courseId: (course) => String((course.course as { id?: unknown } | undefined)?.id ?? course.courseId),
   },
+  brightspace: {
+    id: "brightspace",
+    name: "Brightspace",
+    courses: async (tabId) =>
+      attempt(await inTab<BrightspaceStep, BrightspaceRead>(tabId, readBrightspace, { kind: "courses" }), "not-brightspace", (read) => {
+        const { courses, choices } = read as Extract<BrightspaceRead, { kind: "courses" }>
+        return { baseUrl: read.baseUrl, courses, choices }
+      }),
+    assignments: async (tabId, courseIds) =>
+      attempt(await inTab<BrightspaceStep, BrightspaceRead>(tabId, readBrightspace, { kind: "assignments", courseIds }), "not-brightspace", (read) => {
+        const { folders, quizzes, submissions, coursesUnreadable } = read as Extract<BrightspaceRead, { kind: "assignments" }>
+        return { data: { folders, quizzes, submissions }, coursesUnreadable }
+      }),
+    courseId: (course) => String((course.OrgUnit as { Id?: unknown } | undefined)?.Id ?? ""),
+  },
 }
 
-// Which system the tab is, with its course list. A site synced before is known;
-// otherwise the address hints which to try first, then the other.
+
+// Which system the tab is, with its course list (see detectionOrder).
 export async function readCourses(tabId: number, url: string | undefined): Promise<{ lms: Lms; list: CoursesRead }> {
   let origin: string
   try {
@@ -155,8 +172,7 @@ export async function readCourses(tabId: number, url: string | undefined): Promi
   if (!/^https?:/.test(origin)) throw new QuadernioError(NOT_AN_LMS)
   const state = await loadAutoSync()
   const known = Object.hasOwn(state.sites, origin) ? state.sites[origin].lms : null
-  const order: LmsId[] = known ? [known, known === "canvas" ? "blackboard" : "canvas"] : /blackboard/i.test(origin) ? ["blackboard", "canvas"] : ["canvas", "blackboard"]
-  for (const id of order) {
+  for (const id of detectionOrder(origin, known)) {
     const lms = LMS[id]
     const read = await lms.courses(tabId)
     if (read.ok) return { lms, list: read.value }

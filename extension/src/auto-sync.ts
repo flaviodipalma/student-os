@@ -1,10 +1,10 @@
-// When the extension syncs on its own (the student opened Canvas or Blackboard),
+// When the extension syncs on its own (the student opened Canvas, Blackboard or Brightspace),
 // and which courses it syncs. Kept per school site (a student can have Canvas and
 // Blackboard). No Chrome APIs here (tested in Node).
 import type { CourseChoice, CourseOption } from "./courses"
 
-export type LmsId = "canvas" | "blackboard"
-export const LMS_NAMES: Record<LmsId, string> = { canvas: "Canvas", blackboard: "Blackboard" }
+export type LmsId = "canvas" | "blackboard" | "brightspace"
+export const LMS_NAMES: Record<LmsId, string> = { canvas: "Canvas", blackboard: "Blackboard", brightspace: "Brightspace" }
 
 // At most one automatic sync per half hour per site (Canvas and Blackboard load a
 // new page on every click; Quadernio allows 20 syncs an hour). Sync now in the
@@ -120,4 +120,15 @@ export function timeAgo(then: number, now: number): string {
   if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`
   const days = Math.floor(hours / 24)
   return `${days} ${days === 1 ? "day" : "days"} ago`
+}
+
+// Which systems to try for a site, most likely first: the one it synced as before,
+// then what its address hints at (school.brightspace.com, d2l.school.edu, …).
+export function detectionOrder(origin: string, known: LmsId | null): LmsId[] {
+  const hinted: LmsId[] = /brightspace|d2l/i.test(origin)
+    ? ["brightspace", "canvas", "blackboard"]
+    : /blackboard/i.test(origin)
+      ? ["blackboard", "canvas", "brightspace"]
+      : ["canvas", "blackboard", "brightspace"]
+  return known ? [known, ...hinted.filter((id) => id !== known)] : hinted
 }

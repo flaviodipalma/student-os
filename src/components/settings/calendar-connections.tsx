@@ -236,7 +236,7 @@ function ConnectedActions({ provider, name }: { provider: CalendarProviderId; na
             <AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
             <AlertDialogDescription>
               Quadernio will forget its access to {name} and remove the {name} events it copied. Your events in {name}{" "}
-              aren&apos;t changed, and nothing else in Quadernio is (your own events, Canvas and Blackboard, tasks, courses
+              aren&apos;t changed, and nothing else in Quadernio is (your own events, Canvas, Blackboard and Brightspace, tasks, courses
               and study sessions stay).
             </AlertDialogDescription>
           </AlertDialogHeader>

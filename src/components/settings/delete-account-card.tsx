@@ -72,8 +72,8 @@ export function DeleteAccountCard() {
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
               <AlertDialogDescription>
                 This deletes your courses, tasks, plan, events, reminders and settings right away. It can&apos;t be undone.
-                Connected Google Calendar or Outlook access is removed; nothing changes in those calendars, in Canvas or
-                in Blackboard.
+                Connected Google Calendar or Outlook access is removed; nothing changes in those calendars, or in Canvas,
+                Blackboard or Brightspace.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-2">

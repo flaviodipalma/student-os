@@ -5,9 +5,9 @@
 export type CourseColor = "sky" | "emerald" | "violet" | "orange" | "rose"
 
 // Learning management systems Quadernio can import from.
-export const lmsProviderIds = ["canvas", "blackboard"] as const
+export const lmsProviderIds = ["canvas", "blackboard", "brightspace"] as const
 export type LmsProviderId = (typeof lmsProviderIds)[number]
-export const lmsProviderNames: Record<LmsProviderId, string> = { canvas: "Canvas", blackboard: "Blackboard" }
+export const lmsProviderNames: Record<LmsProviderId, string> = { canvas: "Canvas", blackboard: "Blackboard", brightspace: "Brightspace" }
 
 // Set on courses and tasks imported from an LMS. The record is otherwise a
 // normal course or task: the Dashboard, Tasks and Planner treat it the same.
@@ -97,7 +97,8 @@ export const calendarProviderIds = ["google", "outlook"] as const
 export type CalendarProviderId = (typeof calendarProviderIds)[number]
 export const calendarProviderNames: Record<CalendarProviderId, string> = { google: "Google Calendar", outlook: "Outlook" }
 
-export const externalCalendarSources = [...lmsProviderIds, ...calendarProviderIds] as const
+// Canvas and Blackboard here are events from their old calendar-feed links (Brightspace never had one).
+export const externalCalendarSources = ["canvas", "blackboard", ...calendarProviderIds] as const
 export type ExternalCalendarSource = (typeof externalCalendarSources)[number]
 export type EventSource = "student_os" | ExternalCalendarSource
 

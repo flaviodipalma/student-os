@@ -65,11 +65,11 @@ export type SyncSummary = {
   errors: string[]
 }
 
-// Sends what the extension read from Canvas or Blackboard to Quadernio, which
+// Sends what the extension read from Canvas, Blackboard or Brightspace to Quadernio, which
 // imports it (/api/extension/<lms>/import).
 export async function sendImport(
   address: string,
-  lms: "canvas" | "blackboard",
+  lms: "canvas" | "blackboard" | "brightspace",
   data: { baseUrl: string; courses: unknown[] } & Record<string, unknown>,
   timeZone: string,
   fetchFn: typeof fetch

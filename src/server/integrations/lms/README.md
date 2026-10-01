@@ -1,11 +1,11 @@
-# LMS integrations (Canvas, Blackboard)
+# LMS integrations (Canvas, Blackboard, Brightspace)
 
-**The Quadernio browser extension is the only way to connect Canvas and
-Blackboard Learn** (`extension/`, see `extension/README.md`). It reads the LMS's own
+**The Quadernio browser extension is the only way to connect Canvas,
+Blackboard Learn and D2L Brightspace** (`extension/`, see `extension/README.md`). It reads the LMS's own
 API inside the student's tab, with their own LMS login, and sends the data to
 Quadernio, logged in as that student in the same browser. No school approval, no
 app keys, and no LMS secret stored anywhere: the server never contacts Canvas or
-Blackboard. Read-only. Canvas and Blackboard can be connected at the same time.
+Blackboard or Brightspace. Read-only. They can be connected at the same time.
 
 The earlier calendar-feed links and school-approved sign-in (OAuth) were removed
 (migration `0017_extension_only_lms` deleted any such connections and hid their
@@ -16,6 +16,7 @@ calendar events; imported courses and tasks stayed). They're in git history.
 ```
 extension (Canvas tab)      readCanvas     ──> POST /api/extension/canvas/import      ──┐
 extension (Blackboard tab)  readBlackboard ──> POST /api/extension/blackboard/import  ──┤
+extension (Brightspace tab) readBrightspace ─> POST /api/extension/brightspace/import ──┤
                                                                                          ├─> runSync (sync.ts) ──> normal Quadernio courses & tasks
             validated + mapped: canvas/mapping.ts, blackboard/mapping.ts ──> normalized  │    planCourses / planTasks (src/lib/lms/sync-plan.ts)
             data (src/lib/lms/types.ts)                                                  ┘
@@ -25,12 +26,12 @@ extension (Blackboard tab)  readBlackboard ──> POST /api/extension/blackboar
 | --- | --- |
 | `src/lib/lms/types.ts` | Normalized `LmsCourse`, `LmsAssignment`, `LmsSyncResult` (shared, no secrets) |
 | `src/lib/lms/sync-plan.ts` | Pure matching, mapping and the three-way conflict rule |
-| `canvas/mapping.ts`, `blackboard/mapping.ts` | Each LMS's API objects -> normalized data, every field checked |
+| `canvas/mapping.ts`, `blackboard/mapping.ts`, `brightspace/mapping.ts` | Each LMS's API objects -> normalized data, every field checked |
 | `base-url.ts`, `normalize.ts` | Shared: the LMS address check, same-origin links, HTML -> text, UTC -> local due dates |
 | `connections.ts` | A student's connections: record (from an import), status, disconnect. No secrets |
 | `sync.ts` | The sync service: read -> plan -> save in one transaction -> summary |
 | `provider.ts` | `LmsError`: safe, student-facing messages |
-| `src/server/integrations/extension/` | The extension's endpoints: login + extension check (`http.ts`), the shared import route (`import-route.ts`), the LMS address rule (`base-url.ts`), `canvas-import.ts`, `blackboard-import.ts` |
+| `src/server/integrations/extension/` | The extension's endpoints: login + extension check (`http.ts`), the shared import route (`import-route.ts`), the LMS address rule (`base-url.ts`), `canvas-import.ts`, `blackboard-import.ts`, `brightspace-import.ts` |
 
 `credential-vault.ts` and `oauth-state.ts` live here for historical reasons; only the
 personal calendars (Google Calendar, Outlook: `src/server/integrations/calendar`)
@@ -183,6 +184,33 @@ recent attempt-graded columns (at most 25 per course), their `attempts`.
 (`src/server/integrations/extension/blackboard-import.ts`) uses the Blackboard
 mapping (`blackboard/mapping.ts`): courses taken as a student, real work columns, a
 real grade or a turned-in attempt means done, "unknown" otherwise.
+
+## D2L Brightspace
+
+Imported records use `external_source = 'brightspace'` (migration `0025_brightspace`).
+Courses use the org unit id (`6606`); tasks use `dropbox:<folder id>` and
+`quiz:<quiz id>`, since a folder and a quiz can share a number. Schools often give
+Brightspace their own name and address ("eCampus", `d2l.school.edu`), so the extension
+recognizes it by its public version list, not by the address.
+
+### How it connects
+
+The same as Canvas's, reading the Valence API inside the student's Brightspace tab
+with their own session: `versions/` (which API versions), `lp/{v}/users/whoami`,
+`lp/{v}/enrollments/myenrollments/?orgUnitTypeId=3` and `lp/{v}/courses/{id}` (each
+course's semester; optional), then for the chosen courses
+`le/{v}/{ou}/dropbox/folders/`, `le/{v}/{ou}/quizzes/` (optional: not every school lists
+them to students) and, for recent folders (at most 25 per course),
+`…/submissions/mysubmissions/`. Where a school accepts only tokens, the extension uses
+the page's own short-lived token (`/d2l/lp/auth/oauth2/token`, with the page's
+anti-forgery token), as Brightspace's own pages do.
+`POST /api/extension/brightspace/import`
+(`src/server/integrations/extension/brightspace-import.ts`) uses
+`brightspace/mapping.ts`: course offerings the student takes (standard LIS roles
+decide, since role names are per school), visible folders, active quizzes; a
+submission or completion date means submitted, published feedback means graded,
+"unknown" otherwise. Quiz attempts aren't readable for students, so quizzes stay
+"unknown". Instructors aren't read (the class list is usually closed to students).
 
 ## Known limitations
 

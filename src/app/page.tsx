@@ -17,7 +17,7 @@ import { LEGAL_CONTACT_EMAIL } from "@/lib/legal"
 export const metadata: Metadata = {
   title: { absolute: "Quadernio · Your semester, planned" },
   description:
-    "A free planner for college students: your Canvas and Blackboard deadlines, classes and calendar in one place, with a plan for what to study next.",
+    "A free planner for college students: your Canvas, Blackboard and Brightspace deadlines, classes and calendar in one place, with a plan for what to study next.",
 }
 
 // The public homepage. Signed-in students never see it: src/proxy.ts sends them to
@@ -50,8 +50,8 @@ export default function HomePage() {
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-balance md:text-5xl">Your semester, planned for you.</h1>
             <p className="mt-5 max-w-lg text-lg leading-8 text-muted-foreground">
-              Quadernio brings your Canvas and Blackboard deadlines, your classes and your calendar into one place, and
-              tells you what to study next.
+              Quadernio brings your Canvas, Blackboard and Brightspace deadlines, your classes and your calendar into
+              one place, and tells you what to study next.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className={buttonVariants({ size: "lg" })}>
@@ -72,9 +72,9 @@ export default function HomePage() {
               Everything for your classes, in one plan
             </h2>
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Feature icon={RefreshCwIcon} title="Canvas and Blackboard, synced">
-                The Quadernio browser extension imports your courses, assignments and due dates with your own school
-                login. Submitted work is marked done.
+              <Feature icon={RefreshCwIcon} title="Your school's LMS, synced">
+                For Canvas, Blackboard and Brightspace: the Quadernio browser extension imports your courses,
+                assignments and due dates with your own school login. Submitted work is marked done.
               </Feature>
               <Feature icon={FileTextIcon} title="Syllabus import">
                 Upload a syllabus PDF and Quadernio finds the exams, papers and readings, so nothing is only in a
@@ -117,7 +117,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <strong className="font-semibold text-foreground">Your school login stays in your browser.</strong>{" "}
-                  The extension reads Canvas or Blackboard in your own tab and sends only your courses and deadlines to
+                  The extension reads Canvas, Blackboard or Brightspace in your own tab and sends only your courses and deadlines to
                   your account.
                 </li>
                 <li>
@@ -164,7 +164,7 @@ export default function HomePage() {
           </nav>
         </div>
         <p className="mx-auto max-w-5xl px-4 pb-8 text-xs text-subtle-foreground">
-          Quadernio isn&apos;t affiliated with or endorsed by Instructure (Canvas), Anthology (Blackboard), Google or
+          Quadernio isn&apos;t affiliated with or endorsed by Instructure (Canvas), Anthology (Blackboard), D2L (Brightspace), Google or
           Microsoft.
         </p>
       </footer>
