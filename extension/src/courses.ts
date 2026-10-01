@@ -1,4 +1,4 @@
-import { courseNameWithoutCode, shortCourseCode } from "../../src/lib/course-code"
+import { courseNameWithoutCode, friendlyTermName, shortCourseCode } from "../../src/lib/course-code"
 
 // Choosing which Canvas courses to import. Canvas's "active" courses often include
 // old semesters (many schools never close them), so the student picks; courses in
@@ -37,7 +37,9 @@ export function courseOptions(courses: Record<string, unknown>[]): CourseOption[
     const rawCode = text(course.course_code)
     const code = rawCode ? shortCourseCode(rawCode) : null
     const term = typeof course.term === "object" && course.term !== null ? (course.term as Record<string, unknown>) : null
-    const termName = text(term?.name)
+    // "26SP" -> "Spring 2026", as students say it.
+    const rawTermName = text(term?.name)
+    const termName = rawTermName ? friendlyTermName(rawTermName) : null
     return [
       {
         id,

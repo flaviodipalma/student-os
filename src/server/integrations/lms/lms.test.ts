@@ -116,7 +116,7 @@ describe("LMS connections", () => {
     expect(await getLmsIntegrationStatus(t.db, user)).toEqual([
       { provider: "canvas", name: "Canvas", connection: expect.objectContaining({ provider: "canvas" }) },
       { provider: "blackboard", name: "Blackboard", connection: null },
-      { provider: "brightspace", name: "Brightspace", connection: null },
+      { provider: "brightspace", name: "Brightspace D2L", connection: null },
     ])
   })
 

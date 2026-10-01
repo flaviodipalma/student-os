@@ -126,7 +126,13 @@ describe("POST /api/extension/canvas/import", () => {
     vi.stubEnv("QUADERNIO_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba, abcdefghijklmnopabcdefghijklmnop")
     expect((await send(payload(), alex.userId)).status).toBe(200)
     vi.stubEnv("QUADERNIO_EXTENSION_IDS", "ponmlkjihgfedcbaponmlkjihgfedcba")
-    expect((await send(payload(), alex.userId)).status).toBe(403)
+    // Another extension id (e.g. a copy loaded by hand) is told to use the store version.
+    expect(await send(payload(), alex.userId)).toMatchObject({ status: 403, body: { error: expect.stringMatching(/isn't the one from the Chrome Web Store/) } })
+    // A website still gets the plain refusal.
+    expect(await send(payload(), alex.userId, { Origin: "https://evil.example.com", "X-Quadernio-Extension": "1" })).toMatchObject({
+      status: 403,
+      body: { error: "Only the Quadernio extension can do this." },
+    })
   })
 
   it("the login decides the student: Bob's browser only ever writes to Bob", async () => {

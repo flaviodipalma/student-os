@@ -42,14 +42,93 @@ export function tidyCourseCode(code: string): string {
   return match ? `${match[1]}${match[2]}${match[3]}`.toUpperCase() : trimmed
 }
 
-// Canvas often ends a course's name with its full code in brackets:
-// "Intro to Forensic Psyc (PS28301_26/FA)" -> "Intro to Forensic Psyc". Only a
-// bracket holding a code (no spaces, with a number) is dropped: "Calculus (Honors)"
-// keeps its bracket.
-const CODE_IN_BRACKETS = /\s*[([]\s*[A-Za-z0-9_/.:-]*\d[A-Za-z0-9_/.:-]*\s*[)\]]\s*$/
+// LMS course names often repeat the code (with its section and term) around the
+// real title. Only the title is kept:
+//   "Intro to Forensic Psyc (PS28301_26/FA)"   -> "Intro to Forensic Psyc"   (Canvas)
+//   "CS 305 01 - Advanced Computing"           -> "Advanced Computing"       (Brightspace)
+//   "CS/SE 450 50 - Cyber Security"            -> "Cyber Security"
+//   "CSC215-01-FA26: Data Structures"          -> "Data Structures"          (Blackboard)
+//   "2026FA-MAT141-03 Calculus I"              -> "Calculus I"
+//   "Data Structures - CSC215-01 - Fall 2026"  -> "Data Structures"
+//   "Calculus I FA26", "Biology (Fall 2026)"   -> "Calculus I", "Biology"
+//   "Object-Oriented Design - 2026 Spring"     -> "Object-Oriented Design"
+//   "Intro Discrete Math (CSC 205)"            -> "Intro Discrete Math"
+// A bracket is dropped only when it holds a code (no spaces, with a number):
+// "Calculus (Honors)" keeps it. A leading part is dropped only when it's all
+// capitals and numbers, contains a course code (subject + number), and a real title
+// follows: "US History", "COVID-19 Biology" and "CS 305" alone stay as they are.
+const CODE_IN_BRACKETS = /\s*[([]\s*(?:[A-Za-z0-9_/.:-]*\d[A-Za-z0-9_/.:-]*|[A-Z]{2,5}[ -]?\d{3,4}[A-Z]?(?:[ -][A-Z0-9]{1,4})?)\s*[)\]]\s*$/
+const HAS_COURSE_CODE = /[A-Za-z]{2,5}[ _-]?\d{3,4}/
+const SEPARATOR = /^[-–—:|·]+$/
+
+function withoutLeadingCode(name: string): string {
+  const words = name.split(/\s+/)
+  let cut = 0
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    if (SEPARATOR.test(word)) {
+      cut = i + 1
+      break
+    }
+    // A title word (has a small letter), or something that isn't code-like.
+    if (/[a-z]/.test(word) || !/^[A-Z0-9/&_.,:-]+$/.test(word)) break
+    cut = i + 1
+    if (/[:]$/.test(word)) break
+  }
+  const prefix = words.slice(0, cut).filter((word) => !SEPARATOR.test(word)).join(" ")
+  const title = words.slice(cut).join(" ").trim()
+  // Only when the prefix is a code and what's left reads like a title.
+  if (!prefix || !HAS_COURSE_CODE.test(prefix) || !/[A-Za-z]{2}/.test(title)) return name
+  return title
+}
+
+// A semester at the end, in any of the usual spellings: "FA26", "26SP", "2026SP",
+// "Fall 2026", "2026 Spring", "(Spring 2027)", "- Fall 2026".
+const SEASON = "(?:fall|spring|summer|winter|fa|sp|su|wi)"
+const TERM_AT_END = new RegExp(
+  `\\s*(?:[-–—:|·]\\s*)?[([]?\\s*(?<![A-Za-z0-9])(?:${SEASON}\\s*(?:20)?\\d{2}|(?:20)?\\d{2}\\s*${SEASON})\\s*[)\\]]?\\s*$`,
+  "i"
+)
+
+// A code after a separator at the end: "Data Structures - CSC215-01".
+function withoutTrailingCode(name: string): string {
+  const words = name.split(/\s+/)
+  let start = words.length
+  while (start > 0 && !/[a-z]/.test(words[start - 1]) && /^[A-Z0-9/&_.,-]+$/.test(words[start - 1]) && !SEPARATOR.test(words[start - 1])) start--
+  if (start === words.length || start === 0 || !SEPARATOR.test(words[start - 1])) return name
+  const code = words.slice(start).join(" ")
+  const title = words.slice(0, start - 1).join(" ").trim()
+  return HAS_COURSE_CODE.test(code) && /[A-Za-z]{2}/.test(title) ? title : name
+}
 
 export function courseNameWithoutCode(name: string): string {
   const trimmed = name.trim()
-  const cleaned = trimmed.replace(CODE_IN_BRACKETS, "").trim()
+  let cleaned = trimmed.replace(CODE_IN_BRACKETS, "").trim()
+  cleaned = withoutLeadingCode(cleaned).trim()
+  const withoutTerm = cleaned.replace(TERM_AT_END, "").trim()
+  if (/[A-Za-z]{2}/.test(withoutTerm)) cleaned = withoutTerm
+  cleaned = withoutTrailingCode(cleaned.replace(CODE_IN_BRACKETS, "").trim()).trim()
   return cleaned || trimmed
+}
+
+// An LMS term's name as students say it: "26SP", "SP26", "2026SP", "2026 Spring",
+// "FA2026" -> "Spring 2026", "Fall 2026". Anything else ("Fall 2026", "Default Term",
+// "Academic Year 2026-27") stays as it is.
+const SEASONS: Record<string, string> = {
+  fa: "Fall", fall: "Fall",
+  sp: "Spring", spr: "Spring", spring: "Spring",
+  su: "Summer", sum: "Summer", summer: "Summer",
+  wi: "Winter", win: "Winter", winter: "Winter",
+}
+const SEASON_WORD = "(fa|fall|sp|spr|spring|su|sum|summer|wi|win|winter)"
+const YEAR_FIRST = new RegExp(`^((?:20)?\\d{2})[\\s_-]*${SEASON_WORD}$`, "i")
+const SEASON_FIRST = new RegExp(`^${SEASON_WORD}[\\s_-]*((?:20)?\\d{2})$`, "i")
+
+export function friendlyTermName(name: string): string {
+  const trimmed = name.trim()
+  const yearFirst = YEAR_FIRST.exec(trimmed)
+  const seasonFirst = SEASON_FIRST.exec(trimmed)
+  const [year, season] = yearFirst ? [yearFirst[1], yearFirst[2]] : seasonFirst ? [seasonFirst[2], seasonFirst[1]] : [null, null]
+  if (!year || !season) return trimmed
+  return `${SEASONS[season.toLowerCase()]} ${year.length === 2 ? `20${year}` : year}`
 }

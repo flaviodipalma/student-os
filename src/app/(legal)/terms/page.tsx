@@ -53,7 +53,7 @@ export default function TermsPage() {
 
       <LegalSection id="accuracy" title="Check your deadlines">
         <p>
-          Quadernio gets information from you, from your syllabus, from Canvas, Blackboard or Brightspace, from your calendars, from
+          Quadernio gets information from you, from your syllabus, from Canvas, Blackboard or Brightspace D2L, from your calendars, from
           your school&apos;s website and from AI. Any of these can be incomplete, out of date or wrong: a syllabus can
           be misread, a sync can be late, and an AI can make mistakes.
         </p>
@@ -81,7 +81,7 @@ export default function TermsPage() {
 
       <LegalSection id="others" title="Other services">
         <p>
-          Quadernio works with Canvas, Blackboard, Brightspace, Google Calendar and Outlook, but it isn&apos;t made,
+          Quadernio works with Canvas, Blackboard, Brightspace D2L, Google Calendar and Outlook, but it isn&apos;t made,
           endorsed or supported by Instructure, Anthology, D2L, Google, Microsoft or your school. Their own terms apply when you use
           their services. Connecting them is optional, and you can disconnect them at any time.
         </p>

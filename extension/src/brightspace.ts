@@ -166,14 +166,27 @@ export async function readBrightspace(
         .sort((a, b) => String(record(b.Access).StartDate ?? "").localeCompare(String(record(a.Access).StartDate ?? "")))
         .slice(0, MAX_COURSES)
 
-      // Each course's semester (optional: without it, courses are listed by their own dates).
+      // Each course's semester (optional: without it, courses are listed by their own
+      // dates). From the course offering; where students can't read that, or it names
+      // no semester, from the semester the course sits under (org unit type 5).
       const offerings = new Map<string, Record<string, unknown>>()
       const readOffering = async (id: string) => {
+        let offering: Record<string, unknown> = {}
         try {
-          offerings.set(id, record(await get(`${lp}/courses/${id}`)))
+          offering = record(await get(`${lp}/courses/${id}`))
         } catch {
-          // Not readable here: the course just has no semester name.
+          // Not readable here: try the semester above it.
         }
+        if (typeof record(offering.Semester).Name !== "string") {
+          try {
+            const parents = await get(`${lp}/orgstructure/${id}/parents/?ouTypeId=5`)
+            const semester = Array.isArray(parents) ? record(parents.find((parent) => typeof record(parent).Name === "string")) : {}
+            if (typeof semester.Name === "string") offering = { ...offering, Semester: { Identifier: semester.Identifier, Name: semester.Name } }
+          } catch {
+            // Not readable either: the course just has no semester name.
+          }
+        }
+        if (Object.keys(offering).length > 0) offerings.set(id, offering)
       }
       const ids = eligible.map((item) => idOf(record(item.OrgUnit).Id))
       for (let i = 0; i < ids.length; i += PARALLEL) await Promise.all(ids.slice(i, i + PARALLEL).map(readOffering))

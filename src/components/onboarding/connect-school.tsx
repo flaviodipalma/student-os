@@ -41,7 +41,7 @@ export function ChooseSchool({
               {MONOGRAMS[provider]}
             </span>
             <h2 className="mt-3 font-medium">{lmsProviderNames[provider]}</h2>
-            {provider === "brightspace" && <p className="text-xs text-muted-foreground">by D2L; your school may call it something else, like eCampus</p>}
+            {provider === "brightspace" && <p className="text-xs text-muted-foreground">Your school may call it something else, like eCampus.</p>}
             <p className="mt-1 flex-1 text-sm text-muted-foreground">
               Your {lmsProviderNames[provider]} courses and assignments, and what you&apos;ve already turned in.
             </p>
@@ -63,7 +63,7 @@ export function ChooseSchool({
           <DialogHeader>
             <DialogTitle>Add your classes with a syllabus</DialogTitle>
             <DialogDescription>
-              Not connecting Canvas, Blackboard or Brightspace? Upload a syllabus and Quadernio adds the course and its deadlines. You
+              Not connecting Canvas, Blackboard or Brightspace D2L? Upload a syllabus and Quadernio adds the course and its deadlines. You
               review everything first.
             </DialogDescription>
           </DialogHeader>

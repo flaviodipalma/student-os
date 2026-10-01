@@ -1,5 +1,6 @@
 import { LMS_NAMES, timeAgo, type AutoSyncState } from "./auto-sync"
 import {
+  detectTab,
   importChosen,
   loadAddress,
   loadAutoSync,
@@ -16,8 +17,8 @@ import { currentAccount, DEFAULT_ADDRESS, normalizeAddress, QuadernioError } fro
 
 // The popup. It syncs to the Quadernio account logged in in this browser (Chrome
 // sends that login with the extension's requests), so there's nothing to set up:
-// it checks who's logged in, then syncs Canvas, Blackboard or Brightspace from the tab the
-// student is on. Sync reads the course list, lets the student choose (the first
+// it checks who's logged in and whether the tab is Canvas, Blackboard or Brightspace D2L
+// (and logged in there), then syncs it. Sync reads the course list, lets the student choose (the first
 // time, and when a new semester shows up), then imports those courses. After a
 // site's first sync, a switch turns on automatic sync (background.ts) for it.
 
@@ -39,6 +40,8 @@ const autoCard = $<HTMLDivElement>("auto-sync")
 const newCourses = $<HTMLDivElement>("new-courses")
 
 let address = DEFAULT_ADDRESS
+// Sync works only on a school system's page where the student is logged in (or might be).
+let tabAllowsSync = false
 
 function setText(element: HTMLElement, message: string | null) {
   element.textContent = message ?? ""
@@ -75,11 +78,39 @@ async function checkLogin() {
   try {
     const account = await currentAccount(address, fetch)
     show({ kind: "signed-in", firstName: account.firstName })
+    void checkTab()
     // Logged in again: automatic sync can carry on.
     showAutoSync(await setLoggedOut(false))
   } catch (error) {
     if (error instanceof QuadernioError && error.loggedOut) show({ kind: "logged-out" })
     else show({ kind: "error", message: error instanceof QuadernioError ? error.message : "Something went wrong. Please try again." })
+  }
+}
+
+// ---- This tab: a school system or not ------------------------------------------
+
+function showTab(lead: string | null, text: string, allowsSync: boolean) {
+  setText($("tab-lms"), lead)
+  $("tab-text").textContent = text
+  tabAllowsSync = allowsSync
+  syncButton.disabled = !allowsSync
+  // Choosing courses also needs a school system's page.
+  $("choose-courses").hidden = !allowsSync
+  $("choose-sep").hidden = !allowsSync
+}
+
+// Tells right away whether Sync can work here, and why not.
+async function checkTab() {
+  showTab(null, "Checking this tab…", false)
+  const tab = await canvasTab()
+  const found = tab?.id ? await detectTab(tab.id, tab.url) : { lms: null }
+  if (found.lms === null) {
+    showTab(null, "Open your school's Canvas, Blackboard or Brightspace D2L in this tab to sync your courses and assignments.", false)
+  } else if (found.loggedIn === false) {
+    const name = LMS_NAMES[found.lms]
+    showTab(`You're on ${name},`, `but you're logged out. Log in to ${name}, then sync.`, false)
+  } else {
+    showTab(`You're on ${LMS_NAMES[found.lms]}!`, "Sync now to bring in your courses and assignments.", true)
   }
 }
 
@@ -298,7 +329,7 @@ async function runSync(choose: boolean) {
     setNotice(syncError, error instanceof QuadernioError ? error.message : "Something went wrong. Please try again.")
   } finally {
     setText(progress, null)
-    syncButton.disabled = false
+    syncButton.disabled = !tabAllowsSync
     syncButton.removeAttribute("aria-busy")
     $("sync-label").textContent = "Sync now"
   }

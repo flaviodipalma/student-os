@@ -114,6 +114,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .caption { font-size: 12px; color: var(--muted-foreground); }
 .hint { font-size: 12.5px; color: var(--muted-foreground); margin-bottom: -4px; }
+.hint strong { color: var(--foreground); font-weight: 600; }
 
 /* ---- Brand ---- */
 .brand { display: flex; align-items: center; gap: 10px; }
@@ -201,10 +202,11 @@ input:not([type]), input[type="text"] {
 .picker { gap: 10px; }
 .picker-head { display: grid; gap: 2px; }
 .picker-groups {
-  max-height: 250px; overflow-y: auto; border-radius: var(--radius);
+  max-height: 250px; overflow-y: auto; overflow-x: hidden; border-radius: var(--radius);
   background: var(--background); box-shadow: var(--field-shadow); padding: 2px 10px;
 }
-fieldset { border: 0; margin: 0; padding: 8px 0; }
+/* min-width: 0, or a fieldset grows to its widest line and long names run off the edge. */
+fieldset { border: 0; margin: 0; padding: 8px 0; min-width: 0; }
 fieldset + fieldset { border-top: 1px solid var(--border-subtle); }
 /* Floated, so the legend sits inside its fieldset instead of on the border line. */
 legend {
@@ -221,6 +223,7 @@ legend {
   clear: both; display: flex; align-items: flex-start; gap: 9px; padding: 5px 4px; margin: 0 -4px;
   border-radius: var(--radius-sm); font-size: 13px; font-weight: 400; cursor: pointer;
 }
+.course > span { min-width: 0; overflow-wrap: anywhere; }
 .course:hover { background: color-mix(in oklch, var(--muted), transparent 30%); }
 input[type="checkbox"] {
   appearance: none; flex-shrink: 0; width: 16px; height: 16px; margin: 1.5px 0 0; border-radius: 5px; cursor: pointer;

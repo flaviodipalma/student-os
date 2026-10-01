@@ -41,7 +41,14 @@ export function fromQuadernioExtension(request: Request): boolean {
 
 // The signed-in student, or the response to send instead.
 export async function extensionUser(request: Request): Promise<{ userId: string } | Response> {
-  if (!fromQuadernioExtension(request)) return extensionJson({ error: "Only the Quadernio extension can do this." }, 403)
+  if (!fromQuadernioExtension(request)) {
+    // A Chrome extension, but not the published one: most likely a copy loaded by hand.
+    const otherExtension = request.headers.get(EXTENSION_HEADER) === "1" && /^chrome-extension:\/\/[a-p]{32}$/.test(request.headers.get("origin") ?? "")
+    const error = otherExtension
+      ? "This copy of the extension isn't the one from the Chrome Web Store. Install Quadernio from the Chrome Web Store, then try again."
+      : "Only the Quadernio extension can do this."
+    return extensionJson({ error }, 403)
+  }
   const user = await getCurrentUser()
   if (!user) return extensionJson({ error: "Log in to Quadernio in this browser, then try again.", loggedOut: true }, 401)
   return { userId: user.id }

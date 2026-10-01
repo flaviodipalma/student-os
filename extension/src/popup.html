@@ -43,7 +43,7 @@
           <span class="live" title="Logged in"><span class="live-dot" aria-hidden="true"></span>Connected</span>
         </div>
 
-        <p class="hint">Open your Canvas, Blackboard or Brightspace in this tab, then sync your courses and assignments.</p>
+        <p id="tab-status" class="hint" role="status"><strong id="tab-lms" hidden></strong> <span id="tab-text">Checking this tab…</span></p>
         <button type="button" id="sync" class="primary block"><i data-icon="refresh-cw" class="sync-icon"></i><span id="sync-label">Sync now</span></button>
         <p id="progress" class="progress" role="status" hidden></p>
 
@@ -85,8 +85,8 @@
         </div>
 
         <nav class="links" aria-label="More">
-          <a href="#" id="choose-courses">Choose courses</a>
-          <span class="sep" aria-hidden="true">·</span>
+          <a href="#" id="choose-courses" hidden>Choose courses</a>
+          <span id="choose-sep" class="sep" aria-hidden="true" hidden>·</span>
           <a href="#" id="open-quadernio">Open Quadernio</a>
         </nav>
       </section>

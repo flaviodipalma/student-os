@@ -14,4 +14,4 @@ import { extensionImportRoute } from "@/server/integrations/extension/import-rou
 //     "submissions": { "<folder id>": [...the student's submission records] } }
 //
 // Checks, limits and answers: src/server/integrations/extension/import-route.ts.
-export const POST = extensionImportRoute("Brightspace", importBrightspaceFromExtension)
+export const POST = extensionImportRoute("Brightspace D2L", importBrightspaceFromExtension)

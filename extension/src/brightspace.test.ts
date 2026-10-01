@@ -91,6 +91,21 @@ describe("readBrightspace: courses", () => {
     ])
   })
 
+  it("where the course offering isn't readable, the semester comes from the org structure", async () => {
+    const fetchFn = fakeBrightspace({
+      ...base,
+      [`${LP}/enrollments/myenrollments/`]: {
+        body: { PagingInfo: { HasMoreItems: false }, Items: [{ ...enrollment(6606, "x", "2026-08-31T04:00:00.000Z"), OrgUnit: { Id: 6606, Name: "CS 305 01 - Advanced Computing", Code: "CS-305-01-F26", Type: { Id: 3 } } }] },
+      },
+      [`${LP}/courses/6606`]: { status: 403, body: {} },
+      [`${LP}/orgstructure/6606/parents/`]: { body: [{ Identifier: "60", Name: "Fall 2026", Type: { Id: 5, Code: "Semester" } }] },
+    })
+    const read = await readBrightspace(COURSES, ORIGIN, fetchFn, storage, NOW)
+    if (!read.ok || read.kind !== "courses") throw new Error("expected courses")
+    const groups = groupByTerm(courseOptions(read.choices), NOW)
+    expect(groups.map((group) => [group.name, group.courses.map((course) => course.label)])).toEqual([["Fall 2026", ["CS305 · Advanced Computing"]]])
+  })
+
   it("tells when the tab isn't Brightspace, or the student is logged out", async () => {
     expect(await readBrightspace(COURSES, "https://example.com", fakeBrightspace({}), storage, NOW)).toEqual({ ok: false, reason: "not-brightspace" })
     const loggedOut = fakeBrightspace({ ...base, [`${LP}/users/whoami`]: { status: 401, body: {} } })

@@ -56,20 +56,20 @@ export function IntegrationsCard({
           </>
         )}
         <h3 id="browser-extension" className={cn("text-sm font-semibold", calendars !== undefined && "pt-3")}>
-          Canvas, Blackboard and Brightspace
+          Canvas, Blackboard and Brightspace D2L
         </h3>
         <div className="-mt-1 space-y-2 text-sm text-muted-foreground">
           <p>
-            Connect with the Quadernio browser extension. It uses your own Canvas, Blackboard or Brightspace login (no school approval
+            Connect with the Quadernio browser extension. It uses your own Canvas, Blackboard or Brightspace D2L login (no school approval
             needed) and brings in the courses you choose, their assignments, and what you&apos;ve already turned in.
           </p>
           <ol className="list-inside list-decimal space-y-1">
             <li>Install the Quadernio extension in Chrome, and stay logged in to Quadernio there.</li>
             <li>
-              Open your Canvas, Blackboard or Brightspace, click <PuzzleIcon aria-label="the extension" className="inline size-4 align-text-bottom" />{" "}
+              Open your Canvas, Blackboard or Brightspace D2L, click <PuzzleIcon aria-label="the extension" className="inline size-4 align-text-bottom" />{" "}
               Quadernio, then <span className="font-medium text-foreground">Sync now</span>, and choose your courses.
             </li>
-            <li>Optional: turn on automatic sync in the extension, so opening Canvas, Blackboard or Brightspace keeps Quadernio up to date.</li>
+            <li>Optional: turn on automatic sync in the extension, so opening Canvas, Blackboard or Brightspace D2L keeps Quadernio up to date.</li>
           </ol>
         </div>
         {integrations === null ? (
@@ -84,7 +84,7 @@ export function IntegrationsCard({
           </ul>
         )}
         <p className="text-xs text-muted-foreground">
-          Quadernio only reads from Canvas, Blackboard and Brightspace, never asks for your password, and stores nothing that could
+          Quadernio only reads from Canvas, Blackboard and Brightspace D2L, never asks for your password, and stores nothing that could
           sign in to them.
         </p>
       </CardContent>

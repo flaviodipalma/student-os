@@ -5,6 +5,7 @@ import { badgeFor, detectionOrder, migrateAutoSync, newSite, type AutoSyncState,
 import { readBlackboard, type BlackboardRead, type BlackboardStep } from "./blackboard"
 import { readBrightspace, type BrightspaceRead, type BrightspaceStep } from "./brightspace"
 import { readCanvas, type CanvasRead, type CanvasStep } from "./canvas"
+import { identifyLms, type Detected } from "./detect"
 import type { CourseChoice } from "./courses"
 import { DEFAULT_ADDRESS, sendImport, QuadernioError, summaryLines } from "./quadernio"
 
@@ -69,7 +70,7 @@ export async function showBadge(state: AutoSyncState): Promise<void> {
 // ---- Reading Canvas, Blackboard or Brightspace in a tab ------------------------------------------
 
 export const NOT_AN_LMS =
-  "This tab isn't Canvas, Blackboard or Brightspace. Open your school's Canvas, Blackboard or Brightspace, then click Sync now."
+  "This tab isn't Canvas, Blackboard or Brightspace D2L. Open your school's Canvas, Blackboard or Brightspace D2L, then click Sync now."
 const loggedOutOf = (name: string) => `You're logged out of ${name}. Log in, then click Sync now.`
 const noAnswer = (name: string) => `${name} didn't answer. Reload the page and try again.`
 
@@ -145,7 +146,7 @@ export const LMS: Record<LmsId, Lms> = {
   },
   brightspace: {
     id: "brightspace",
-    name: "Brightspace",
+    name: "Brightspace D2L",
     courses: async (tabId) =>
       attempt(await inTab<BrightspaceStep, BrightspaceRead>(tabId, readBrightspace, { kind: "courses" }), "not-brightspace", (read) => {
         const { courses, choices } = read as Extract<BrightspaceRead, { kind: "courses" }>
@@ -160,6 +161,19 @@ export const LMS: Record<LmsId, Lms> = {
   },
 }
 
+
+// What the popup shows as soon as it opens: is this tab Canvas, Blackboard or
+// Brightspace D2L, and is the student logged in there? Only web pages can be.
+export async function detectTab(tabId: number, url: string | undefined): Promise<Detected> {
+  if (!/^https?:/.test(url ?? "")) return { lms: null }
+  try {
+    const [injection] = await chrome.scripting.executeScript({ target: { tabId }, func: identifyLms })
+    return (injection?.result as Detected | undefined) ?? { lms: null }
+  } catch {
+    // The extension can't run here (the Chrome Web Store, a PDF, …).
+    return { lms: null }
+  }
+}
 
 // Which system the tab is, with its course list (see detectionOrder).
 export async function readCourses(tabId: number, url: string | undefined): Promise<{ lms: Lms; list: CoursesRead }> {

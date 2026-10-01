@@ -151,10 +151,10 @@ describe("syncing Brightspace into Quadernio", () => {
 
   it("refuses data that isn't Brightspace's, and addresses that aren't public HTTPS", async () => {
     const user = await t.addUser("Alex")
-    await expect(sync(user, { courses: "nope", folders: {} })).rejects.toThrow(/doesn't look like Brightspace data/)
-    await expect(sync(user, { courses: [], folders: { "../x": [] } })).rejects.toThrow(/doesn't look like Brightspace data/)
+    await expect(sync(user, { courses: "nope", folders: {} })).rejects.toThrow(/doesn't look like Brightspace D2L data/)
+    await expect(sync(user, { courses: [], folders: { "../x": [] } })).rejects.toThrow(/doesn't look like Brightspace D2L data/)
     await expect(importBrightspaceFromExtension(t.db, user, { baseUrl: "http://localhost:9999", courses: [], folders: {} })).rejects.toThrow(
-      /Brightspace address/
+      /Brightspace D2L address/
     )
   })
 })

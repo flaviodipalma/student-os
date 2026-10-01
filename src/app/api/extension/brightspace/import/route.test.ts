@@ -59,7 +59,7 @@ describe("POST /api/extension/brightspace/import", () => {
     const alex = await t.addUser("Alex")
     expect((await send(payload, alex, { "X-Quadernio-Extension": "1", Origin: "https://evil.example.com" })).status).toBe(403)
     expect((await send(payload, null)).status).toBe(401)
-    expect(await send("{not json", alex)).toMatchObject({ status: 400, body: { error: expect.stringMatching(/Brightspace data/) } })
+    expect(await send("{not json", alex)).toMatchObject({ status: 400, body: { error: expect.stringMatching(/Brightspace D2L data/) } })
     expect(await send({ ...payload, folders: "nope" }, alex)).toMatchObject({ status: 400 })
     expect(await listTasks(t.db, alex)).toEqual([])
   })

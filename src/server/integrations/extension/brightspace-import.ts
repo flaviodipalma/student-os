@@ -65,9 +65,9 @@ export async function importBrightspaceFromExtension(
   options: { now?: Date } = {}
 ): Promise<LmsSyncResult> {
   const parsed = importSchema.safeParse(payload)
-  if (!parsed.success) throw new LmsError("That doesn't look like Brightspace data. Update the extension and try again.")
+  if (!parsed.success) throw new LmsError("That doesn't look like Brightspace D2L data. Update the extension and try again.")
   const data = parsed.data
-  const baseUrl = parseExtensionLmsBaseUrl(data.baseUrl, "Brightspace")
+  const baseUrl = parseExtensionLmsBaseUrl(data.baseUrl, "Brightspace D2L")
   const timeZone = isValidTimeZone(data.timeZone) ? data.timeZone : undefined
 
   const courses = data.courses
@@ -96,9 +96,9 @@ export async function importBrightspaceFromExtension(
   }
 
   await saveLmsExtensionConnection(db, userId, "brightspace", baseUrl)
-  return runSync(db, userId, { provider: "brightspace", name: "Brightspace" }, { now: options.now, timeZone }, async () => ({
+  return runSync(db, userId, { provider: "brightspace", name: "Brightspace D2L" }, { now: options.now, timeZone }, async () => ({
     provider: "brightspace",
-    name: "Brightspace",
+    name: "Brightspace D2L",
     // The student chooses which courses to send: one that isn't sent may just be unchecked.
     listsAllCourses: false,
     getCourses: async () => courses,

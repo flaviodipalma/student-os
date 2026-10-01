@@ -17,7 +17,7 @@ import { LEGAL_CONTACT_EMAIL } from "@/lib/legal"
 export const metadata: Metadata = {
   title: { absolute: "Quadernio · Your semester, planned" },
   description:
-    "A free planner for college students: your Canvas, Blackboard and Brightspace deadlines, classes and calendar in one place, with a plan for what to study next.",
+    "A free planner for college students: your Canvas, Blackboard and Brightspace D2L deadlines, classes and calendar in one place, with a plan for what to study next.",
 }
 
 // The public homepage. Signed-in students never see it: src/proxy.ts sends them to
@@ -50,7 +50,7 @@ export default function HomePage() {
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-balance md:text-5xl">Your semester, planned for you.</h1>
             <p className="mt-5 max-w-lg text-lg leading-8 text-muted-foreground">
-              Quadernio brings your Canvas, Blackboard and Brightspace deadlines, your classes and your calendar into
+              Quadernio brings your Canvas, Blackboard and Brightspace D2L deadlines, your classes and your calendar into
               one place, and tells you what to study next.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -73,7 +73,7 @@ export default function HomePage() {
             </h2>
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <Feature icon={RefreshCwIcon} title="Your school's LMS, synced">
-                For Canvas, Blackboard and Brightspace: the Quadernio browser extension imports your courses,
+                For Canvas, Blackboard and Brightspace D2L: the Quadernio browser extension imports your courses,
                 assignments and due dates with your own school login. Submitted work is marked done.
               </Feature>
               <Feature icon={FileTextIcon} title="Syllabus import">
@@ -117,7 +117,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <strong className="font-semibold text-foreground">Your school login stays in your browser.</strong>{" "}
-                  The extension reads Canvas, Blackboard or Brightspace in your own tab and sends only your courses and deadlines to
+                  The extension reads Canvas, Blackboard or Brightspace D2L in your own tab and sends only your courses and deadlines to
                   your account.
                 </li>
                 <li>

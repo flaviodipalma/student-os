@@ -20,24 +20,24 @@ development build (`npm run build:extension`) keeps using localhost. For an upda
 **Name:** Quadernio (from the manifest)
 
 **Summary** (from the manifest, max 132 characters):
-> Brings your Canvas, Blackboard and Brightspace courses and assignments into Quadernio, using your own school login.
+> Brings your Canvas, Blackboard and Brightspace D2L courses and assignments into Quadernio, using your own school login.
 
 **Description:**
 
 > Quadernio is a planner for college students: your courses, deadlines, classes and study time in one place, with a plan for what to do next.
 >
-> This extension connects Quadernio to your school's Canvas, Blackboard or Brightspace (D2L), with no setup from your school and no passwords to share.
+> This extension connects Quadernio to your school's Canvas, Blackboard or Brightspace D2L, with no setup from your school and no passwords to share.
 >
 > How it works
-> • Log in to Quadernio (quadernio.com) and to your Canvas, Blackboard or Brightspace in Chrome.
-> • Open Canvas, Blackboard or Brightspace, click the Quadernio icon, and press Sync now.
+> • Log in to Quadernio (quadernio.com) and to your Canvas, Blackboard or Brightspace D2L in Chrome.
+> • Open Canvas, Blackboard or Brightspace D2L, click the Quadernio icon, and press Sync now.
 > • Choose your courses. Their assignments and due dates appear in Quadernio as tasks, and the ones you've already submitted are marked done.
-> • Optional: turn on automatic sync, and your courses update whenever you open Canvas, Blackboard or Brightspace (at most every 30 minutes).
+> • Optional: turn on automatic sync, and your courses update whenever you open Canvas, Blackboard or Brightspace D2L (at most every 30 minutes).
 >
 > Private by design
-> • Your school login never leaves your browser. The extension reads Canvas, Blackboard or Brightspace in your own tab, the same way the page does.
+> • Your school login never leaves your browser. The extension reads Canvas, Blackboard or Brightspace D2L in your own tab, the same way the page does.
 > • Only your courses, assignments, due dates and submission status are sent, to your own Quadernio account. Nothing else.
-> • Quadernio's servers never contact your school's systems, and nothing is ever changed in Canvas, Blackboard or Brightspace.
+> • Quadernio's servers never contact your school's systems, and nothing is ever changed in Canvas, Blackboard or Brightspace D2L.
 >
 > Quadernio isn't affiliated with or endorsed by Instructure (Canvas), Anthology (Blackboard) or D2L (Brightspace).
 >
@@ -60,17 +60,17 @@ All are 24-bit PNGs without transparency, as the store requires.
 ## 3. Privacy practices tab
 
 **Single purpose:**
-> Import the student's own courses and assignments from Canvas, Blackboard or Brightspace into their Quadernio planner account.
+> Import the student's own courses and assignments from Canvas, Blackboard or Brightspace D2L into their Quadernio planner account.
 
 **Permission justifications:**
 
 | Permission | Justification to paste |
 | --- | --- |
-| `activeTab` | When the student clicks the extension on their Canvas, Blackboard or Brightspace page, it reads that one tab to find their courses and assignments. No access to any tab without that click. |
-| `scripting` | Runs the reader in the Canvas, Blackboard or Brightspace tab the student chose (it calls the LMS's own API with the student's existing session), and marks Quadernio's own pages so the site can tell the extension is installed. |
+| `activeTab` | When the student clicks the extension on their Canvas, Blackboard or Brightspace D2L page, it reads that one tab to find their courses and assignments. No access to any tab without that click. When the popup opens, it checks whether the current tab is Canvas, Blackboard or Brightspace D2L (and whether the student is logged in there), so it can say whether Sync will work; that check reads no course data. |
+| `scripting` | Runs the reader in the Canvas, Blackboard or Brightspace D2L tab the student chose (it calls the LMS's own API with the student's existing session), and marks Quadernio's own pages so the site can tell the extension is installed. |
 | `storage` | Remembers, on this computer only, the Quadernio address, which courses the student chose, and whether automatic sync is on. |
 | Host permission `https://quadernio.com/*` | Sends the imported courses and assignments to the student's Quadernio account and asks Quadernio who is logged in. Chrome includes the student's Quadernio login only because of this permission. |
-| Optional host permission `https://*/*` | Never granted at install. Requested for one address at a time, only when the student turns on automatic sync for their school's Canvas, Blackboard or Brightspace (schools host these on their own domains, so the address can't be listed in advance). Turning automatic sync off removes it. |
+| Optional host permission `https://*/*` | Never granted at install. Requested for one address at a time, only when the student turns on automatic sync for their school's Canvas, Blackboard or Brightspace D2L (schools host these on their own domains, so the address can't be listed in advance). Turning automatic sync off removes it. |
 
 **Remote code:** No, I am not using remote code. (All code is in the package; the
 extension only exchanges JSON data with quadernio.com and the student's LMS.)

@@ -34,9 +34,9 @@ export default function PrivacyPage() {
           your account.
         </p>
         <p>
-          <strong>Courses and assignments from Canvas, Blackboard or Brightspace.</strong> When you use the Quadernio browser
+          <strong>Courses and assignments from Canvas, Blackboard or Brightspace D2L.</strong> When you use the Quadernio browser
           extension, it reads your courses, assignments, due dates and submission status from your school&apos;s Canvas,
-          Blackboard or Brightspace, in your own browser, and sends only those details to Quadernio. Your school login
+          Blackboard or Brightspace D2L, in your own browser, and sends only those details to Quadernio. Your school login
           never leaves your browser, and our servers never contact your school&apos;s system.
         </p>
         <p>
@@ -160,7 +160,7 @@ export default function PrivacyPage() {
       <LegalSection id="choices" title="Your choices and rights">
         <LegalList>
           <li>You can see and change your data in the app at any time.</li>
-          <li>You can disconnect Google Calendar, Outlook, Canvas, Blackboard or Brightspace in Integrations.</li>
+          <li>You can disconnect Google Calendar, Outlook, Canvas, Blackboard or Brightspace D2L in Integrations.</li>
           <li>You can turn push reminders off in Settings.</li>
           <li>
             You can delete your account and everything in it at any time in Settings &gt; Profile &gt; Delete account.

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Quadernio",
-  "version": "0.2.0",
-  "description": "Brings your Canvas, Blackboard and Brightspace courses and assignments into Quadernio, using your own school login.",
+  "version": "0.2.2",
+  "description": "Brings your Canvas, Blackboard and Brightspace D2L courses and assignments into Quadernio, using your own school login.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

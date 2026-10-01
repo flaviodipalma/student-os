@@ -4,7 +4,7 @@
 import type { CourseChoice, CourseOption } from "./courses"
 
 export type LmsId = "canvas" | "blackboard" | "brightspace"
-export const LMS_NAMES: Record<LmsId, string> = { canvas: "Canvas", blackboard: "Blackboard", brightspace: "Brightspace" }
+export const LMS_NAMES: Record<LmsId, string> = { canvas: "Canvas", blackboard: "Blackboard", brightspace: "Brightspace D2L" }
 
 // At most one automatic sync per half hour per site (Canvas and Blackboard load a
 // new page on every click; Quadernio allows 20 syncs an hour). Sync now in the
