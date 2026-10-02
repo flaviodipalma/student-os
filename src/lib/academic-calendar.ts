@@ -1,5 +1,5 @@
 import { addDays, fromDateKey } from "@/lib/format"
-import type { AcademicEvent, AcademicEventKind, RecurringCommitment } from "@/lib/types"
+import type { AcademicEvent, AcademicEventKind, ClassCancellation, RecurringCommitment } from "@/lib/types"
 
 // The student's academic calendar: semesters, days without classes (breaks,
 // holidays), the exam period, deadlines. Class times don't meet on no-class and
@@ -50,13 +50,23 @@ export function semesterOf(commitment: Pick<RecurringCommitment, "startDate" | "
 
 // Class times (commitments with a courseId) meet only inside their semester (not in
 // the week between finals and winter break, even if their own dates run longer), and
-// skip the days without classes.
-export function withAcademicCalendar(commitments: RecurringCommitment[], events: AcademicEvent[]): RecurringCommitment[] {
+// skip the days without classes, plus their own course's cancelled days ("No class
+// Tuesday", from an announcement or the course calendar).
+export function withAcademicCalendar(
+  commitments: RecurringCommitment[],
+  events: AcademicEvent[],
+  cancellations: Pick<ClassCancellation, "courseId" | "date">[] = []
+): RecurringCommitment[] {
   const skip = noClassDates(events)
+  const cancelledByCourse = new Map<string, string[]>()
+  for (const cancellation of cancellations) {
+    cancelledByCourse.set(cancellation.courseId, [...(cancelledByCourse.get(cancellation.courseId) ?? []), cancellation.date])
+  }
   return commitments.map((commitment) => {
     if (!commitment.courseId) return commitment
-    const next: RecurringCommitment = { ...commitment, skipDates: skip }
-    if (skip.length === 0) delete next.skipDates
+    const cancelled = cancelledByCourse.get(commitment.courseId)
+    const next: RecurringCommitment = { ...commitment, skipDates: cancelled ? [...new Set([...skip, ...cancelled])].sort() : skip }
+    if (next.skipDates?.length === 0) delete next.skipDates
     // (Class times always have dates; one without wouldn't know its semester.)
     const semester = commitment.startDate && commitment.endDate ? semesterOf(commitment, events) : undefined
     if (semester) {

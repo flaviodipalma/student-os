@@ -8,6 +8,7 @@ import { courses, recurringCommitments } from "../db/schema"
 import type { Database } from "../db/types"
 import { NotFoundError, ValidationError } from "../errors"
 import { listAcademicEvents } from "./academic-calendar"
+import { listClassCancellations } from "./announcements"
 import { hasChanges } from "./util"
 
 // Weekly commitments: one row per rule. The weekly occurrences are never stored;
@@ -55,7 +56,8 @@ function toCommitment(row: typeof recurringCommitments.$inferSelect): RecurringC
 }
 
 // Class times are named after their course as it's called now (it may have been
-// renamed), and skip the days without classes on the academic calendar.
+// renamed), and skip the days without classes on the academic calendar and their
+// course's cancelled days.
 export async function listRecurringCommitments(db: Database, userId: string): Promise<RecurringCommitment[]> {
   const rows = await db
     .select({ row: recurringCommitments, code: courses.courseCode, name: courses.courseName })
@@ -65,7 +67,7 @@ export async function listRecurringCommitments(db: Database, userId: string): Pr
     .orderBy(asc(recurringCommitments.startTime), asc(recurringCommitments.createdAt))
   const commitments = rows.map(({ row, code, name }) => ({ ...toCommitment(row), ...(code && name ? { title: classTitle(code, name) } : {}) }))
   return commitments.some((commitment) => commitment.courseId)
-    ? withAcademicCalendar(commitments, await listAcademicEvents(db, userId))
+    ? withAcademicCalendar(commitments, await listAcademicEvents(db, userId), await listClassCancellations(db, userId))
     : commitments
 }
 

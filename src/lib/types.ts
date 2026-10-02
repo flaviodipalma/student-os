@@ -97,12 +97,36 @@ export const calendarProviderIds = ["google", "outlook"] as const
 export type CalendarProviderId = (typeof calendarProviderIds)[number]
 export const calendarProviderNames: Record<CalendarProviderId, string> = { google: "Google Calendar", outlook: "Outlook" }
 
-// Canvas and Blackboard here are events from their old calendar-feed links (Brightspace never had one).
-export const externalCalendarSources = ["canvas", "blackboard", ...calendarProviderIds] as const
+// Course calendars (read by the browser extension) and personal calendars.
+export const externalCalendarSources = [...lmsProviderIds, ...calendarProviderIds] as const
 export type ExternalCalendarSource = (typeof externalCalendarSources)[number]
 export type EventSource = "student_os" | ExternalCalendarSource
 
 export const eventSourceNames: Record<EventSource, string> = { student_os: "Quadernio", ...lmsProviderNames, ...calendarProviderNames }
+
+// What the AI found in a course announcement, waiting for the student to accept it
+// (src/server/services/announcements.ts). Nothing changes until they do.
+export const announcementFindingKinds = ["exam", "quiz", "deadline", "no_class"] as const
+export type AnnouncementFindingKind = (typeof announcementFindingKinds)[number]
+export type AnnouncementFinding = {
+  id: string
+  courseId: string
+  kind: AnnouncementFindingKind
+  title: string
+  date: string
+  time?: string
+  // The announcement's own words, so the student can judge it.
+  quote?: string
+  status: "pending" | "accepted" | "dismissed"
+}
+
+// One course's class doesn't meet on one day: its class times skip that date.
+export type ClassCancellation = {
+  id: string
+  courseId: string
+  date: string
+  source: "announcement" | "calendar"
+}
 
 export type CalendarEvent = {
   id: string

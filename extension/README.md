@@ -7,7 +7,13 @@ LMS's own API (Canvas `/api/v1`, Blackboard `/learn/api/public`, Brightspace `/d
 on, then sends that data to Quadernio, which validates it and imports it like any other
 sync (`src/server/integrations/extension`).
 
-**Status:** Canvas, Blackboard and Brightspace: **Sync now** with course choice, and **automatic sync** when
+Each sync also reads the chosen courses' **calendar** (from about a semester back to half a year
+ahead) and their **announcements from the last 3 weeks**. Both are optional: a school that hides
+them from students just means those lists stay empty. The server turns exams and quizzes on the
+calendar into tasks, "no class" days into cancelled classes, other items into calendar events, and
+new announcements into suggestions (read once by the AI): `src/server/integrations/lms/course-extras.ts`.
+
+**Status:** Canvas, Blackboard and Brightspace D2L: **Sync now** with course choice, and **automatic sync** when
 you open them. The popup tells which one the tab is.
 
 ## Try it (development)

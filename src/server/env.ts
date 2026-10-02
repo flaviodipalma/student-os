@@ -73,6 +73,7 @@ export function checkEnv(env: Env = process.env, production = isDeployment(env))
     ["SYLLABUS_AI_PROVIDER", "Syllabus import"],
     ["ASSISTANT_AI_PROVIDER", "The Assistant"],
     ["ACADEMIC_CALENDAR_AI_PROVIDER", "Reading academic calendars"],
+    ["ANNOUNCEMENT_AI_PROVIDER", "Reading course announcements"],
   ] as const) {
     if (env[name] === "mock") {
       ;(production ? report.errors : report.warnings).push(`${feature} uses the MOCK provider (${name}=mock): not real AI. Not allowed in production.`)

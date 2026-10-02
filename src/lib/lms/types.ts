@@ -83,4 +83,36 @@ export type LmsSyncResult = {
   // Safe, student-facing messages.
   errors: string[]
   syncedAt: string
+  // From the courses' calendars and announcements (see src/server/integrations/lms/course-extras.ts).
+  calendarEventsAdded?: number
+  classesCancelled?: number
+  // New suggestions from announcements, waiting on the Dashboard.
+  suggestions?: number
+}
+
+// An item on a course's calendar in the LMS (not an assignment: those are read separately).
+export type LmsCalendarItem = {
+  provider: LmsProviderId
+  externalId: string
+  courseExternalId: string
+  title: string
+  description: string | null
+  // Real instants (ISO 8601). Null start: unusable. Null end: a point in time.
+  startsAt: string | null
+  endsAt: string | null
+  // All-day items carry their own date ("YYYY-MM-DD") instead of times.
+  allDayDate: string | null
+  location: string | null
+  url: string | null
+}
+
+// A course announcement, as plain text (read once by the AI for quizzes, exams,
+// deadlines and cancelled classes).
+export type LmsAnnouncement = {
+  provider: LmsProviderId
+  externalId: string
+  courseExternalId: string
+  title: string
+  text: string
+  postedAt: string | null
 }

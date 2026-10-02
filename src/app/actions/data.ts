@@ -2,7 +2,16 @@
 
 import { z } from "zod"
 import type { ActionResult } from "@/lib/action-result"
-import type { CalendarEvent, Course, RecurringCommitment, StudySessionRecord, Task } from "@/lib/types"
+import type {
+  AnnouncementFinding,
+  CalendarEvent,
+  ClassCancellation,
+  Course,
+  ExternalEventRecord,
+  RecurringCommitment,
+  StudySessionRecord,
+  Task,
+} from "@/lib/types"
 import {
   bulkCourseChangeSchema,
   classTimesSchema,
@@ -18,8 +27,10 @@ import {
   updateTaskSchema,
 } from "@/lib/validation"
 import { parse, runAction } from "@/server/actions"
+import { listAnnouncementFindings, listClassCancellations } from "@/server/services/announcements"
 import { bulkUpdateCourses, createCourse, deleteCourse, listCourses, updateCourse } from "@/server/services/courses"
 import { createEvent, deleteEvent, updateEvent } from "@/server/services/events"
+import { listExternalEvents } from "@/server/services/external-events"
 import { setClassTimes } from "@/server/services/recurring-commitments"
 import { createStudySession, deleteStudySession, updateStudySession } from "@/server/services/study-sessions"
 import { createTask, deleteTask, listTasks, updateTask } from "@/server/services/tasks"
@@ -57,8 +68,24 @@ export async function bulkUpdateCoursesAction(
 }
 
 // The student's courses and tasks as saved now (e.g. after the extension imported some).
-export async function loadCoursesAction(): Promise<ActionResult<{ courses: Course[]; tasks: Task[] }>> {
-  return runAction(async ({ db, userId }) => ({ courses: await listCourses(db, userId), tasks: await listTasks(db, userId) }))
+// After an extension sync: what it can change (courses, tasks, course calendar events,
+// suggestions from announcements and cancelled classes).
+export async function loadCoursesAction(): Promise<
+  ActionResult<{
+    courses: Course[]
+    tasks: Task[]
+    externalEvents: ExternalEventRecord[]
+    announcementFindings: AnnouncementFinding[]
+    classCancellations: ClassCancellation[]
+  }>
+> {
+  return runAction(async ({ db, userId }) => ({
+    courses: await listCourses(db, userId),
+    tasks: await listTasks(db, userId),
+    externalEvents: await listExternalEvents(db, userId),
+    announcementFindings: await listAnnouncementFindings(db, userId),
+    classCancellations: await listClassCancellations(db, userId),
+  }))
 }
 
 // A course's class times, all together (an empty list takes the course off the

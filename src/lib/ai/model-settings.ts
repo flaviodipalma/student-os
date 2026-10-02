@@ -4,7 +4,7 @@ export function modelSettings(model: string) {
   if (model.startsWith("claude-haiku-4")) {
     return { thinking: { type: "enabled" as const, budget_tokens: 4000 }, fallback: false }
   }
-  // Opus 5: if a safety classifier declines, retry server-side on Anthropic's
+  // Opus 5 / 5.5: if a safety classifier declines, retry server-side on Anthropic's
   // recommended fallback model. Other models go without it.
-  return { thinking: { type: "adaptive" as const }, fallback: model === "claude-opus-5" }
+  return { thinking: { type: "adaptive" as const }, fallback: model === "claude-opus-5" || model === "claude-opus-5-5" }
 }

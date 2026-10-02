@@ -32,11 +32,12 @@ development build (`npm run build:extension`) keeps using localhost. For an upda
 > • Log in to Quadernio (quadernio.com) and to your Canvas, Blackboard or Brightspace D2L in Chrome.
 > • Open Canvas, Blackboard or Brightspace D2L, click the Quadernio icon, and press Sync now.
 > • Choose your courses. Their assignments and due dates appear in Quadernio as tasks, and the ones you've already submitted are marked done.
+> • Exams and quizzes on the course calendar are added too, with study time planned before them. Quadernio also reads new announcements and suggests the quizzes, exams, deadlines and cancelled classes it finds; nothing changes until you accept a suggestion.
 > • Optional: turn on automatic sync, and your courses update whenever you open Canvas, Blackboard or Brightspace D2L (at most every 30 minutes).
 >
 > Private by design
 > • Your school login never leaves your browser. The extension reads Canvas, Blackboard or Brightspace D2L in your own tab, the same way the page does.
-> • Only your courses, assignments, due dates and submission status are sent, to your own Quadernio account. Nothing else.
+> • Only your courses, assignments, due dates, submission status, course calendar events and recent announcements are sent, to your own Quadernio account. Nothing else.
 > • Quadernio's servers never contact your school's systems, and nothing is ever changed in Canvas, Blackboard or Brightspace D2L.
 >
 > Quadernio isn't affiliated with or endorsed by Instructure (Canvas), Anthology (Blackboard) or D2L (Brightspace).
@@ -75,8 +76,9 @@ All are 24-bit PNGs without transparency, as the store requires.
 **Remote code:** No, I am not using remote code. (All code is in the package; the
 extension only exchanges JSON data with quadernio.com and the student's LMS.)
 
-**Data usage:** check **Website content** only (course names, assignment titles, due dates
-and submission status read from the student's LMS). Leave everything else unchecked:
+**Data usage:** check **Website content** only (course names, assignment titles, due dates,
+submission status, course calendar events and the text of recent course announcements read
+from the student's LMS). Leave everything else unchecked:
 the extension collects no personally identifiable information, authentication
 credentials, location, web history or activity beyond that.
 

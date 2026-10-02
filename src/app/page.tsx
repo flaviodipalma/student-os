@@ -74,7 +74,8 @@ export default function HomePage() {
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <Feature icon={RefreshCwIcon} title="Your school's LMS, synced">
                 For Canvas, Blackboard and Brightspace D2L: the Quadernio browser extension imports your courses,
-                assignments and due dates with your own school login. Submitted work is marked done.
+                assignments and exams with your own school login, and spots quizzes and cancelled classes in
+                announcements.
               </Feature>
               <Feature icon={FileTextIcon} title="Syllabus import">
                 Upload a syllabus PDF and Quadernio finds the exams, papers and readings, so nothing is only in a
@@ -117,8 +118,8 @@ export default function HomePage() {
                 </li>
                 <li>
                   <strong className="font-semibold text-foreground">Your school login stays in your browser.</strong>{" "}
-                  The extension reads Canvas, Blackboard or Brightspace D2L in your own tab and sends only your courses and deadlines to
-                  your account.
+                  The extension reads Canvas, Blackboard or Brightspace D2L in your own tab and sends only your
+                  courses, deadlines, course calendars and recent announcements to your account.
                 </li>
                 <li>
                   <strong className="font-semibold text-foreground">No ads, no selling, no tracking.</strong> Your data

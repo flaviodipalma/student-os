@@ -7,7 +7,8 @@
 // Two steps, so the student can choose courses in between:
 //   { kind: "courses" }                    their courses (as a student) with the term
 //   { kind: "assignments", courseIds }     those courses' instructors (names only), grade
-//                                          columns, the student's grades and recent attempts
+//                                          columns, the student's grades and recent attempts,
+//                                          calendar items and recent announcements
 //
 // Always full addresses (origin + path): Ultra pages set a <base href> to their CDN,
 // so a relative address would go to the CDN instead of Blackboard.
@@ -37,6 +38,9 @@ export type BlackboardRead =
       columns: Record<string, unknown[]>
       grades: Record<string, unknown[]>
       attempts: Record<string, unknown[]>
+      // Course id -> its calendar items / announcements from the last 3 weeks (optional).
+      events: Record<string, unknown[]>
+      announcements: Record<string, unknown[]>
       coursesUnreadable: number
     }
   | { ok: false; reason: "not-blackboard" | "logged-out" | "error" }
@@ -56,6 +60,13 @@ export async function readBlackboard(
   const ATTEMPT_WINDOW_DAYS = 30
   const MAX_ATTEMPT_LOOKUPS = 25
   const ID = /^_\d+_\d+$/
+  const DAY = 24 * 60 * 60 * 1000
+  const EVENTS_FROM = new Date(now - 120 * DAY).toISOString()
+  const EVENTS_UNTIL = new Date(now + 180 * DAY).toISOString()
+  const ANNOUNCEMENTS_FROM = now - 21 * DAY
+  const MAX_EVENTS = 200
+  const MAX_ANNOUNCEMENTS = 15
+  const MAX_ANNOUNCEMENT_TEXT = 4000
   const api = `${origin}/learn/api/public`
 
   class HttpError extends Error {
@@ -171,6 +182,8 @@ export async function readBlackboard(
     const columns: Record<string, unknown[]> = {}
     const grades: Record<string, unknown[]> = {}
     const attempts: Record<string, unknown[]> = {}
+    const events: Record<string, unknown[]> = {}
+    const announcements: Record<string, unknown[]> = {}
     let coursesUnreadable = 0
     const ids = step.courseIds.filter((id) => ID.test(id)).slice(0, MAX_COURSES)
 
@@ -243,11 +256,48 @@ export async function readBlackboard(
           // e.g. anonymous grading: this one stays unknown.
         }
       }
+
+      // The course calendar (course items only: gradebook items are read above).
+      try {
+        const items = await all(
+          `v1/calendars/items?courseId=${courseId}&since=${encodeURIComponent(EVENTS_FROM)}&until=${encodeURIComponent(EVENTS_UNTIL)}`,
+          MAX_EVENTS
+        )
+        events[courseId] = items
+          .map(record)
+          .filter((item) => item.type === undefined || item.type === "Course")
+          .map((item) => {
+            const kept = pick(item, ["id", "type", "calendarId", "title", "start", "end", "location"])
+            if (typeof item.description === "string") kept.description = item.description.slice(0, MAX_DESCRIPTION)
+            return kept
+          })
+      } catch {
+        // Not readable here: the course's calendar is just not imported.
+      }
+
+      // Announcements from the last 3 weeks.
+      try {
+        const items = await all(`v1/courses/${courseId}/announcements?fields=id,title,body,created,modified,availability`, 100)
+        announcements[courseId] = items
+          .map(record)
+          .filter((item) => {
+            const posted = Date.parse(String(item.created ?? item.modified ?? ""))
+            return !Number.isNaN(posted) && posted >= ANNOUNCEMENTS_FROM
+          })
+          .slice(0, MAX_ANNOUNCEMENTS)
+          .map((item) => {
+            const kept = pick(item, ["id", "title", "created"])
+            if (typeof item.body === "string") kept.body = item.body.slice(0, MAX_ANNOUNCEMENT_TEXT)
+            return kept
+          })
+      } catch {
+        // Not readable here: no suggestions from this course's announcements.
+      }
     }
 
     // A few courses at a time, so Blackboard isn't flooded.
     for (let i = 0; i < ids.length; i += PARALLEL) await Promise.all(ids.slice(i, i + PARALLEL).map(readCourse))
-    return { ok: true, kind: "assignments", baseUrl: origin, instructors, columns, grades, attempts, coursesUnreadable }
+    return { ok: true, kind: "assignments", baseUrl: origin, instructors, columns, grades, attempts, events, announcements, coursesUnreadable }
   } catch (error) {
     if (error instanceof HttpError && error.status === 401) return { ok: false, reason: "logged-out" }
     return { ok: false, reason: "error" }

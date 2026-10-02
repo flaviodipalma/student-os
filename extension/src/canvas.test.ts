@@ -59,6 +59,9 @@ describe("readCanvas", () => {
       kind: "assignments",
       baseUrl: ORIGIN,
       assignments: { "215": [{ id: 1, name: "Assignment 1", due_at: "2026-10-01T03:59:00Z", published: true, submission: { workflow_state: "submitted" } }] },
+      // This fake Canvas has no calendar or announcements: those lists stay empty, the sync goes on.
+      events: {},
+      announcements: {},
       coursesUnreadable: 0,
     })
     // Same-origin requests with the student's login, asking for the right things, and
@@ -69,6 +72,32 @@ describe("readCanvas", () => {
     expect(urls).toContain(`${ORIGIN}/api/v1/courses/215/assignments?include[]=submission&order_by=due_at&per_page=100`)
     expect(urls.some((url) => url.includes("/courses/216/"))).toBe(false)
     expect(vi.mocked(fetchFn).mock.calls[0][1]).toMatchObject({ credentials: "same-origin" })
+  })
+
+  it("also reads the chosen courses' calendar events and announcements from the last 3 weeks (only what's needed)", async () => {
+    const NOW = Date.parse("2026-10-02T12:00:00Z")
+    const fetchFn = fakeCanvas({
+      "/api/v1/users/self": { body: { id: 42 } },
+      "/api/v1/courses/215/assignments": { body: [] },
+      "/api/v1/calendar_events": {
+        body: [{ id: 501, title: "Midterm Exam", start_at: "2026-10-15T14:00:00Z", end_at: "2026-10-15T15:15:00Z", all_day: false, location_name: "Room 204", description: "<p>Chapters 1-5</p>", html_url: `${ORIGIN}/calendar?event_id=501`, context_code: "course_215", user: { name: "Private" } }],
+      },
+      "/api/v1/announcements": {
+        body: [{ id: 601, title: "Quiz Thursday", message: "<p>Quiz 3 on Thursday.</p>", posted_at: "2026-10-01T13:00:00Z", html_url: `${ORIGIN}/courses/215/discussion_topics/601`, author: { display_name: "Prof. Smith" }, attachments: [{ filename: "secret.pdf" }] }],
+      },
+    })
+    const read = await readCanvas(assignmentsOf(215), ORIGIN, fetchFn, NOW)
+    if (!read.ok || read.kind !== "assignments") throw new Error("expected assignments")
+    expect(read.events["215"]).toEqual([
+      { id: 501, title: "Midterm Exam", start_at: "2026-10-15T14:00:00Z", end_at: "2026-10-15T15:15:00Z", all_day: false, location_name: "Room 204", html_url: `${ORIGIN}/calendar?event_id=501`, description: "<p>Chapters 1-5</p>" },
+    ])
+    expect(read.announcements["215"]).toEqual([
+      { id: 601, title: "Quiz Thursday", posted_at: "2026-10-01T13:00:00Z", html_url: `${ORIGIN}/courses/215/discussion_topics/601`, message: "<p>Quiz 3 on Thursday.</p>" },
+    ])
+    expect(JSON.stringify(read)).not.toMatch(/Private|Prof\. Smith|secret/)
+    const urls = vi.mocked(fetchFn).mock.calls.map(([url]) => decodeURIComponent(String(url)))
+    expect(urls.some((url) => url.includes("/api/v1/calendar_events?type=event&context_codes[]=course_215&start_date=2026-06-04"))).toBe(true)
+    expect(urls.some((url) => url.includes("/api/v1/announcements?context_codes[]=course_215&start_date=2026-09-11"))).toBe(true)
   })
 
   it("only reads numeric course ids (nothing else ends up in a Canvas address)", async () => {

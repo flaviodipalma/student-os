@@ -16,7 +16,9 @@ import {
 import { saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
+import { blackboardAnnouncementItem, blackboardCalendarItem } from "../lms/extras-mapping"
 import { parseExtensionLmsBaseUrl } from "./base-url"
+import { calendarExams, extrasFields, readExtras, withCourseExtras } from "./extras"
 
 // A Blackboard Learn import sent by the Quadernio browser extension, which reads
 // Learn's REST API with the student's own browser session (Blackboard's own pages
@@ -53,6 +55,8 @@ const importSchema = z.object({
     .record(z.string().max(40), z.array(z.unknown()).max(100))
     .refine((lists) => Object.keys(lists).length <= MAX_BLACKBOARD_ATTEMPT_LISTS)
     .optional(),
+  // Calendar items and recent announcements (see ./extras.ts).
+  ...extrasFields,
 })
 
 // Own properties only: an id like "__proto__" or "constructor" isn't a list.
@@ -77,6 +81,7 @@ export async function importBlackboardFromExtension(
     // Co-taught courses list every instructor ("Jane Smith, Ali Khan").
     .map((course) => ({ ...course, instructor: own(data.instructors, course.externalId)?.join(", ") || null }))
   const courseUrls = new Map(courses.map((course) => [course.externalId, course.url]))
+  const extras = readExtras(data, blackboardCalendarItem, blackboardAnnouncementItem)
 
   // The same conservative rules as the OAuth adapter: "graded" only with a real
   // grade, "submitted" only with a turned-in attempt, "unknown" whenever Blackboard
@@ -92,20 +97,25 @@ export async function importBlackboardFromExtension(
     if (!raw) throw new LmsError("The extension couldn't read this course's assignments.", "course")
     const grades = own(data.grades, courseId)
     const graded = grades ? gradedColumns(grades) : null
-    return raw
-      .map(parseBlackboardColumn)
-      .filter((column): column is BlackboardColumn => column !== null)
-      .map((column) =>
-        blackboardAssignmentToLms(column, courseId, {
-          timeZone,
-          courseUrl: courseUrls.get(courseId) ?? null,
-          submissionStatus: statusOf(column, graded),
-        })
-      )
+    return [
+      ...raw
+        .map(parseBlackboardColumn)
+        .filter((column): column is BlackboardColumn => column !== null)
+        .map((column) =>
+          blackboardAssignmentToLms(column, courseId, {
+            timeZone,
+            courseUrl: courseUrls.get(courseId) ?? null,
+            submissionStatus: statusOf(column, graded),
+          })
+        ),
+      // Exams and quizzes on the course calendar (linked to the course).
+      ...calendarExams(extras, courseId, timeZone).map((exam) => ({ ...exam, url: exam.url ?? courseUrls.get(courseId) ?? null })),
+    ]
   }
 
   await saveLmsExtensionConnection(db, userId, "blackboard", baseUrl)
-  return runSync(db, userId, { provider: "blackboard", name: "Blackboard" }, { now: options.now, timeZone }, async () => ({
+  const now = options.now ?? new Date()
+  const result = await runSync(db, userId, { provider: "blackboard", name: "Blackboard" }, { now, timeZone }, async () => ({
     provider: "blackboard",
     name: "Blackboard",
     // The student chooses which courses to send, so one that isn't sent may just be
@@ -114,4 +124,5 @@ export async function importBlackboardFromExtension(
     getCourses: async () => courses,
     getAssignments: async (courseId) => assignmentsFor(courseId),
   }))
+  return withCourseExtras(db, userId, "blackboard", result, extras, { timeZone, now })
 }

@@ -8,7 +8,9 @@ import { canvasAssignmentToLms, canvasCourseToLms } from "../lms/canvas/mapping"
 import { saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
+import { canvasAnnouncementItem, canvasCalendarItem } from "../lms/extras-mapping"
 import { parseExtensionLmsBaseUrl } from "./base-url"
+import { calendarExams, extrasFields, readExtras, withCourseExtras } from "./extras"
 
 // A Canvas import sent by the Quadernio browser extension. The extension reads
 // Canvas with the student's own browser session:
@@ -30,6 +32,8 @@ const importSchema = z.object({
   // Canvas course id -> that course's assignments. A course the extension couldn't
   // read is left out, so its tasks aren't reported as gone from Canvas.
   assignments: z.record(z.string().max(32), z.array(z.unknown()).max(MAX_IMPORT_ASSIGNMENTS_PER_COURSE)),
+  // Calendar items and recent announcements (see ./extras.ts).
+  ...extrasFields,
 })
 
 export async function importCanvasFromExtension(
@@ -45,17 +49,21 @@ export async function importCanvasFromExtension(
   const timeZone = isValidTimeZone(data.timeZone) ? data.timeZone : undefined
 
   const courses = data.courses.map((raw) => canvasCourseToLms(raw, baseUrl, timeZone)).filter((course): course is LmsCourse => course !== null)
+  const extras = readExtras(data, (raw, courseId) => canvasCalendarItem(raw, courseId, baseUrl), canvasAnnouncementItem)
   const assignmentsFor = (courseId: string): LmsAssignment[] => {
     // Own property only: a course id like "__proto__" or "constructor" isn't a list.
     const raw = Object.hasOwn(data.assignments, courseId) ? data.assignments[courseId] : undefined
     if (!raw) throw new LmsError("The extension couldn't read this course's assignments.", "course")
-    return raw
-      .map((item) => canvasAssignmentToLms(item, courseId, { baseUrl, timeZone }))
-      .filter((assignment): assignment is LmsAssignment => assignment !== null)
+    return [
+      ...raw.map((item) => canvasAssignmentToLms(item, courseId, { baseUrl, timeZone })).filter((assignment): assignment is LmsAssignment => assignment !== null),
+      // Exams and quizzes on the course calendar.
+      ...calendarExams(extras, courseId, timeZone),
+    ]
   }
 
   await saveLmsExtensionConnection(db, userId, "canvas", baseUrl)
-  return runSync(db, userId, { provider: "canvas", name: "Canvas" }, { now: options.now, timeZone }, async () => ({
+  const now = options.now ?? new Date()
+  const result = await runSync(db, userId, { provider: "canvas", name: "Canvas" }, { now, timeZone }, async () => ({
     provider: "canvas",
     name: "Canvas",
     // The student chooses which courses to send, so a course that isn't sent may just
@@ -64,4 +72,5 @@ export async function importCanvasFromExtension(
     getCourses: async () => courses,
     getAssignments: async (courseId) => assignmentsFor(courseId),
   }))
+  return withCourseExtras(db, userId, "canvas", result, extras, { timeZone, now })
 }

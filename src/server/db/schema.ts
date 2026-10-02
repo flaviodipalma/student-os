@@ -50,9 +50,14 @@ export const lmsProvider = pgEnum("lms_provider", ["canvas", "blackboard", "brig
 export const academicEventKind = pgEnum("academic_event_kind", ["term", "no_classes", "exams", "deadline", "other"])
 export const schoolCalendarStatus = pgEnum("school_calendar_status", ["found", "not_found"])
 export const lmsConnectionStatus = pgEnum("lms_connection_status", ["connected", "needs_reauth", "error"])
-// Where an external calendar event comes from: a personal calendar (Google, Outlook). "canvas"
-// and "blackboard" are from the removed LMS calendar-feed links (hidden since migration 0017).
-export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook"])
+// Where an external calendar event comes from: a personal calendar (Google, Outlook), or a
+// course calendar read by the browser extension (Canvas, Blackboard, Brightspace D2L). Older
+// "canvas" / "blackboard" rows from the removed calendar-feed links were hidden in migration 0017.
+export const externalCalendarSource = pgEnum("external_calendar_source", ["canvas", "blackboard", "google", "outlook", "brightspace"])
+// What an announcement says that matters for the plan (see src/lib/announcements).
+export const announcementFindingKind = pgEnum("announcement_finding_kind", ["exam", "quiz", "deadline", "no_class"])
+export const announcementFindingStatus = pgEnum("announcement_finding_status", ["pending", "accepted", "dismissed"])
+export const classCancellationSource = pgEnum("class_cancellation_source", ["announcement", "calendar"])
 export const calendarProvider = pgEnum("calendar_provider", ["google", "outlook"])
 // How Quadernio reads the LMS: only the Quadernio browser extension now ("extension",
 // with the student's own browser session). "oauth" and "calendar_feed" are no longer
@@ -610,5 +615,83 @@ export const feedback = pgTable(
     index("feedback_created_idx").on(t.createdAt),
     check("feedback_message_length", sql`char_length(btrim(${t.message})) between 1 and 2000`),
     check("feedback_page_path", sql`${t.page} is null or (${t.page} like '/%' and char_length(${t.page}) <= 200)`),
+  ]
+).enableRLS()
+
+// Course announcements the extension sent, so each one is read (by the AI) only once.
+// Only the id, the title and when it was posted are kept: never the text.
+export const lmsAnnouncements = pgTable(
+  "lms_announcements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    provider: lmsProvider("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    courseId: uuid("course_id").notNull(),
+    title: text("title").notNull().default(""),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("lms_announcements_user_external_key").on(t.userId, t.provider, t.externalId),
+    unique("lms_announcements_id_user_id_key").on(t.id, t.userId),
+    foreignKey({ name: "lms_announcements_course_fk", columns: [t.courseId, t.userId], foreignColumns: [courses.id, courses.userId] }).onDelete("cascade"),
+    check("lms_announcements_title_length", sql`char_length(${t.title}) <= 300`),
+  ]
+).enableRLS()
+
+// What the AI found in an announcement (a quiz, an exam, a deadline, no class), shown
+// as a suggestion: nothing changes until the student accepts it.
+export const announcementFindings = pgTable(
+  "announcement_findings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    announcementId: uuid("announcement_id").notNull(),
+    courseId: uuid("course_id").notNull(),
+    kind: announcementFindingKind("kind").notNull(),
+    title: text("title").notNull(),
+    date: date("date").notNull(),
+    time: time("time"),
+    // The announcement's own words this came from, so the student can judge it.
+    quote: text("quote"),
+    status: announcementFindingStatus("status").notNull().default("pending"),
+    // The task an accepted quiz, exam or deadline became (kept if the task is deleted later).
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    index("announcement_findings_user_status_idx").on(t.userId, t.status),
+    unique("announcement_findings_id_user_id_key").on(t.id, t.userId),
+    foreignKey({ name: "announcement_findings_announcement_fk", columns: [t.announcementId, t.userId], foreignColumns: [lmsAnnouncements.id, lmsAnnouncements.userId] }).onDelete("cascade"),
+    foreignKey({ name: "announcement_findings_course_fk", columns: [t.courseId, t.userId], foreignColumns: [courses.id, courses.userId] }).onDelete("cascade"),
+    check("announcement_findings_title_length", sql`char_length(btrim(${t.title})) between 1 and 200`),
+    check("announcement_findings_quote_length", sql`${t.quote} is null or char_length(${t.quote}) <= 500`),
+  ]
+).enableRLS()
+
+// One course's class doesn't meet on one day ("No class today"): its class times skip
+// that date everywhere (calendar, Planner, reminders), like a day off on the academic calendar.
+export const classCancellations = pgTable(
+  "class_cancellations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull(),
+    date: date("date").notNull(),
+    source: classCancellationSource("source").notNull(),
+    // The accepted suggestion it came from (announcements).
+    findingId: uuid("finding_id").references(() => announcementFindings.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("class_cancellations_user_course_date_key").on(t.userId, t.courseId, t.date),
+    foreignKey({ name: "class_cancellations_course_fk", columns: [t.courseId, t.userId], foreignColumns: [courses.id, courses.userId] }).onDelete("cascade"),
   ]
 ).enableRLS()

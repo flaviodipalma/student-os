@@ -195,6 +195,37 @@ describe("readBlackboard: assignments", () => {
     if (read.ok && read.kind === "assignments") expect(Object.keys(read.columns)).toEqual(["_215_1"])
   })
 
+  it("also reads the course calendar (course items only) and announcements from the last 3 weeks", async () => {
+    const fetchFn = fakeBlackboard({
+      ...me,
+      ...course([]),
+      "/learn/api/public/v1/calendars/items": {
+        body: {
+          results: [
+            { id: "_701_1", type: "Course", calendarId: "_215_1", title: "Midterm Exam", start: "2026-10-15T14:00:00.000Z", end: "2026-10-15T15:15:00.000Z", location: "Room 204", description: "Chapters 1-5", createdByUserId: "_9_1" },
+            { id: "_702_1", type: "GradebookColumn", calendarId: "_215_1", title: "Project 1 due", start: "2026-10-02T03:59:00.000Z", end: "2026-10-02T03:59:00.000Z" },
+          ],
+        },
+      },
+      "/learn/api/public/v1/courses/_215_1/announcements": {
+        body: {
+          results: [
+            { id: "_801_1", title: "No class Tuesday", body: "<p>No class on Tuesday.</p>", created: "2026-09-24T13:00:00.000Z", creator: "_9_1" },
+            { id: "_802_1", title: "Welcome!", body: "<p>Welcome to the course.</p>", created: "2026-08-25T13:00:00.000Z" },
+          ],
+        },
+      },
+    })
+    const read = await readBlackboard(assignmentsOf("_215_1"), ORIGIN, fetchFn, NOW)
+    if (!read.ok || read.kind !== "assignments") throw new Error("expected assignments")
+    expect(read.events["_215_1"]).toEqual([
+      { id: "_701_1", type: "Course", calendarId: "_215_1", title: "Midterm Exam", start: "2026-10-15T14:00:00.000Z", end: "2026-10-15T15:15:00.000Z", location: "Room 204", description: "Chapters 1-5" },
+    ])
+    // The welcome post is older than 3 weeks.
+    expect(read.announcements["_215_1"]).toEqual([{ id: "_801_1", title: "No class Tuesday", created: "2026-09-24T13:00:00.000Z", body: "<p>No class on Tuesday.</p>" }])
+    expect(JSON.stringify(read.announcements)).not.toMatch(/creator/)
+  })
+
   it("only reads Blackboard-shaped course ids (nothing else ends up in an address)", async () => {
     const fetchFn = fakeBlackboard({ ...me })
     await readBlackboard(assignmentsOf("../../v1/users", "_1_1?x=1", "215"), ORIGIN, fetchFn, NOW)

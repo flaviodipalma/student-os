@@ -4,11 +4,12 @@
 //
 // Two steps, so the student can choose courses in between:
 //   { kind: "courses" }                    the student's active courses, with their term
-//   { kind: "assignments", courseIds }     those courses' assignments
+//   { kind: "assignments", courseIds }     those courses' assignments, calendar events
+//                                          and recent announcements
 //
 // executeScript copies the function's source into the tab: it must be completely
 // self-contained (every helper defined inside it, nothing from this module). The
-// step is passed as an argument; origin and fetchFn exist for tests.
+// step is passed as an argument; origin, fetchFn and now exist for tests.
 
 export type CanvasStep = { kind: "courses" } | { kind: "assignments"; courseIds: string[] }
 
@@ -20,6 +21,10 @@ export type CanvasRead =
       baseUrl: string
       // Course id -> its assignments. A course that couldn't be read is left out.
       assignments: Record<string, unknown[]>
+      // Course id -> its calendar events / announcements from the last 3 weeks. Optional:
+      // a course whose calendar or announcements can't be read is left out of that list.
+      events: Record<string, unknown[]>
+      announcements: Record<string, unknown[]>
       coursesUnreadable: number
     }
   | { ok: false; reason: "not-canvas" | "logged-out" | "error" }
@@ -27,7 +32,8 @@ export type CanvasRead =
 export async function readCanvas(
   step: CanvasStep,
   origin: string = location.origin,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  now: number = Date.now()
 ): Promise<CanvasRead> {
   // Same limits as the Quadernio import endpoint.
   const MAX_COURSES = 100
@@ -35,6 +41,15 @@ export async function readCanvas(
   const MAX_PAGES = 20
   const MAX_DESCRIPTION = 4000
   const PARALLEL = 4
+  // Calendar events from about a semester back to half a year ahead; announcements
+  // from the last 3 weeks (older ones have been acted on already).
+  const DAY = 24 * 60 * 60 * 1000
+  const EVENTS_FROM = new Date(now - 120 * DAY).toISOString()
+  const EVENTS_UNTIL = new Date(now + 180 * DAY).toISOString()
+  const ANNOUNCEMENTS_FROM = new Date(now - 21 * DAY).toISOString()
+  const MAX_EVENTS = 200
+  const MAX_ANNOUNCEMENTS = 15
+  const MAX_ANNOUNCEMENT_TEXT = 4000
 
   class CanvasHttpError extends Error {
     constructor(readonly status: number) {
@@ -121,6 +136,8 @@ export async function readCanvas(
       return { ok: true, kind: "courses", baseUrl: origin, courses: courses.map(trimCourse) }
     }
     const assignments: Record<string, unknown[]> = {}
+    const events: Record<string, unknown[]> = {}
+    const announcements: Record<string, unknown[]> = {}
     let coursesUnreadable = 0
     const ids = step.courseIds.filter((id) => /^\d+$/.test(id)).slice(0, MAX_COURSES)
     // A few courses at a time, so Canvas isn't flooded.
@@ -132,11 +149,42 @@ export async function readCanvas(
             assignments[id] = list.map(trimAssignment)
           } catch {
             coursesUnreadable++
+            return
+          }
+          // The course calendar (events only: assignments are read above).
+          try {
+            const list = await all(
+              `/calendar_events?type=event&context_codes[]=course_${id}&start_date=${encodeURIComponent(EVENTS_FROM)}&end_date=${encodeURIComponent(EVENTS_UNTIL)}`,
+              MAX_EVENTS
+            )
+            events[id] = list.map((event) => {
+              const kept = pick(event, ["id", "title", "start_at", "end_at", "all_day", "all_day_date", "location_name", "html_url", "workflow_state"])
+              const { description } = record(event)
+              if (typeof description === "string") kept.description = description.slice(0, MAX_DESCRIPTION)
+              return kept
+            })
+          } catch {
+            // Not readable here: the course's calendar is just not imported.
+          }
+          // Announcements from the last 3 weeks (newest first).
+          try {
+            const list = await all(
+              `/announcements?context_codes[]=course_${id}&start_date=${encodeURIComponent(ANNOUNCEMENTS_FROM)}&end_date=${encodeURIComponent(new Date(now + DAY).toISOString())}`,
+              MAX_ANNOUNCEMENTS
+            )
+            announcements[id] = list.map((item) => {
+              const kept = pick(item, ["id", "title", "posted_at", "html_url"])
+              const { message } = record(item)
+              if (typeof message === "string") kept.message = message.slice(0, MAX_ANNOUNCEMENT_TEXT)
+              return kept
+            })
+          } catch {
+            // Not readable here: no suggestions from this course's announcements.
           }
         })
       )
     }
-    return { ok: true, kind: "assignments", baseUrl: origin, assignments, coursesUnreadable }
+    return { ok: true, kind: "assignments", baseUrl: origin, assignments, events, announcements, coursesUnreadable }
   } catch (error) {
     if (error instanceof CanvasHttpError && error.status === 401) return { ok: false, reason: "logged-out" }
     return { ok: false, reason: "error" }

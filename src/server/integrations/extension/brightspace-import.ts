@@ -17,7 +17,9 @@ import {
 import { saveLmsExtensionConnection } from "../lms/connections"
 import { LmsError } from "../lms/provider"
 import { runSync } from "../lms/sync"
+import { brightspaceAnnouncementItem, brightspaceCalendarItem } from "../lms/extras-mapping"
 import { parseExtensionLmsBaseUrl } from "./base-url"
+import { calendarExams, extrasFields, readExtras, withCourseExtras } from "./extras"
 
 // A D2L Brightspace import sent by the Quadernio browser extension, which reads
 // Brightspace's API with the student's own browser session (Brightspace's own pages
@@ -52,6 +54,8 @@ const importSchema = z.object({
     .record(courseId, z.array(z.unknown()).max(20))
     .refine((lists) => Object.keys(lists).length <= MAX_BRIGHTSPACE_SUBMISSION_LISTS)
     .optional(),
+  // Calendar items and recent announcements (see ./extras.ts).
+  ...extrasFields,
 })
 
 // Own properties only: an id like "__proto__" or "constructor" isn't a list.
@@ -73,6 +77,7 @@ export async function importBrightspaceFromExtension(
   const courses = data.courses
     .map((raw) => brightspaceCourseToLms(raw, baseUrl, timeZone))
     .filter((course): course is LmsCourse => course !== null)
+  const extras = readExtras(data, (raw, orgUnitId) => brightspaceCalendarItem(raw, orgUnitId, baseUrl), brightspaceAnnouncementItem)
 
   const assignmentsFor = (orgUnitId: string): LmsAssignment[] => {
     const folders = own(data.folders, orgUnitId)
@@ -92,11 +97,13 @@ export async function importBrightspaceFromExtension(
       .map(parseBrightspaceQuiz)
       .filter((item): item is BrightspaceQuiz => item !== null)
       .map((item) => brightspaceQuizToLms(item, orgUnitId, { baseUrl, timeZone }))
-    return [...fromFolders, ...fromQuizzes]
+    // Plus exams and quizzes on the course calendar.
+    return [...fromFolders, ...fromQuizzes, ...calendarExams(extras, orgUnitId, timeZone)]
   }
 
   await saveLmsExtensionConnection(db, userId, "brightspace", baseUrl)
-  return runSync(db, userId, { provider: "brightspace", name: "Brightspace D2L" }, { now: options.now, timeZone }, async () => ({
+  const now = options.now ?? new Date()
+  const result = await runSync(db, userId, { provider: "brightspace", name: "Brightspace D2L" }, { now, timeZone }, async () => ({
     provider: "brightspace",
     name: "Brightspace D2L",
     // The student chooses which courses to send: one that isn't sent may just be unchecked.
@@ -104,4 +111,5 @@ export async function importBrightspaceFromExtension(
     getCourses: async () => courses,
     getAssignments: async (orgUnitId) => assignmentsFor(orgUnitId),
   }))
+  return withCourseExtras(db, userId, "brightspace", result, extras, { timeZone, now })
 }

@@ -6,8 +6,9 @@
 //
 // Two steps, so the student can choose courses in between:
 //   { kind: "courses" }                    their course offerings, each with its semester
-//   { kind: "assignments", courseIds }     those courses' assignment folders, quizzes and
-//                                          the student's own submissions (recent folders only)
+//   { kind: "assignments", courseIds }     those courses' assignment folders, quizzes,
+//                                          the student's own submissions (recent folders only),
+//                                          calendar events and recent announcements (news)
 //
 // Brightspace accepts the session's cookies for these reads. Where a school only
 // accepts a token, the page's own short-lived token is used instead (the same one
@@ -36,6 +37,9 @@ export type BrightspaceRead =
       folders: Record<string, unknown[]>
       quizzes: Record<string, unknown[]>
       submissions: Record<string, unknown[]>
+      // Course id -> its calendar events / announcements from the last 3 weeks (optional).
+      events: Record<string, unknown[]>
+      announcements: Record<string, unknown[]>
       coursesUnreadable: number
     }
   | { ok: false; reason: "not-brightspace" | "logged-out" | "error" }
@@ -57,6 +61,13 @@ export async function readBrightspace(
   const SUBMISSION_WINDOW_DAYS = 30
   const MAX_SUBMISSION_LOOKUPS = 25
   const ID = /^\d{1,18}$/
+  const DAY = 24 * 60 * 60 * 1000
+  const EVENTS_FROM = new Date(now - 120 * DAY).toISOString()
+  const EVENTS_UNTIL = new Date(now + 180 * DAY).toISOString()
+  const ANNOUNCEMENTS_FROM = now - 21 * DAY
+  const MAX_EVENTS = 200
+  const MAX_ANNOUNCEMENTS = 15
+  const MAX_ANNOUNCEMENT_TEXT = 4000
 
   class HttpError extends Error {
     constructor(readonly status: number) {
@@ -227,6 +238,8 @@ export async function readBrightspace(
     const folders: Record<string, unknown[]> = {}
     const quizzes: Record<string, unknown[]> = {}
     const submissions: Record<string, unknown[]> = {}
+    const events: Record<string, unknown[]> = {}
+    const announcements: Record<string, unknown[]> = {}
     let coursesUnreadable = 0
     const ids = step.courseIds.filter((id) => ID.test(id)).slice(0, MAX_COURSES)
 
@@ -285,11 +298,57 @@ export async function readBrightspace(
           // This one stays unknown.
         }
       }
+
+      // The course calendar: an array, or a page of { Objects, Next } on newer versions.
+      try {
+        const found: Record<string, unknown>[] = []
+        let url: string | null = `${le}/${ou}/calendar/events/?startDateTime=${encodeURIComponent(EVENTS_FROM)}&endDateTime=${encodeURIComponent(EVENTS_UNTIL)}`
+        for (let pages = 0; url && pages < MAX_PAGES && found.length < MAX_EVENTS; pages++) {
+          const page = await get(url)
+          if (Array.isArray(page)) {
+            found.push(...page.map(record))
+            url = null
+          } else {
+            const objects = record(page).Objects
+            if (!Array.isArray(objects)) throw new HttpError(0)
+            found.push(...objects.map(record))
+            const next = typeof record(page).Next === "string" ? new URL(record(page).Next as string, origin) : null
+            url = next && next.origin === origin ? next.href : null
+          }
+        }
+        events[ou] = found.slice(0, MAX_EVENTS).map((event) => ({
+          ...pick(event, ["CalendarEventId", "Title", "StartDateTime", "EndDateTime", "StartDay", "EndDay", "IsAllDayEvent", "LocationName"]),
+          ...(typeof event.Description === "string" ? { Description: event.Description.slice(0, MAX_DESCRIPTION) } : {}),
+          // Only what kind of item it's tied to (a folder's or quiz's due date is read above).
+          ...(record(event.AssociatedEntity).AssociatedEntityType ? { AssociatedEntityType: record(event.AssociatedEntity).AssociatedEntityType } : {}),
+        }))
+      } catch {
+        // Not readable here: the course's calendar is just not imported.
+      }
+
+      // Announcements ("news") from the last 3 weeks.
+      try {
+        const news = await get(`${le}/${ou}/news/`)
+        if (!Array.isArray(news)) throw new HttpError(0)
+        announcements[ou] = news
+          .map(record)
+          .filter((item) => {
+            const posted = Date.parse(String(item.StartDate ?? item.CreatedDate ?? ""))
+            return item.IsHidden !== true && item.IsPublished !== false && !Number.isNaN(posted) && posted >= ANNOUNCEMENTS_FROM
+          })
+          .slice(0, MAX_ANNOUNCEMENTS)
+          .map((item) => ({
+            ...pick(item, ["Id", "Title", "StartDate", "CreatedDate"]),
+            Body: { Text: cut(record(item.Body).Text) ?? null, Html: typeof record(item.Body).Html === "string" ? (record(item.Body).Html as string).slice(0, MAX_ANNOUNCEMENT_TEXT) : null },
+          }))
+      } catch {
+        // Not readable here: no suggestions from this course's announcements.
+      }
     }
 
     // A few courses at a time, so Brightspace isn't flooded.
     for (let i = 0; i < ids.length; i += PARALLEL) await Promise.all(ids.slice(i, i + PARALLEL).map(readCourse))
-    return { ok: true, kind: "assignments", baseUrl: origin, folders, quizzes, submissions, coursesUnreadable }
+    return { ok: true, kind: "assignments", baseUrl: origin, folders, quizzes, submissions, events, announcements, coursesUnreadable }
   } catch (error) {
     if (error instanceof HttpError && (error.status === 401 || error.status === 403)) return { ok: false, reason: "logged-out" }
     return { ok: false, reason: "error" }

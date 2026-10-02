@@ -22,8 +22,7 @@ export async function disconnectLmsAction(provider: unknown): Promise<ActionResu
   return runAction(async ({ db, userId }) => {
     const id = parse(providerSchema, provider)
     await disconnectLms(db, userId, id)
-    // Only Canvas and Blackboard ever had calendar-feed events.
-    if (id !== "brightspace") await removeExternalEventsFrom(db, userId, id)
+    await removeExternalEventsFrom(db, userId, id)
     return null
   })
 }

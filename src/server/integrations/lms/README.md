@@ -212,6 +212,28 @@ submission or completion date means submitted, published feedback means graded,
 "unknown" otherwise. Quiz attempts aren't readable for students, so quizzes stay
 "unknown". Instructors aren't read (the class list is usually closed to students).
 
+## Course calendars and announcements
+
+Each extension import may also carry the chosen courses' calendar items and announcements from
+the last 3 weeks (`events`, `announcements`; `src/server/integrations/extension/extras.ts`, mapped
+per LMS in `extras-mapping.ts`). After the normal sync, `course-extras.ts`:
+
+- **Exams and quizzes on the calendar** (by title, `src/lib/lms/course-calendar.ts`) become tasks
+  through the normal sync (ids `event:<id>`), so re-syncs update them and the student's own
+  changes are kept. Sessions about an exam ("review", "prep") aren't exams.
+- **"No class" calendar items** become class cancellations right away (`class_cancellations`):
+  the course's class times skip that day everywhere (`withAcademicCalendar`).
+- **Other calendar items** become read-only external events (source = the LMS), titled with the
+  course code.
+- **New announcements** are read once by the AI (`src/lib/ai/announcement-ai.ts`; prompt in
+  `prompts/announcements.ts`; `ANNOUNCEMENT_AI_PROVIDER=mock` in tests) into **suggestions**
+  (`announcement_findings`): exam, quiz, deadline or no class, with the announcement's sentence.
+  Nothing changes until the student accepts one on the Dashboard (a task, or a cancelled class
+  with Undo). Only each announcement's id, title and posting time are stored (`lms_announcements`),
+  never its text; one the AI couldn't read is tried again on the next sync. Duplicates (already
+  suggested, already a task that day, class already cancelled) are skipped. Per-student limit:
+  `RATE_LIMITS.announcements`.
+
 ## Known limitations
 
 - Syncing needs Chrome with the extension (desktop), logged in to both Quadernio
@@ -224,7 +246,7 @@ submission or completion date means submitted, published feedback means graded,
 - Canvas and Blackboard give no time estimates: imported tasks have none until the
   student adds one (the Planner still plans them with its fallback length).
 - Removed assignments are reported and kept, not deleted.
-- LMS calendar events (office hours, exam sessions) aren't imported yet; the
-  extension could read them (Canvas `calendar_events`, Blackboard calendar API).
+- Calendar items are classified by title only; an exam named oddly ("Assessment day")
+  comes in as a plain calendar event.
 - Blackboard's submission status: a real grade or a turned-in attempt (recent
   assignments only: at most 25 per course, due within the last 30 days or later).

@@ -2,6 +2,8 @@ import "server-only"
 
 import type {
   AcademicEvent,
+  AnnouncementFinding,
+  ClassCancellation,
   AppNotification,
   CalendarEvent,
   Course,
@@ -16,6 +18,7 @@ import type {
 } from "@/lib/types"
 import type { Database } from "../db/types"
 import { listAcademicEvents } from "./academic-calendar"
+import { listAnnouncementFindings, listClassCancellations } from "./announcements"
 import { listCourses } from "./courses"
 import { listEvents } from "./events"
 import { listExternalEvents } from "./external-events"
@@ -43,6 +46,10 @@ export type AppData = {
   learning: LearningSettings
   // The school's semesters, breaks, exams and deadlines, as the student confirmed them.
   academicEvents: AcademicEvent[]
+  // Suggestions from course announcements, waiting for the student (soonest first).
+  announcementFindings: AnnouncementFinding[]
+  // Days one course's class doesn't meet.
+  classCancellations: ClassCancellation[]
 }
 
 // Everything the app shows for one user, loaded once per page load. The
@@ -61,6 +68,8 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     notificationPreferences,
     learning,
     academicEvents,
+    announcementFindings,
+    classCancellations,
   ] = await Promise.all([
     getProfile(db, userId),
     listCourses(db, userId),
@@ -74,6 +83,8 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     getNotificationPreferences(db, userId),
     getLearningSettings(db, userId),
     listAcademicEvents(db, userId),
+    listAnnouncementFindings(db, userId),
+    listClassCancellations(db, userId),
   ])
   return {
     student,
@@ -88,5 +99,7 @@ export async function loadAppData(db: Database, userId: string): Promise<AppData
     notificationPreferences,
     learning,
     academicEvents,
+    announcementFindings,
+    classCancellations,
   }
 }

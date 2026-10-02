@@ -63,6 +63,10 @@ export type SyncSummary = {
   assignmentsWithoutDueDate: number
   conflicts: unknown[]
   errors: string[]
+  // From the courses' calendars and announcements (missing from older servers).
+  calendarEventsAdded?: number
+  classesCancelled?: number
+  suggestions?: number
 }
 
 // Sends what the extension read from Canvas, Blackboard or Brightspace to Quadernio, which
@@ -117,6 +121,9 @@ export function summaryLines(result: SyncSummary, coursesUnreadable: number, lms
     result.assignmentsWithoutDueDate > 0 && `${plural(result.assignmentsWithoutDueDate, "assignment")} without a due date weren't imported`,
     result.coursesSkipped + coursesUnreadable > 0 && `${plural(result.coursesSkipped + coursesUnreadable, "course")} couldn't be read`,
     result.conflicts.length > 0 && `${plural(result.conflicts.length, "change")} of yours kept (see Integrations)`,
+    (result.calendarEventsAdded ?? 0) > 0 && `${plural(result.calendarEventsAdded ?? 0, "calendar event")} added`,
+    (result.classesCancelled ?? 0) > 0 && `${plural(result.classesCancelled ?? 0, "cancelled class", "cancelled classes")} taken off your schedule`,
+    (result.suggestions ?? 0) > 0 && `${plural(result.suggestions ?? 0, "suggestion")} from announcements (see your Dashboard)`,
   ].filter((line): line is string => typeof line === "string")
   return lines.length > 0 ? lines : ["Everything was already up to date."]
 }

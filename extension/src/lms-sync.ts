@@ -124,8 +124,8 @@ export const LMS: Record<LmsId, Lms> = {
       }),
     assignments: async (tabId, courseIds) =>
       attempt(await inTab<CanvasStep, CanvasRead>(tabId, readCanvas, { kind: "assignments", courseIds }), "not-canvas", (read) => {
-        const { assignments, coursesUnreadable } = read as Extract<CanvasRead, { kind: "assignments" }>
-        return { data: { assignments }, coursesUnreadable }
+        const { assignments, events, announcements, coursesUnreadable } = read as Extract<CanvasRead, { kind: "assignments" }>
+        return { data: { assignments, events, announcements }, coursesUnreadable }
       }),
     courseId: (course) => String(course.id),
   },
@@ -139,8 +139,8 @@ export const LMS: Record<LmsId, Lms> = {
       }),
     assignments: async (tabId, courseIds) =>
       attempt(await inTab<BlackboardStep, BlackboardRead>(tabId, readBlackboard, { kind: "assignments", courseIds }), "not-blackboard", (read) => {
-        const { instructors, columns, grades, attempts, coursesUnreadable } = read as Extract<BlackboardRead, { kind: "assignments" }>
-        return { data: { instructors, columns, grades, attempts }, coursesUnreadable }
+        const { instructors, columns, grades, attempts, events, announcements, coursesUnreadable } = read as Extract<BlackboardRead, { kind: "assignments" }>
+        return { data: { instructors, columns, grades, attempts, events, announcements }, coursesUnreadable }
       }),
     courseId: (course) => String((course.course as { id?: unknown } | undefined)?.id ?? course.courseId),
   },
@@ -154,8 +154,8 @@ export const LMS: Record<LmsId, Lms> = {
       }),
     assignments: async (tabId, courseIds) =>
       attempt(await inTab<BrightspaceStep, BrightspaceRead>(tabId, readBrightspace, { kind: "assignments", courseIds }), "not-brightspace", (read) => {
-        const { folders, quizzes, submissions, coursesUnreadable } = read as Extract<BrightspaceRead, { kind: "assignments" }>
-        return { data: { folders, quizzes, submissions }, coursesUnreadable }
+        const { folders, quizzes, submissions, events, announcements, coursesUnreadable } = read as Extract<BrightspaceRead, { kind: "assignments" }>
+        return { data: { folders, quizzes, submissions, events, announcements }, coursesUnreadable }
       }),
     courseId: (course) => String((course.OrgUnit as { Id?: unknown } | undefined)?.Id ?? ""),
   },

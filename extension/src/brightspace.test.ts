@@ -159,6 +159,37 @@ describe("readBrightspace: assignments", () => {
     expect(read.coursesUnreadable).toBe(0)
   })
 
+  it("also reads the course calendar and news (announcements) from the last 3 weeks", async () => {
+    const fetchFn = fakeBrightspace({
+      ...base,
+      [`${LE}/6606/dropbox/folders/`]: { body: [] },
+      [`${LE}/6606/calendar/events/`]: {
+        body: [
+          { CalendarEventId: 901, Title: "Midterm Exam", StartDateTime: "2026-10-15T14:00:00.000Z", EndDateTime: "2026-10-15T15:15:00.000Z", IsAllDayEvent: false, LocationName: "Room 204", Description: "Chapters 1-5", CreatedBy: 7 },
+          { CalendarEventId: 902, Title: "Lab Report due", StartDateTime: "2026-10-10T03:59:00.000Z", EndDateTime: "2026-10-10T03:59:00.000Z", AssociatedEntity: { AssociatedEntityType: "D2L.LE.Dropbox.Dropbox", AssociatedEntityId: 11, Link: "/x" } },
+        ],
+      },
+      [`${LE}/6606/news/`]: {
+        body: [
+          { Id: 1001, Title: "Quiz on Thursday", Body: { Text: "Quiz 2 is on Thursday.", Html: "<p>Quiz 2 is on Thursday.</p>" }, StartDate: "2026-09-23T13:00:00.000Z", IsHidden: false, IsPublished: true, CreatedBy: 7, Attachments: [{ FileName: "secret.pdf" }] },
+          { Id: 1002, Title: "Hidden draft", Body: { Text: "x", Html: "" }, StartDate: "2026-09-24T13:00:00.000Z", IsHidden: true },
+          { Id: 1003, Title: "Welcome", Body: { Text: "Welcome!", Html: "" }, StartDate: "2026-08-20T13:00:00.000Z" },
+        ],
+      },
+    })
+    const read = await readBrightspace(assignmentsOf("6606"), ORIGIN, fetchFn, storage, NOW)
+    if (!read.ok || read.kind !== "assignments") throw new Error("expected assignments")
+    expect(read.events["6606"]).toEqual([
+      { CalendarEventId: 901, Title: "Midterm Exam", StartDateTime: "2026-10-15T14:00:00.000Z", EndDateTime: "2026-10-15T15:15:00.000Z", IsAllDayEvent: false, LocationName: "Room 204", Description: "Chapters 1-5" },
+      { CalendarEventId: 902, Title: "Lab Report due", StartDateTime: "2026-10-10T03:59:00.000Z", EndDateTime: "2026-10-10T03:59:00.000Z", AssociatedEntityType: "D2L.LE.Dropbox.Dropbox" },
+    ])
+    // Only the visible, recent post; no attachments or authors.
+    expect(read.announcements["6606"]).toEqual([
+      { Id: 1001, Title: "Quiz on Thursday", StartDate: "2026-09-23T13:00:00.000Z", Body: { Text: "Quiz 2 is on Thursday.", Html: "<p>Quiz 2 is on Thursday.</p>" } },
+    ])
+    expect(JSON.stringify(read)).not.toMatch(/secret|CreatedBy/)
+  })
+
   it("a course whose folders can't be read is counted, not sent", async () => {
     const fetchFn = fakeBrightspace({ ...base, [`${LE}/6606/dropbox/folders/`]: { status: 500, body: {} } })
     const read = await readBrightspace(assignmentsOf("6606"), ORIGIN, fetchFn, storage, NOW)

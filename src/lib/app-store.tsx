@@ -36,6 +36,7 @@ import {
   deleteAcademicEventAction,
   updateAcademicEventAction,
 } from "@/app/actions/academic-calendar"
+import { acceptFindingAction, dismissFindingAction, removeClassCancellationAction } from "@/app/actions/announcements"
 import { setExternalEventHiddenAction } from "@/app/actions/integrations"
 import { importSyllabusAction } from "@/app/actions/syllabus"
 import type { ActionResult } from "@/lib/action-result"
@@ -52,7 +53,9 @@ import {
   DEFAULT_LEARNING_SETTINGS,
   type AcademicEvent,
   type AcademicEventInput,
+  type AnnouncementFinding,
   type CalendarEvent,
+  type ClassCancellation,
   type ClassTimeInput,
   type Course,
   type CourseInput,
@@ -96,8 +99,17 @@ type AppStore = {
   learning: LearningSettings
   // Including courses' class times (with a courseId), named after the course.
   recurringCommitments: RecurringCommitment[]
-  // Read-only copies of Canvas / Blackboard calendar events (hidden ones included).
+  // Read-only copies of course and personal calendar events (hidden ones included).
   externalEvents: ExternalEventRecord[]
+  // Suggestions from course announcements, waiting for the student (soonest first),
+  // and the days one course's class doesn't meet (class times skip them).
+  announcementFindings: AnnouncementFinding[]
+  classCancellations: ClassCancellation[]
+  // A suggestion becomes a task, or cancels that day's class. Dismiss hides it.
+  acceptFinding: (id: string) => Promise<boolean>
+  dismissFinding: (id: string) => void
+  // Undo: the class meets that day again (its suggestion comes back).
+  undoClassCancellation: (id: string) => void
   // The school's semesters, breaks, exams and deadlines (sorted by date). Class times
   // skip the days without classes.
   academicEvents: AcademicEvent[]
@@ -129,7 +141,8 @@ type AppStore = {
     times: ClassTimeInput[],
     options?: { quiet?: boolean; online?: boolean }
   ) => Promise<ActionResult<RecurringCommitment[]>>
-  // Loads the courses and tasks again (after the browser extension imported some).
+  // Loads courses, tasks, course calendar events, suggestions and cancelled classes
+  // again (after the browser extension synced).
   reloadCourses: () => Promise<Course[] | null>
   addTask: (input: TaskInput) => void
   updateTask: (id: string, changes: Partial<TaskInput>) => void
@@ -214,9 +227,11 @@ export function AppStoreProvider({
   const [learning, setLearning] = useState(initial.learning ?? DEFAULT_LEARNING_SETTINGS)
   const [savedCommitments, setRecurringCommitments] = useState(initial.recurringCommitments)
   const [academicEvents, setAcademicEvents] = useState(() => sortAcademicEvents(initial.academicEvents ?? []))
+  const [announcementFindings, setAnnouncementFindings] = useState(initial.announcementFindings ?? [])
+  const [classCancellations, setClassCancellations] = useState(initial.classCancellations ?? [])
   const recurringCommitments = useMemo(
-    () => withAcademicCalendar(withCourseTitles(savedCommitments, courses), academicEvents),
-    [savedCommitments, courses, academicEvents]
+    () => withAcademicCalendar(withCourseTitles(savedCommitments, courses), academicEvents, classCancellations),
+    [savedCommitments, courses, academicEvents, classCancellations]
   )
   const [externalEvents, setExternalEvents] = useState(initial.externalEvents ?? [])
 
@@ -410,7 +425,58 @@ export function AppStoreProvider({
       if (!result.ok) return null
       setCourses(result.data.courses)
       setTasks(result.data.tasks)
+      setExternalEvents(result.data.externalEvents)
+      setAnnouncementFindings(result.data.announcementFindings)
+      setClassCancellations(result.data.classCancellations)
       return result.data.courses
+    },
+
+    // ---- Suggestions from announcements, cancelled classes
+    announcementFindings,
+    classCancellations,
+    acceptFinding: async (id) => {
+      const before = announcementFindings.find((finding) => finding.id === id)
+      if (!before) return false
+      setAnnouncementFindings((prev) => withoutId(prev, id))
+      const result = await call(acceptFindingAction(id))
+      if (!result.ok) {
+        setAnnouncementFindings((prev) => (prev.some((finding) => finding.id === id) ? prev : [...prev, before]))
+        if (result.code !== "unauthorized") showError(result.error)
+        return false
+      }
+      const { task, cancellation } = result.data
+      if (task) {
+        setTasks((prev) => [...withoutId(prev, task.id), task])
+        showSuccess(`Added to your tasks: ${task.title}.`)
+      }
+      if (cancellation) {
+        setClassCancellations((prev) => [...withoutId(prev, cancellation.id), cancellation])
+        showSuccess("That class is off your schedule for the day.")
+      }
+      return true
+    },
+    dismissFinding: (id) => {
+      const before = announcementFindings.find((finding) => finding.id === id)
+      if (!before) return
+      setAnnouncementFindings((prev) => withoutId(prev, id))
+      save(
+        dismissFindingAction(id),
+        () => {},
+        () => setAnnouncementFindings((prev) => [...prev, before])
+      )
+    },
+    undoClassCancellation: (id) => {
+      const before = classCancellations.find((cancellation) => cancellation.id === id)
+      if (!before) return
+      setClassCancellations((prev) => withoutId(prev, id))
+      save(
+        removeClassCancellationAction(id),
+        ({ finding }) => {
+          if (finding) setAnnouncementFindings((prev) => [...withoutId(prev, finding.id), finding].sort((a, b) => a.date.localeCompare(b.date)))
+        },
+        () => setClassCancellations((prev) => [...prev, before]),
+        "The class is back on your schedule."
+      )
     },
 
     // ---- Tasks

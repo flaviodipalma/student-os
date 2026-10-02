@@ -183,6 +183,13 @@
       "when": 1790879925933,
       "tag": "0025_brightspace",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790968136811,
+      "tag": "0026_announcements",
+      "breakpoints": true
     }
   ]
 }

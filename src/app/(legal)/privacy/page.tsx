@@ -36,8 +36,10 @@ export default function PrivacyPage() {
         <p>
           <strong>Courses and assignments from Canvas, Blackboard or Brightspace D2L.</strong> When you use the Quadernio browser
           extension, it reads your courses, assignments, due dates and submission status from your school&apos;s Canvas,
-          Blackboard or Brightspace D2L, in your own browser, and sends only those details to Quadernio. Your school login
-          never leaves your browser, and our servers never contact your school&apos;s system.
+          Blackboard or Brightspace D2L, in your own browser, and sends only those details to Quadernio. For the courses
+          you choose, it also reads their calendar events and their announcements from the last three weeks, so exams,
+          quizzes and cancelled classes reach your plan. Your school login never leaves your browser, and our servers never
+          contact your school&apos;s system.
         </p>
         <p>
           <strong>Google Calendar and Outlook, if you connect them.</strong> We read your calendar events (title, time,
@@ -84,15 +86,17 @@ export default function PrivacyPage() {
 
       <LegalSection id="ai" title="AI features">
         <p>
-          Quadernio uses an AI model from Anthropic to read syllabi, to answer your questions in the Assistant, and to
-          read your school&apos;s public academic calendar. Only what each request needs is sent: the syllabus text for
-          an import, and for the Assistant your recent messages plus the parts of your plan the question is about.
+          Quadernio uses an AI model from Anthropic to read syllabi, to answer your questions in the Assistant, to read
+          your school&apos;s public academic calendar, and to read your courses&apos; new announcements for quizzes, exams,
+          deadlines and cancelled classes. Only what each request needs is sent: the syllabus text for an import; for the
+          Assistant your recent messages plus the parts of your plan the question is about; and for announcements, each
+          new announcement&apos;s text with its course and the day it was posted (each one is read only once).
           Your email address, passwords and access keys are never sent. Under its commercial terms, Anthropic does not
           use this data to train its models.
         </p>
         <p>
           AI can make mistakes. Always check important dates against your syllabus or your course site. The Assistant
-          only suggests changes; nothing changes in your plan until you confirm it.
+          and the announcement reader only suggest changes; nothing changes in your plan until you confirm it.
         </p>
       </LegalSection>
 
@@ -150,6 +154,10 @@ export default function PrivacyPage() {
             Google Calendar and Outlook events and access keys: deleted as soon as you disconnect that calendar.
           </li>
           <li>Syllabus files: never stored.</li>
+          <li>
+            Course announcements: we keep only each one&apos;s title and when it was posted, so it isn&apos;t read twice,
+            never its text. Suggestions you dismiss are kept so they don&apos;t come back.
+          </li>
           <li>
             When you delete your account, your data is deleted right away. Copies in our backups disappear within 30
             days, as the backups are replaced.
